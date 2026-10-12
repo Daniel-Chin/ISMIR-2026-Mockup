@@ -1,12 +1,13 @@
 '''
 Check if posters are roughly 1:1.414 landscape.
-1. Download all poster PDFs to `IN_DIR`
+1. Download all poster PDFs to `POSTERS_DIR`
 2. Run this.
 '''
 
 import argparse
 import csv
 import html
+import json
 import math
 import re
 import subprocess
@@ -16,8 +17,9 @@ from urllib.parse import parse_qs, urlparse
 
 import requests
 
-IN_DIR = './tmp/posters/all'
+POSTERS_DIR = './tmp/posters/all'
 PAPERS_CSV = './sitedata/papers.csv'
+CACHE_PATH = Path('./tmp/poster_drive_names.json')
 
 TARGET_RATIO = math.sqrt(2)  # width / height
 TOLERANCE = 0.15  # relative
@@ -60,55 +62,60 @@ def drive_file_name(file_id: str) -> str:
     return html.unescape(match.group(1)).strip().removesuffix(' - Google Drive')
 
 
-def poster_name_to_uids() -> dict[str, list[str]]:
-    '''Return {poster PDF name on Google Drive: [paper_id, ...]}.'''
+def check(path: Path, tolerance: float) -> list[str]:
+    '''Return the problems of one poster PDF.'''
+    try:
+        sizes = page_sizes(path)
+    except subprocess.CalledProcessError as exc:
+        return [f'failed to read: {exc.stderr.strip()}']
+    problems = []
+    if len(sizes) != 1:
+        problems.append(f'{len(sizes)} pages')
+    if sizes:
+        w, h = sizes[0]
+        ratio = w / h
+        if ratio < 1:
+            problems.append('portrait')
+        if abs(ratio - TARGET_RATIO) / TARGET_RATIO > tolerance:
+            problems.append(f'ratio {ratio:.3f} (w/h)')
+    return problems
+
+
+def drive_file_names(file_ids: list[str]) -> dict[str, str]:
+    '''Return {file_id: name}. Drive files are immutable, so names are cached forever.'''
+    cache = json.loads(CACHE_PATH.read_text()) if CACHE_PATH.exists() else {}
+    if todo := sorted(set(file_ids) - cache.keys()):
+        print(f'Querying Google Drive for {len(todo)} poster names...')
+        with ThreadPoolExecutor(max_workers=16) as pool:
+            cache.update(zip(todo, pool.map(drive_file_name, todo)))
+        CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        CACHE_PATH.write_text(json.dumps(cache, indent=1, sort_keys=True))
+    return cache
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--posters', type=Path, default=Path(POSTERS_DIR), help='Poster directory')
+    parser.add_argument('--tolerance', type=float, default=TOLERANCE, help='Relative ratio tolerance')
+    args = parser.parse_args()
+
     with open(PAPERS_CSV, newline='', encoding='utf-8') as f:
         uid_to_id = {
             row['uid']: file_id for row in csv.DictReader(f)
             if (file_id := drive_file_id(row['raw_poster_pdf']))
         }
-    with ThreadPoolExecutor(max_workers=16) as pool:
-        names = pool.map(drive_file_name, uid_to_id.values())
-    name_to_uids: dict[str, list[str]] = {}
-    for uid, name in zip(uid_to_id, names):
-        name_to_uids.setdefault(name, []).append(uid)
-    return name_to_uids
+    names = drive_file_names(list(uid_to_id.values()))
 
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--posters', type=Path, default=Path(IN_DIR), help='Poster directory')
-    parser.add_argument('--tolerance', type=float, default=TOLERANCE, help='Relative ratio tolerance')
-    args = parser.parse_args()
-
-    posters = sorted(args.posters.glob('*.pdf'))
-    print(f'Checking {len(posters)} posters in {args.posters}...')
-    flagged: list[tuple[str, list[str]]] = []
-    for path in posters:
-        try:
-            sizes = page_sizes(path)
-        except subprocess.CalledProcessError as exc:
-            flagged.append((path.name, [f'failed to read: {exc.stderr.strip()}']))
-            continue
-        problems = []
-        if len(sizes) != 1:
-            problems.append(f'{len(sizes)} pages')
-        if sizes:
-            w, h = sizes[0]
-            ratio = w / h
-            if ratio < 1:
-                problems.append('portrait')
-            if abs(ratio - TARGET_RATIO) / TARGET_RATIO > args.tolerance:
-                problems.append(f'ratio {ratio:.3f} (w/h)')
+    print(f'Checking {len(uid_to_id)} posters in {args.posters}...')
+    n_bad = 0
+    for uid, file_id in uid_to_id.items():
+        name = names[file_id]
+        path = args.posters / name
+        problems = check(path, args.tolerance) if path.exists() else ['missing local file']
         if problems:
-            flagged.append((path.name, problems))
-    if flagged:
-        print(f'Querying Google Drive for poster names in {PAPERS_CSV}...')
-        name_to_uids = poster_name_to_uids()
-        for name, problems in flagged:
-            uids = ', '.join(name_to_uids.get(name, ['?']))
-            print(f'paper {uids}: {name}: {", ".join(problems)}')
-    print(f'{len(flagged)} / {len(posters)} posters flagged')
+            n_bad += 1
+            print(f'paper {uid}: {name}: {", ".join(problems)}')
+    print(f'{n_bad} / {len(uid_to_id)} posters flagged')
     return 0
 
 
