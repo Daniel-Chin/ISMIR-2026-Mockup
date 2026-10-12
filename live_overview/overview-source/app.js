@@ -391,7 +391,7 @@ function linkRow(links, opts = {}) {
 }
 
 function zoomCountPresentation(h = {}) {
-  if (h?.available === false && !h?.partial) return { count: '—', prefix: '', title: 'Zoom participant count unavailable' };
+  if (h?.available === false && !h?.partial) return { count: '?', prefix: '', title: 'Zoom participant count unavailable' };
   const count = String(Number(h?.zoom || 0));
   if (h?.partial) return { count, prefix: '≥', title: 'Partial Zoom count from currently reporting poster lobby and breakout rooms' };
   return { count, prefix: '', title: '' };
@@ -403,7 +403,7 @@ function liveZoomBadge(h, key = '') {
 }
 
 function peakZoomBadge(metrics, key = '') {
-  return `<span class="zoom-peak-badge" ${key ? `data-peak-badge="${esc(key)}"` : ''}>Peak <strong data-peak-count>${metrics?.available === false ? '—' : Number(metrics?.peakZoom || 0)}</strong> online</span>`;
+  return `<span class="zoom-peak-badge" ${key ? `data-peak-badge="${esc(key)}"` : ''}>Peak <strong data-peak-count>${metrics?.available === false ? '?' : Number(metrics?.peakZoom || 0)}</strong> online</span>`;
 }
 
 function upcomingBadge(e) {
@@ -452,12 +452,13 @@ function dashboardStats(state) {
   const zoomEvents = liveEvents.filter(e => e?.links?.zoom);
   const fresh = zoomEvents.filter(e => e.headcounts?.available !== false);
   const sum = fresh.reduce((n, e) => n + Number(e.headcounts?.zoom || 0), 0);
-  const zoom = fresh.length === zoomEvents.length ? sum : fresh.length ? `≥${sum}` : '—';
+  // Offline states drop Zoom links and live signals, so their counts would read as a misleading 0.
+  const zoom = state.offline ? '?' : fresh.length === zoomEvents.length ? sum : fresh.length ? `≥${sum}` : '?';
   const next = upcomingEvents[0];
   return {
     liveEvents: ['Live events', liveEvents.length, 'events currently active'],
     zoomAttendees: ['Zoom attendees', zoom, 'summed live Zoom headcounts'],
-    activeConversations: ['Recent conversations', activeConversations, `${activeConversations}/${papers.length} poster rooms with recent speaker signals`],
+    activeConversations: ['Recent conversations', state.offline ? '?' : activeConversations, `${state.offline ? '?' : activeConversations}/${papers.length} poster rooms with recent speaker signals`],
     nextEvent: ['Next event', next ? fmtNextEventDateTime(next.startsAt) : '—', next ? timeUntilEvent(next.startsAt, state) : 'No upcoming scheduled event'],
   };
 }
@@ -1172,7 +1173,7 @@ function totalCountHtml(event) {
 }
 
 function lobbyCountHtml(event) {
-  const count = event.headcounts?.available === false ? '—' : Number(event.headcounts?.lobbyZoom || 0);
+  const count = event.headcounts?.available === false ? '?' : Number(event.headcounts?.lobbyZoom || 0);
   return `<strong>${esc(count)}</strong> ${count === 1 ? 'attendee' : 'attendees'} in the lobby`;
 }
 
