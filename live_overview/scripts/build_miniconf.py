@@ -2,7 +2,7 @@
 """Build the standalone Live Overview (own nav, linked from the miniconf menu) into live_overview/build.
 
 Owned outputs (see integration.md):
-  build/live-no-nav.html   the page; miniconf's nav links here directly (no iframe wrapper)
+  build/live.html   the page; miniconf's nav links here directly (no iframe wrapper)
   build/live_overview/     assets, config and the frozen schedule snapshot
 Nothing else under build/ is written or removed.
 """
@@ -19,6 +19,8 @@ import urllib.request
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import yaml
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build_public_site import ASSETS, PUBLIC_RELEASE, snapshot  # noqa: E402
 import update_schedule  # noqa: E402
@@ -26,29 +28,18 @@ import update_schedule  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 REPO = ROOT.parent
 DEFAULT_API_ORIGIN = 'https://ismir-backend-test.linliwei3916.workers.dev'
-PAGE = 'live-no-nav.html'
+PAGE = 'live.html'
 ASSET_DIR = 'live_overview'
 
 
 def read_config(path):
-    """Top-level scalars of config.yml; Live Overview only needs a few plain keys."""
-    values = {}
-    for line in path.read_text(encoding='utf-8').splitlines():
-        m = re.match(r'^([A-Za-z_][\w-]*):\s*(.*)$', line)
-        if not m:
-            continue
-        value = m[2].strip()
-        if value and value[0] in '\'"':
-            value = value[1:value.index(value[0], 1)] if value.count(value[0]) > 1 else value[1:]
-        else:
-            value = re.sub(r'\s+#.*$', '', value).strip()
-        values[m[1]] = value
-    conf = {key: values.get(key, '') for key in ('name', 'date', 'timezone', 'miniconf_url')}
+    values = yaml.safe_load(path.read_text(encoding='utf-8'))
+    conf = {key: str(values.get(key) or '') for key in ('name', 'date', 'timezone', 'miniconf_url')}
     missing = [key for key, value in conf.items() if not value]
     if missing:
         raise ValueError(f'{path}: missing {", ".join(missing)}')
     conf['miniconf_url'] = conf['miniconf_url'].rstrip('/')
-    conf['official_site_url'] = values.get('official_site_url', '')  # optional
+    conf['official_site_url'] = str(values.get('official_site_url') or '')  # optional
     return conf
 
 
@@ -56,15 +47,12 @@ def render_page(text, asset_prefix, home):
     text = re.sub(r'(\.js|\.css)\?v=[^"\s]+', lambda m: m.group(1) + '?v=' + PUBLIC_RELEASE, text)
     text = re.sub(r'(data-build-version>)[^<]*', lambda m: m.group(1) + 'UI ' + PUBLIC_RELEASE, text)
     # Root-absolute links were written for a dedicated host; here pages live at
-    # {prefix}/live-no-nav.html and {prefix}/live_overview/*.
+    # {prefix}/live.html and {prefix}/live_overview/*.
     def relink(m):
         path = m[2]
         target = home + path if not path or path.startswith('#') else asset_prefix + path
         return f'{m[1]}="{target}"'
     text = re.sub(r'(src|href)="/(?!/)([^"]*)"', relink, text)
-    # Debug clock is backend-hosted only; never ship it in the static page.
-    text = re.sub(r'    try \{\s*const params = new URLSearchParams\(location.search\);.*?\} catch \(error\) \{\}', '', text, flags=re.S)
-    text = re.sub(r'  <section class="debug-clock-panel".*?</section>', '', text, flags=re.S)
     return text
 
 
@@ -77,17 +65,11 @@ def load_schedule(data_path, conf):
     """CSV -> schedule. Sheet problems become warnings; returns (schedule, notes, problems)."""
     problems = []
     try:
-        schedule, notes = update_schedule.convert(data_path, warnings=problems)
+        schedule, notes = update_schedule.convert(data_path, conf, warnings=problems)
     except (ValueError, KeyError, OSError) as error:
         # Unreadable sheets: still ship the page (live data comes from the backend), without a snapshot.
         problems.append(f'schedule not built: {error}')
         schedule, notes = {'conference': {}, 'events': []}, []
-    # The converter targets the production miniconf; retarget to this build's prefix.
-    for event in schedule['events']:
-        for paper in event.get('papers', []):
-            if paper.get('detailUrl', '').startswith(update_schedule.PROGRAM_SITE + '/'):
-                paper['detailUrl'] = conf['miniconf_url'] + paper['detailUrl'][len(update_schedule.PROGRAM_SITE):]
-    schedule['conference'].update(name=conf['name'], timeZone=conf['timezone'])
     return schedule, notes, problems
 
 

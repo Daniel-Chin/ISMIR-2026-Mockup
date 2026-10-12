@@ -1,4 +1,5 @@
 'use strict';
+// Shared with the backend-hosted page: debug-clock and non-publicStatic code paths only run there.
 const publicStatic = window.ISMIR_PUBLIC_CONFIG?.staticHosting === true;
 
 const ISMIR_BUILD_VERSION = '1.0.0-ui.6';
@@ -31,7 +32,7 @@ const expandedLivePaperEventIds = new Set();
 let lastTopologyKey = '';
 let realtimeUpdateQueued = false;
 let pendingRealtimeState = null;
-let conferenceTimeZone = window.ISMIRSite?.timeZone || 'Asia/Dubai';
+let conferenceTimeZone = window.ISMIRSite.timeZone;
 let debugClockPollTimer = null;
 let latestDebugClockRevision = -1;
 let lastClockAuthoritySignature = '';
@@ -341,7 +342,7 @@ function detailUrlFromPaper(p) {
   if (p?.detailUrl) return p.detailUrl;
   // MiniConf pages are keyed by the papers.csv uid, not by our paper/oral display ids.
   const uid = String(p?.sourcePaperId || '').trim() || (String(p?.id || '').match(/(?:^|-)paper-(\d+)$/) || [])[1] || '';
-  return uid ? `https://ismir2026program.ismir.net/poster_${encodeURIComponent(uid)}.html` : '';
+  return uid ? `${window.ISMIRSite.programSite}/poster_${encodeURIComponent(uid)}.html` : '';
 }
 
 function eventInfoUrl(e) {
@@ -1620,8 +1621,7 @@ function handleZoomTabClick(event) {
   if (!anchor || anchor.target !== '_blank') return;
   let url;
   try { url = new URL(anchor.href, window.location.href); } catch (_) { return; }
-  const zoomRedirect = window.ISMIRSite ? Boolean(window.ISMIRSite.zoomRedirectUrl(url.href)) : url.hostname === 'ismir2026program.ismir.net' && url.pathname === '/zoom.html';
-  if (url.protocol !== 'https:' || !(zoomRedirect || /(^|\.)(zoom\.us|zoom\.com|zoomgov\.com)$/.test(url.hostname))) return;
+  if (!window.ISMIRSite.isZoomRedirectUrl(url)) return;
   let tab;
   try {
     // No window features: request a normal browsing tab, not a sized popup.

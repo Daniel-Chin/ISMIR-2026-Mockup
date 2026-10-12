@@ -1,4 +1,5 @@
 'use strict';
+// Shared with the backend-hosted page: debug-clock and non-publicStatic code paths only run there.
 const publicStatic = window.ISMIR_PUBLIC_CONFIG?.staticHosting === true;
 
 const ISMIR_BUILD_VERSION = '1.0.0-ui.6';
@@ -10,7 +11,7 @@ const connection = document.getElementById('connection-status');
 const copyHistoryPromptButton = document.getElementById('copy-history-prompt');
 const historyCopyStatus = document.getElementById('history-copy-status');
 let latestState = null;
-let conferenceTimeZone = window.ISMIRSite?.timeZone || 'Asia/Dubai';
+let conferenceTimeZone = window.ISMIRSite.timeZone;
 let reconnectTimer = null;
 let lastClockAuthoritySignature = '';
 let clockAuthorityPollBusy = false;
@@ -110,7 +111,7 @@ function detailUrlFromPaper(p) {
   if (info) return info;
   // MiniConf pages are keyed by the papers.csv uid, not by our paper/oral display ids.
   const uid = String(p?.sourcePaperId || '').trim() || (String(p?.id || '').match(/(?:^|-)paper-(\d+)$/) || [])[1] || '';
-  return uid ? `https://ismir2026program.ismir.net/poster_${encodeURIComponent(uid)}.html` : '';
+  return uid ? `${window.ISMIRSite.programSite}/poster_${encodeURIComponent(uid)}.html` : '';
 }
 function eventInfoUrl(e) {
   const links = e?.links || {};

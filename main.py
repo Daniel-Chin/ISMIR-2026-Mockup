@@ -297,19 +297,11 @@ def zoom_redirect():
     return render_template("zoom.html", **data)
 
 
-@app.route("/live")
-@app.route("/live.html")
-def live_overview():
-    data = _data()
-    data["active_page"] = "Live Overview (Experimental)"
-    return render_template("live.html", **data)
-
-
-def register_live_no_nav_route():
-    @app.route("/live-no-nav.html")
-    def serve_live_no_nav():
+def register_live_route():
+    @app.route("/live.html")
+    def serve_live():
         live_path = os.path.join(
-            os.path.dirname(__file__), "live_overview", "build", "live-no-nav.html"
+            os.path.dirname(__file__), "live_overview", "build", "live.html"
         )
         if not os.path.exists(live_path):
             abort(404)
@@ -825,7 +817,7 @@ if __name__ == "__main__":
     if args.build:
         freezer.freeze()
     else:
-        register_live_no_nav_route()
+        register_live_route()
         debug_val = False
         if os.getenv("FLASK_DEBUG") == "True":
             debug_val = True

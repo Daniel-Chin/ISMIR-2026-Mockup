@@ -18,9 +18,9 @@
           throw new Error('Invalid prompt configuration.');
         }
         const values = {
-          // Inside miniconf the shareable page is {prefix}/live-no-nav.html, not this asset dir.
+          // Inside miniconf the shareable page is {prefix}/live.html, not this asset dir.
           pageUrl: window.ISMIRSite?.conference?.miniconfUrl
-            ? (kind === 'history' ? new URL('./history.html', configUrl).href : window.ISMIRSite.programSite + '/live-no-nav.html')
+            ? (kind === 'history' ? new URL('./history.html', configUrl).href : window.ISMIRSite.programSite + '/live.html')
             : new URL(kind === 'history' ? './history.html' : './', configUrl).href,
           snapshot: JSON.stringify(snapshot, null, 2)
         };

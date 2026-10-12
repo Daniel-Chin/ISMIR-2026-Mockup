@@ -2,7 +2,7 @@
 
 (function () {
   // Not persisted: like miniconf, every visit starts from the system time zone.
-  const FALLBACK_ZONE = window.ISMIRSite?.timeZone || 'Asia/Dubai';
+  const FALLBACK_ZONE = window.ISMIRSite.timeZone;
 
 
   // Search metadata is generated from the IANA tzdb country/zone tables.

@@ -1,0 +1,9 @@
+[project]
+name = "live-overview"
+version = "0.1.0"
+description = "Static Live Overview page for the miniconf build"
+requires-python = ">=3.10"
+dependencies = ["PyYAML"]
+
+[tool.uv]
+package = false

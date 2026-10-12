@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ISMIR 2026 History Events</title>
+  <title>History Events</title>
   <script>
     try {
       document.documentElement.dataset.theme = localStorage.getItem("ismirColorTheme") || "light";
@@ -15,17 +15,16 @@
 </head>
 <body>
   <header class="site-header">
-    <div class="brand" aria-label="ISMIR 2026 live overview logo">
-      <span class="brand-mark">ISMIR 2026</span>
-      <span class="brand-sub">Abu Dhabi</span>
+    <div class="brand" aria-label="Live overview logo">
+      <span class="brand-mark" data-conf="name"></span>
     </div>
     <nav class="top-nav" aria-label="Conference navigation">
       <a href="/#home">Home</a>
       <a href="/#live-events">Live Events</a>
       <a href="/#upcoming-events">Upcoming</a>
       <a href="/history.html" aria-current="page">History</a>
-      <a href="https://ismir2026program.ismir.net/" data-site-link="miniconf">Mini Conf</a>
-      <a href="https://ismir2026.ismir.net/" data-site-link="official" target="_blank" rel="noopener noreferrer">Official Website</a>
+      <a data-site-link="miniconf">Mini Conf</a>
+      <a data-site-link="official" target="_blank" rel="noopener noreferrer">Official Website</a>
     </nav>
     <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch color theme">🌙 Lights Off</button>
   </header>
@@ -34,10 +33,9 @@
     <section class="hero compact-hero">
       <div class="hero-copy">
         <p class="eyebrow hero-conference-kicker">Completed conference events</p>
-        <h1><span data-conf="name">ISMIR 2026</span> history</h1>
-        <div class="hero-conference-meta" aria-label="Conference dates and location">
-          <span data-conf="date">NOVEMBER 8-12, 2026</span>
-          <span>Abu Dhabi, UAE</span>
+        <h1><span data-conf="name"></span> history</h1>
+        <div class="hero-conference-meta" aria-label="Conference dates">
+          <span data-conf="date"></span>
         </div>
         <p class="hero-archive-note">The conference is ongoing now. Completed sessions are archived here.</p>
       </div>
@@ -75,7 +73,7 @@
   </main>
 
   <footer class="footer">
-    <span><span data-conf="name">ISMIR 2026</span> Live Overview</span>
+    <span><span data-conf="name"></span> Live Overview</span>
     <span class="connection" id="connection-status" role="status">Connecting…</span>
     <span>Historical poster telemetry displays peak online count only.</span>
   <span class="build-version" data-build-version>UI 1.0.0-ui.6</span>

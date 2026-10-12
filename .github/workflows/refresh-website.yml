@@ -116,7 +116,7 @@ jobs:
 
       - name: Merge Live Overview
         run: |
-          if [ -f live_overview/build/live-no-nav.html ]; then cp -r live_overview/build/. build/; fi
+          if [ -f live_overview/build/live.html ]; then cp -r live_overview/build/. build/; fi
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6.0.0

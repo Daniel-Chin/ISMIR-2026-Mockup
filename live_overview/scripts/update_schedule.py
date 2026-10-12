@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read the three site CSVs; write schedule.json and the GitHub Pages export."""
+"""convert(): events.csv + papers.csv + session_assignment.csv -> schedule dict (used by build_miniconf.py)."""
 import csv,json,re,sys,tempfile,os
 from pathlib import Path
 from datetime import datetime,timedelta,timezone
@@ -7,7 +7,6 @@ from urllib.parse import urlsplit
 import csv_helpers as helper
 from build_public_site import build
 ROOT=Path(__file__).resolve().parents[1]
-PROGRAM_SITE='https://ismir2026program.ismir.net'  # sitedata/config.yml miniconf_url
 
 def read(path):
     with path.open(encoding='utf-8-sig',newline='') as f:
@@ -24,7 +23,8 @@ def find_csv(folder,stem):
     if len(found)!=1:raise ValueError(f'请在 {folder} 放入唯一的 {stem}.csv（也支持下载时的括号编号）。')
     return found[0]
 
-def convert(folder,warnings=None):
+def convert(folder,conf,warnings=None):
+    # conf: name/timezone/miniconf_url from config.yml (see build_miniconf.read_config).
     # warnings=None: any data problem aborts (manual upload). With a list, problems are
     # recorded there and the offending row/link is skipped, so CI builds never stop on sheet edits.
     def problem(message):
@@ -43,7 +43,7 @@ def convert(folder,warnings=None):
     groups={n:[] for n in columns.values()};used=set();positions=set();block_times={}
     for row in assign:
         label=row['Session Name'].strip();m=re.fullmatch(r'Paper-(\d+)',label,re.I)
-        if label=='Session Day & Time (UTC+4)':block_times={n:row[k].strip() for k,n in columns.items()}
+        if label.startswith('Session Day & Time'):block_times={n:row[k].strip() for k,n in columns.items()}
         if not m:continue
         pos=int(m[1])
         if pos<1 or pos in positions:problem(f'session_assignment.csv: 重复或无效的 Paper-n 行 ({label})');continue
@@ -66,12 +66,12 @@ def convert(folder,warnings=None):
         if category.lower()=='award nominee':typ='special'
         tbd=row.get('end_time','').strip().lower() in {'','tbd','tba'}
         try:
-            start=helper.parse_local_datetime(row.get('start_date'),row.get('start_time'))
+            start=helper.parse_local_datetime(row.get('start_date'),row.get('start_time'),conf['timezone'])
             if tbd:
                 end=(start+timedelta(days=1)).replace(hour=0,minute=0,second=0)
                 notes.append(f'{title}: 结束时间待定，显示 TBD；仅用当地次日零点作为列表归档界限。')
             else:
-                end=helper.parse_local_datetime(row.get('start_date'),row.get('end_time'))
+                end=helper.parse_local_datetime(row.get('start_date'),row.get('end_time'),conf['timezone'])
                 if end<=start:end+=timedelta(days=1)
         except ValueError as error:
             problem(f'events.csv: {title} (uid {uid}) 时间无效: {error}');continue
@@ -94,11 +94,11 @@ def convert(folder,warnings=None):
             event['papers']=[]
             for pos,puid in sorted(groups[num]):
                 raw=paper_by_id[puid]
-                paper=helper.build_paper({**raw,'session':str(num),'position':str(pos)},event['id'])
+                paper=helper.build_paper(raw,event['id'],num,pos)
                 # Stable source identity, independent of positional changes; separate Oral display instances.
                 paper['id']=f'paper-{puid}' if typ=='poster' else f'oral-{num}-paper-{puid}'
                 paper['displayId']=f'P{num}-{pos:02d}'
-                paper['detailUrl']=f'{PROGRAM_SITE}/poster_{puid}.html'
+                paper['detailUrl']=f"{conf['miniconf_url']}/poster_{puid}.html"
                 # Unknown attendance mode must not silently become "onsite".
                 if not raw.get('paper_presentation','').strip():paper.pop('presenterMode',None)
                 fact=helper.clean_text(raw.get('fun_facts'))
@@ -116,7 +116,10 @@ def convert(folder,warnings=None):
         if block_times.get(n) and re.sub(r'\s+',' ',block_times[n])!=expected:problem(f'PS-{n:02d}: 分组表时间 {block_times[n]} 与 events.csv 的 Oral+Poster 时间 {expected} 不一致')
     output.sort(key=lambda e:(e['startsAt'],e['id']))
     if not any(e['links'].get('zoom') for e in output):notes.append('CSV 中没有 Zoom 链接。测试时在后台的“测试会议链接”填写。')
-    return {'schemaVersion':7,'generatedAt':datetime.now(timezone.utc).isoformat(),'conference':helper.infer_conference(events),'events':output,'source':[p.name for p in sources.values()]},notes
+    return {'schemaVersion':7,'generatedAt':datetime.now(timezone.utc).isoformat(),'conference':helper.infer_conference(events,conf),'events':output,'source':[p.name for p in sources.values()]},notes
+
+# ---- Below: standalone CLI, not part of the miniconf build. Likely the backend maintainer's
+# manual deploy tool (writes output/, edits the backend's wrangler.jsonc). Kept until the backend source is available.
 
 def configure():
     path=ROOT/'site-config.json'

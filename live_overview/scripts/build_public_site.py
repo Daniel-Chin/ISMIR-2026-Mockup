@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Export ONLY public pages. No npm build, credentials, server or Observer files."""
+"""Standalone GitHub Pages exporter of the public page (no backend, credentials or Observer files).
+
+Not part of the miniconf build, which imports only PUBLIC_RELEASE, ASSETS and snapshot().
+Kept for the backend maintainer's standalone deploys.
+"""
 import argparse
 from datetime import datetime, timezone
 import json
