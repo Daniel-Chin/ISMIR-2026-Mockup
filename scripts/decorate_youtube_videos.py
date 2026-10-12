@@ -92,9 +92,9 @@ def generate_description(paper: PaperRow) -> str:
     conf_name = config['name']
     miniconf_url = config['miniconf_url']
     miniconf_page_url = f'{miniconf_url}/poster_{paper["uid"]}'  # site serves extensionless URLs
-    short_url = miniconf_page_url.split('https://', 1)[-1]
+    # short_url = miniconf_page_url.split('https://', 1)[-1]
     buf = []
-    buf.append(f'Paper, Poster, and more: \n{short_url}\n\n')
+    buf.append(f'Paper, Poster, and more: \n{miniconf_page_url}\n\n')
     buf.append('Authors: ')
     buf.append(paper['authors_and_affil'])
     buf.append('\n\n')
