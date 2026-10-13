@@ -52,6 +52,11 @@ Details:
     - Never touches Slack: messages are printed to stdout in an ASCII frame instead.
     - As a safety net, refuses to start if `SLACK_TOKEN_ANNOUNCEMENT_BOT` is set
       (in the environment or `.env`).
+- Tape: every change to the offset or the frozen starts is appended to
+  `tmp/announcement_bot_state*.tape.jsonl` (never rewritten). Keeping the bot's time correct
+  (`goto`, `calibrate`, `running late`) therefore also serves to auto split the video recordings:
+  `scripts/event_boundaries.py` replays the tape into event boundaries, which a human checks, then
+  `scripts/event_boundaries_to_ffmpeg.py` turns into cut commands.
 - Loads events.csv once at startup. If you change it during the conference, restart this script.
 '''
 
@@ -504,6 +509,8 @@ class AnnouncementBot:
         # (event, as typed, typed + 12h) awaiting `y`/`n`.
         self.pending_calibration: tuple[ScheduledEvent, datetime, datetime] | None = None
         self.state = BotState()
+        self.tape_path = state_path.with_suffix(".tape.jsonl")
+        self.last_taped: dict[str, Any] | None = None
 
     # ---------- time & schedule ----------
 
@@ -593,10 +600,20 @@ class AnnouncementBot:
         tmp_path = self.state_path.with_suffix(".json.tmp")
         tmp_path.write_text(json.dumps(self.state.to_json(), indent=2))
         tmp_path.replace(self.state_path)
+        self.append_tape()
+
+    def append_tape(self) -> None:
+        snapshot = {key: self.state.to_json()[key] for key in ("offset", "started")}
+        if snapshot == self.last_taped:
+            return
+        self.last_taped = snapshot
+        with self.tape_path.open("a") as f:
+            f.write(json.dumps({"at": self.now().isoformat(), **snapshot}) + "\n")
 
     def load_or_recover(self) -> None:
         if self.is_testing:
             say(f"Testing: starting from a fresh state at {self.state_path}.")
+            self.tape_path.unlink(missing_ok=True)
             self.save()
             return
         if self.state_path.exists():

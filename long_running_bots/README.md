@@ -58,6 +58,16 @@ frames instead of sent. It refuses to start if `SLACK_TOKEN_ANNOUNCEMENT_BOT` is
 
 State (offset, announcement log) is saved in `tmp/announcement_bot_state*.json`, so restarting is safe.
 
+## Splitting recordings by event
+Keeping the bot's time correct (`goto`, `calibrate`, `running late`) also auto splits the video
+recordings. The bot appends every offset/start change to `tmp/announcement_bot_state*.tape.jsonl`.
+```fish
+uv run python -m scripts.event_boundaries                 # -> tmp/event_boundaries.txt
+# Human: check/edit the boundaries; fill in each `recording | file start time | path` line.
+uv run python -m scripts.event_boundaries_to_ffmpeg tmp/event_boundaries.txt > tmp/cut.sh
+bash tmp/cut.sh   # outputs "tmp/event_videos/{date} {title}.mp4"
+```
+
 ## Notes
 For ISMIR2026, Daniel Chin is in charge of keeping the process running, by keeping his home desktop always on, and opening ssh for maintenance.  
 

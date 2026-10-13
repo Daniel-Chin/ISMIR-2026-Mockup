@@ -153,6 +153,7 @@ Full reference — bot app/scope setup, per-step behavior, idempotence, platform
 ### Session announcements (`long_running_bots/announcement_bot.py`)
 
 A bot that automatically posts an announcement when an event starts. See [../long_running_bots/announcement_bot.py](../long_running_bots/announcement_bot.py) and [../long_running_bots/README.md](../long_running_bots/README.md)  
+Keeping its time correct additionally serves to auto split the video recordings by event (see the README).  
 
 ### Self-service website updates (`long_running_bots/self_service_pusher.py`)
 
