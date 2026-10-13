@@ -15,3 +15,12 @@ For hosting 3-min presentation videos.
 ## Set title, description, captions, and other metadata
 - Set up project and app in Google Cloud Console.  
 - Use [../scripts/decorate_youtube_videos.py](../scripts/decorate_youtube_videos.py)  
+
+## Set visibility to unlisted
+- Try batch edit in YouTube Studio first.
+- If batch edit fails, use [../scripts/make_video_unlisted_bot_companion.py](../scripts/make_video_unlisted_bot_companion.py) to semi-manually publish drafts as unlisted.
+  - Linux only (evdev/uinput, works on Wayland). Needs access to `/dev/input/*` and `/dev/uinput` (e.g. be in the `input` group, or use sudo). Assumes a US keyboard layout.
+  - Install the Vimium browser extension beforehand.
+  - Run `uv run --extra youtube python -m scripts.make_video_unlisted_bot_companion` (optionally `--device /dev/input/eventN`, `--debug` to slow down).
+  - Loop: click "edit" (pen icon) on a draft → press `2` → wait for the bot to finish.
+  - Press `` ` `` to quit immediately.
