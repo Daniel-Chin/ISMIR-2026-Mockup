@@ -5,8 +5,11 @@ uv run python ./scripts/parse_reviews.py
 '''
 
 import csv
+import io
 import re
 from pathlib import Path
+
+import pyperclip
 
 REVIEWS_FILE = '~/ismir2026/reviews.csv'
 META_REVIEWS_FILE = '~/ismir2026/meta_reviews.csv'
@@ -132,6 +135,19 @@ def write_into_sitedata(papers: dict[int, dict[str, str]]) -> None:
     print(f'Reviews updated in {output_path}.')
     print(f'Please paste the updated {", ".join(REVIEW_COLUMNS)} columns back into the Google Sheet '
           'papers tab before running pull_from_google_sheet.py.')
+    if input('Copy those columns (with header, in papers.csv row order) to the clipboard? [y/N] ').strip().lower() == 'y':
+        copy_columns(headers, rows)
+
+
+def copy_columns(headers: list[str], rows: list[list[str]]) -> None:
+    """As TSV with quoted multi-line cells, which Google Sheets parses on paste, keeping the newlines."""
+    indices = [headers.index(column) for column in REVIEW_COLUMNS]
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, dialect='excel-tab')
+    writer.writerow(REVIEW_COLUMNS)
+    writer.writerows([row[index] for index in indices] for row in rows)
+    pyperclip.copy(buffer.getvalue())
+    print(f'Copied. Paste into the {REVIEW_COLUMNS[0]} header cell.')
 
 
 if __name__ == '__main__':

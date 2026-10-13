@@ -19,3 +19,4 @@ google-api-python-client>=2.201.0
 google-auth-oauthlib>=1.5.0
 matplotlib>=3.11.2
 prompt-toolkit>=3.0.53
+pyperclip>=1.11.0
