@@ -5,31 +5,6 @@ from datetime import datetime, timedelta
 import pytz
 
 
-CALENDAR_IDS = {
-    "Tutorials": "tut",
-    "Opening": "open",
-    "Oral session": "oral",
-    "All Meeting": "all",
-    "Poster session": "pos",
-    "Meetup": "meet",
-    "VMeetup": "vmeet",
-    "WiMIR Meetup": "wimir",
-    "Music": "mus",
-    "Social": "social",
-    "Satellite": "sat",
-    "Lunch": "lunch",
-    "Registration": "registration",
-    "Industry": "industry",
-    "LBD": "lbd",
-    "Awards": "awards",
-    "Performance": "performance",
-    "Award nominee": "awardnominee",
-    "Majlis": "majlis",
-    "Unconference": "unconference",
-    "Special": "special",
-}
-
-
 def build_calendar(events, config):
     timezone = pytz.timezone(config["timezone"])
     schedules = []
@@ -80,7 +55,7 @@ def build_calendar(events, config):
             "location": link,
             "link": link,
             "category": "time",
-            "calendarId": CALENDAR_IDS.get(category, "other"),
+            "calendarId": category.replace(" ", "_"),
             "scrollKey": "\n".join(description),
             "raw": {"endTimeTbd": end_time_tbd},
         })

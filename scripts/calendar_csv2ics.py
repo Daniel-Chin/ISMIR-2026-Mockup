@@ -76,30 +76,6 @@ def calendar_csv2ics(
     orig_csv = pd.read_csv(in_csv)
     orig_csv = orig_csv.sort_values(by=["uid"])
 
-    color_dict = {
-        "Tutorials": "tut",
-        "Opening": "open",
-        "Oral session": "oral",
-        "All Meeting": "all",
-        "Poster session": "pos",
-        "Meetup": "meet",
-        "VMeetup": "vmeet",
-        "WiMIR Meetup": "wimir",
-        "Music": "mus",
-        "Social": "social",
-        "Satellite": "sat",
-        "Lunch": "lunch",
-        "Registration": "registration",
-        "Industry": "industry",
-        "LBD": "lbd",
-        "Awards": "awards",
-        "Performance": "performance",
-        "Award nominee": "awardnominee",
-        "Majlis": "majlis",
-        "Unconference": "unconference",
-        "Special": "special",
-    }
-
     cal = Calendar()
     cal.add("prodid", "ISMIR 2026 calendar")
     cal.add("version", "2.0")
@@ -128,9 +104,7 @@ def calendar_csv2ics(
             event, 
         )
 
-        # use safe lookup for color and build summary
-        color_key = color_dict.get(event["category"], "other")
-        e_cal.add("summary", f"#{color_key} {event['title']}")
+        e_cal.add("summary", f"#{event['category'].replace(' ', '_')} {event['title']}")
         # build dtstart/dtend as UTC-aware datetimes
         e_cal.add(
             "dtstart",
