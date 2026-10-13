@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import cast, overload
@@ -23,6 +23,17 @@ def calendar_ics_path(site_data_path: str) -> str:
     """Relative to the repo root, e.g. static/calendar/ISMIR_2026.ics"""
     name = str(load_site_config(site_data_path)["name"])
     return f"static/calendar/{name.replace(' ', '_')}.ics"
+
+
+def parse_conference_dates(config: dict) -> tuple[date, date]:
+    """First and last conference day from config["date"], e.g. '2026 Nov 8-12'"""
+    year, month, day_range = str(config["date"]).split(" ")
+    first_day, last_day = day_range.split("-")
+    month_number = datetime.strptime(month, "%b").month  # noqa: DTZ007
+    return (
+        date(int(year), month_number, int(first_day)),
+        date(int(year), month_number, int(last_day)),
+    )
 
 
 def load_helpdesk_url(site_data_path: str) -> str:

@@ -31,7 +31,12 @@ from markdown_it import MarkdownIt
 from markupsafe import Markup
 
 from utils.zoom_redirect import build_zoom_redirect_url
-from utils.shared import calendar_ics_path, load_helpdesk_url, load_site_config
+from utils.shared import (
+    calendar_ics_path,
+    load_helpdesk_url,
+    load_site_config,
+    parse_conference_dates,
+)
 from utils.calendar import build_calendar
 from utils.session_assignment import parse_file as parse_session_assignment
 
@@ -177,6 +182,9 @@ def main(site_data_path: str):
     app.jinja_env.globals["calendar_ics_path"] = calendar_ics_path(site_data_path)
 
     site_data["main_calendar"] = build_calendar(site_data["events"], site_data["config"])
+    site_data["config"]["calendar_days"] = [
+        day.isoformat() for day in parse_conference_dates(site_data["config"])
+    ]
 
     site_data.setdefault("config", {})["zoom_redirect_access_token"] = os.environ.get(
         "ZOOM_REDIRECT_ACCESS_TOKEN", ""

@@ -10,7 +10,7 @@ import itertools
 from zoneinfo import ZoneInfo
 from pprint import pprint
 
-from utils.shared import load_conference_timezone, load_site_config, format_session_window
+from utils.shared import load_conference_timezone, load_site_config, format_session_window, parse_conference_dates
 
 @dataclass(frozen=True)
 class Session:
@@ -99,15 +99,8 @@ def parse_file(sitedata_path: str) -> tuple[list[Session], list[Paper]]:
 
 
 def parse_conference_start(conf_config: dict, zone_info: ZoneInfo) -> datetime:
-    conf_block: str = conf_config['date']   # e.g. '2026 Nov 8-12'
-    year_str, month_str, day_range = conf_block.split(' ')
-    day_start_str, _ = day_range.split('-')
-
-    year = int(year_str)
-    month = datetime.strptime(month_str, '%b').month  # noqa: DTZ007
-    start_day = int(day_start_str)
-
-    return datetime(year, month, start_day, tzinfo=zone_info)
+    first_date, _ = parse_conference_dates(conf_config)
+    return datetime(first_date.year, first_date.month, first_date.day, tzinfo=zone_info)
 
 
 def parse_time_block(

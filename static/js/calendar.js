@@ -69,6 +69,14 @@ function make_cal(name) {
             }
             // console.log(min_hours, max_hours);
             const Calendar = tui.Calendar;
+            // tui.Calendar v1 weeks are always 7 days; show only the conference days.
+            const [firstDay, lastDay] = config.calendar_days.map(d => moment(d).toDate());
+            const numDays = moment(lastDay).diff(moment(firstDay), 'days') + 1;
+            const weekDayRange = Calendar.prototype._getWeekDayRange;
+            Calendar.prototype._getWeekDayRange = function () {
+                const [start] = weekDayRange.call(this, firstDay, firstDay.getDay(), false);
+                return [start, new start.constructor(start).addDate(numDays - 1)];
+            };
             const calendar = new Calendar('#calendar', {
                 defaultView: 'week',
                 isReadOnly: true,
@@ -80,7 +88,7 @@ function make_cal(name) {
                 week: {
                     // workweek: !config.calendar["sunday_friday"],
                     daynames: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-                    startDayOfWeek: 6,
+                    startDayOfWeek: firstDay.getDay(),
                     // hourStart: min_hours,
                     // hourEnd: max_hours,
                     // narrowWeekend: true,
@@ -145,7 +153,7 @@ function make_cal(name) {
                     },
                 },
             });
-            calendar.setDate(Date.parse(min_date));
+            calendar.setDate(firstDay);
             calendar.createSchedules(events);
             calendar.on({
                 'clickSchedule': function (e) {
