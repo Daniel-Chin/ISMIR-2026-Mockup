@@ -31,7 +31,7 @@ from markdown_it import MarkdownIt
 from markupsafe import Markup
 
 from utils.zoom_redirect import build_zoom_redirect_url
-from utils.shared import load_helpdesk_url, load_site_config
+from utils.shared import calendar_ics_path, load_helpdesk_url, load_site_config
 from utils.calendar import build_calendar
 from utils.session_assignment import parse_file as parse_session_assignment
 
@@ -174,6 +174,7 @@ def main(site_data_path: str):
             )
 
     app.jinja_env.globals["helpdesk_url"] = load_helpdesk_url(site_data_path)
+    app.jinja_env.globals["calendar_ics_path"] = calendar_ics_path(site_data_path)
 
     site_data["main_calendar"] = build_calendar(site_data["events"], site_data["config"])
 
@@ -368,13 +369,11 @@ def topics():
 
 @app.route("/getCalendar")
 def get_calendar():
-    filepath = "static/calendar/"
-    filename = "ISMIR_2026.ics"
     # Keep this legacy URL extensionless for compatibility.
     # Use octet-stream so Frozen-Flask's guessed type for extensionless
     # paths matches the served Content-Type during static builds.
     return send_file(
-        os.path.join(filepath, filename),
+        app.jinja_env.globals["calendar_ics_path"],
         as_attachment=True,
         mimetype="application/octet-stream",
     )

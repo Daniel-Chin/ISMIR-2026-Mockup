@@ -19,6 +19,12 @@ def load_site_config(site_data_path: str) -> dict:
     return config
 
 
+def calendar_ics_path(site_data_path: str) -> str:
+    """Relative to the repo root, e.g. static/calendar/ISMIR_2026.ics"""
+    name = str(load_site_config(site_data_path)["name"])
+    return f"static/calendar/{name.replace(' ', '_')}.ics"
+
+
 def load_helpdesk_url(site_data_path: str) -> str:
     return str(load_site_config(site_data_path)["helpdesk_url"])
 

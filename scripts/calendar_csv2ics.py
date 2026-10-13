@@ -5,7 +5,11 @@ import pandas as pd
 import pytz
 from icalendar import Calendar, Event
 
-from utils.shared import load_conference_timezone_name, load_site_config
+from utils.shared import (
+    calendar_ics_path,
+    load_conference_timezone_name,
+    load_site_config,
+)
 
 from utils.zoom_redirect import build_zoom_redirect_url
 
@@ -69,15 +73,17 @@ def toDescription(site_data_path, event):
     )
 
 
-def calendar_csv2ics(
-    in_csv="sitedata/events.csv", out_ics="static/calendar/ISMIR_2026.ics"
-):
+def calendar_csv2ics(in_csv="sitedata/events.csv", out_ics=None):
     conf_tz = load_conference_timezone(in_csv)
+    site_data_path = os.path.dirname(in_csv)
+    conf_name = load_site_config(site_data_path)["name"]
+    if out_ics is None:
+        out_ics = calendar_ics_path(site_data_path)
     orig_csv = pd.read_csv(in_csv)
     orig_csv = orig_csv.sort_values(by=["uid"])
 
     cal = Calendar()
-    cal.add("prodid", "ISMIR 2026 calendar")
+    cal.add("prodid", f"{conf_name} calendar")
     cal.add("version", "2.0")
 
     tut_csv = orig_csv.copy()[orig_csv["category"].isin(["Tutorials"])]
@@ -95,7 +101,7 @@ def calendar_csv2ics(
             else [int(x) for x in event["end_time"].split(":")]
         )
         # make uid a string and add a domain to be a valid UID
-        e_cal.add("uid", f"{int(event['uid'])}@ismir2026virtual")
+        e_cal.add("uid", f"{int(event['uid'])}@{conf_name.replace(' ', '').lower()}virtual")
         # use current UTC time for dtstamp
         e_cal.add("dtstamp", datetime.now(pytz.UTC))
 

@@ -5,7 +5,7 @@ Creates:
                      config.yml
   mock_inputs/     - private-shaped fake registration input (never published)
   static/mock/     - placeholder PDFs (paper/poster/slides per paper, LBD, sponsor)
-  static/calendar/ISMIR_2026.ics
+  static/calendar/<config name>.ics
 
 Run from the repo root:
   python scripts/make_mock_data.py
@@ -425,9 +425,10 @@ def make_config():
 
 def make_calendar():
     from scripts.calendar_csv2ics import calendar_csv2ics
+    from utils.shared import calendar_ics_path
 
-    # Same filename main.py's /getCalendar route serves.
-    ics_path = os.path.join(ROOT, "static", "calendar", "ISMIR_2026.ics")
+    # Same file main.py's /getCalendar route serves.
+    ics_path = os.path.join(ROOT, calendar_ics_path(MOCK_DIR))
     calendar_csv2ics(in_csv=os.path.join(MOCK_DIR, "events.csv"), out_ics=ics_path)
     print("wrote", ics_path)
 

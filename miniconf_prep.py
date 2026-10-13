@@ -282,8 +282,4 @@ if __name__ == "__main__":
         # If links from schedule are not redirecting to the right page, check this code
         from scripts.calendar_csv2ics import calendar_csv2ics
 
-        calendar_path = os.path.join("static", "calendar", "ISMIR_2026.ics")
-        calendar_csv2ics(
-            in_csv=os.path.join(data_path, "events.csv"),
-            out_ics=calendar_path,
-        )
+        calendar_csv2ics(in_csv=os.path.join(data_path, "events.csv"))

@@ -131,12 +131,11 @@ def pull_data_dir(target_dir: Path, mockup: bool) -> Path:
 def rebuild_calendar_for_data_dir(data_dir: Path) -> None:
     """Rebuild the downloadable ICS calendar from the freshest events CSV."""
     events_csv = data_dir / "events.csv"
-    calendar_ics = Path("static") / "calendar" / "ISMIR_2026.ics"
 
     if not events_csv.exists():
         raise FileNotFoundError(f"Missing events CSV at {events_csv}")
 
-    calendar_csv2ics(in_csv=str(events_csv), out_ics=str(calendar_ics))
+    calendar_csv2ics(in_csv=str(events_csv))
     print("calendar rebuilt")
 
 

@@ -365,7 +365,7 @@ def build(sitedata, base_url, version):
     catalogue = {
         "version": version,
         "conference": {
-            "name": config.get("name", "ISMIR 2026"),
+            "name": config["name"],
             "timezone": config_timezone,
             "site_base_url": base_url,
         },
@@ -390,15 +390,17 @@ def main():
     parser.add_argument("--out-dir", default="build/catalogue/")
     parser.add_argument(
         "--site-base-url",
-        default="https://ismir2026program.ismir.net",
-        help="production MiniConf base URL (no trailing slash)",
+        default=None,
+        help="production MiniConf base URL (default: config miniconf_url)",
     )
     parser.add_argument(
         "--version", default=datetime.date.today().isoformat(), help="YYYY-MM-DD"
     )
     args = parser.parse_args()
 
-    base_url = args.site_base_url.rstrip("/")
+    base_url = (
+        args.site_base_url or load_site_config(args.path.rstrip("/"))["miniconf_url"]
+    ).rstrip("/")
     catalogue = build(args.path.rstrip("/"), base_url, args.version)
 
     validate_catalogue(catalogue)
