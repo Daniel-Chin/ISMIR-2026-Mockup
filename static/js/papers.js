@@ -145,11 +145,28 @@ const updateFilterSelectionBtn = value => {
     // sessionSearch();
 }
 
+const alertedMissingLinks = new Set();
+const updateSessionButtons = (session) => {
+    const type = getUrlParameter("type") === "oral" ? "oral" : "poster";
+    d3.select('#session_type').text(type);
+    const links = sessionLinks[type][session] || {};
+    for (const [id, key] of [['#session_slack', 'channel_url'], ['#session_zoom', 'zoom_url']]) {
+        const url = links[key];
+        d3.select(id).attr('href', url || null).classed('d-none', !url);
+        const message = `Missing ${key} for ${type} session ${session}`;
+        if (!url && devBuild && !alertedMissingLinks.has(message)) {
+            alertedMissingLinks.add(message);
+            alert(message);
+        }
+    }
+}
+
 const updateSession = () => {
     const urlSession = getUrlParameter("session");
     if (urlSession) {
         filters['session'] = urlSession
         d3.select('#session_name').text(urlSession);
+        updateSessionButtons(urlSession);
         d3.select('.session_notice').classed('d-none', null);
         return true;
     } else {

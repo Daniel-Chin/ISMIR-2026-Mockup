@@ -241,6 +241,20 @@ def _paper_zoom_url(paper_row):
     return ""
 
 
+def _session_links():
+    """{"poster"|"oral": {session number: {"channel_url", "zoom_url"}}}"""
+    links = {"poster": {}, "oral": {}}
+    for event in site_data.get("events", []):
+        kind = {"Poster session": "poster", "Oral session": "oral"}.get(event.get("category"))
+        if kind is None:
+            continue
+        links[kind][str(event["title"]).split()[-1]] = {
+            "channel_url": str(event.get("channel_url") or ""),
+            "zoom_url": str(event.get("zoom_url") or ""),
+        }
+    return links
+
+
 @app.route("/")
 def index():
     return redirect("/calendar.html")
@@ -258,6 +272,7 @@ def home():
 def papers():
     data = _data()
     data["papers"] = site_data["papers"]
+    data["session_links"] = _session_links()
     return render_template("papers.html", **data)
 
 
@@ -801,6 +816,11 @@ def parse_arguments():
     )
 
     parser.add_argument(
+        "--dev", action="store_true",
+        help="Dev build: alert on missing data instead of silently hiding it",
+    )
+
+    parser.add_argument(
         "--mockup", action="store_true",
         help="Use sitedata_mock instead of sitedata",
     )
@@ -814,6 +834,7 @@ if __name__ == "__main__":
     data_path = "sitedata_mock" if args.mockup else "sitedata"
 
     extra_files = main(data_path)
+    app.jinja_env.globals["dev_build"] = args.dev
     if args.build:
         freezer.freeze()
     else:

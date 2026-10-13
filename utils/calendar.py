@@ -52,7 +52,8 @@ def build_calendar(events, config):
 
         category = event["category"]
         if category in {"Poster session", "Oral session"}:
-            link = f"papers.html?session={event['title'].split()[-1]}"
+            session_type = "poster" if category == "Poster session" else "oral"
+            link = f"papers.html?session={event['title'].split()[-1]}&type={session_type}"
         else:
             link = {
                 "LBD": "lbds.html",

@@ -22,11 +22,11 @@ def test_calendar_handles_month_boundary_and_unknown_end(end_time):
     end = datetime.fromisoformat(schedule["end"])
     assert start.isoformat() == "2026-11-30T19:30:00+00:00"
     assert end - start == timedelta(minutes=45 if end_time == "0:15" else 180)
-    assert schedule["location"] == "papers.html?session=2"
+    assert schedule["location"] == "papers.html?session=2&type=poster"
     assert schedule["calendarId"] == "pos"
     assert schedule["raw"]["endTimeTbd"] is (end_time == "tbd")
     assert schedule["scrollKey"] == (
-        "Miniconf page: https://example.com/conference/papers.html?session=2"
+        "Miniconf page: https://example.com/conference/papers.html?session=2&type=poster"
     )
 
 

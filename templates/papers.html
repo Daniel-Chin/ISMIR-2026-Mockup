@@ -16,6 +16,10 @@
 <meta id="release-day" data-name="{{config.paper_day_release}}" data-other>
 <meta id="browse-buttons" data-name="{{config.browse_paper_buttons}}"
   data-other>
+<script>
+  const sessionLinks = {{ session_links | tojson }};
+  const devBuild = {{ dev_build | default(false) | tojson }};
+</script>
 {% endblock %}
 
 {% block tabs %}
@@ -46,8 +50,15 @@
   <div
     class="alert alert-warning alert-dismissible fade show col-12"
     role="alert">
-    Showing papers for session
-    <span id="session_name" style="font-weight: bold;"></span>.
+    Showing papers for <span id="session_type"></span> session
+    <span id="session_name" style="font-weight: bold;"></span>:
+    <span class="btn-group btn-group-sm ml-2">
+      <a id="session_slack" class="btn btn-outline-primary" target="_blank"
+        rel="noopener noreferrer">{% include 'slack_svg.html' %} Slack
+        channel</a>
+      <a id="session_zoom" class="btn btn-outline-primary" target="_blank"
+        rel="noopener noreferrer">Zoom</a>
+    </span>
     <button
       type="button"
       class="close remove_session"
