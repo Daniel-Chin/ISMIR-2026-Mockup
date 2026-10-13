@@ -314,12 +314,12 @@ tr.fc-list-item {
   height: 4.5em;
   overflow: hidden;
 }
-#abstractExample > p {
-  color: #030303;
-}
-
 #abstractExample.collapsing {
   height: 4.5em;
+}
+
+.paper-text {
+  color: #030303;
 }
 
 #absShow.collapsed::after {
