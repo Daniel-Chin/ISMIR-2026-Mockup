@@ -180,9 +180,6 @@
     </div>
     {% endblock %}
     <script src="static/js/lazy_load.js"></script>
-    <p class="text-center text-muted small my-3">
-      Website issue? Let us know in <a href="{{ helpdesk_url }}" target="_blank" rel="noopener" style="text-decoration: underline;">#help</a>.
-    </p>
     {% block footer %}
 
     <!-- Google tag: moved to <head> to ensure single installation per page. -->
@@ -191,6 +188,9 @@
     <footer class="footer bg-light p-4">
       <div class="container">
         <p class="float-right"><a href="#">Back to Top</a></p>
+        <p class="float-left">
+          Website issue? Let us know in <a href="{{ helpdesk_url }}" target="_blank" rel="noopener" style="text-decoration: underline;">#help</a>.
+        </p>
         <p class="text-center">© 2026 {{config.organization}}</p>
       </div>
     </footer>
