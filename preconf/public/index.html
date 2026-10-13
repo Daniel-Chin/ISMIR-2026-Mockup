@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ISMIR 2026 Pre-Conference Lounge</title>
+  <meta name="description" content="Leave a sticky note at the Welcome Reception and discuss ISMIR 2026 papers before the conference." />
+  <script src="/theme.js"></script>
+  <!-- Header, hero, section headings and footer come straight from the live overview. -->
+  <link rel="stylesheet" href="/vendor/overview.css" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand" aria-label="Pre-Conference Lounge logo">
+      <span class="brand-mark" data-conf="name">ISMIR 2026</span>
+    </div>
+    <nav class="top-nav" aria-label="Lounge navigation">
+      <a href="#home" data-nav="home">Home</a>
+      <a href="#welcome" data-nav="welcome">Welcome Reception</a>
+      <a href="#papers" data-nav="papers">Paper Hall</a>
+      <a href="#lbd" data-nav="lbd">LBD Hall</a>
+      <a href="https://ismir2026program.ismir.net/" data-site-link="miniconf">Mini Conf</a>
+      <a href="https://ismir2026.ismir.net/" data-site-link="official" target="_blank" rel="noopener noreferrer">Official Website</a>
+    </nav>
+    <div class="pc-header-tools">
+      <div id="auth-slot"></div>
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch color theme">🌙 Lights Off</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero home-hero" id="home">
+      <div class="hero-copy">
+        <p class="eyebrow hero-conference-kicker">International Society for Music Information Retrieval Conference</p>
+        <h1>ISMIR 2026 Pre-Conference Lounge</h1>
+        <div class="hero-conference-meta" aria-label="Conference dates">
+          <span data-conf="date">2026 Nov 8-12</span>
+        </div>
+        <div class="hero-timezone-control" id="user-timezone-control">
+          <span class="hero-timezone-kicker">Choose your time zone</span>
+          <button class="timezone-inline-value hero-timezone-value" type="button" data-timezone-trigger aria-label="Choose your time zone">
+            <span data-timezone-summary>Detecting...</span>
+          </button>
+        </div>
+      </div>
+      <aside class="hero-card llm-prompt-card" aria-label="How the lounge works">
+        <div class="robot-logo pc-note-logo" aria-hidden="true">▣</div>
+        <span class="mini-label">How it works</span>
+        <strong>Stick it. Move it.</strong>
+        <p>Sign in once with the lounge link from Slack. Double-click any board to stick a note, drag a note to move it, and drag empty space to look around.</p>
+        <div class="prompt-action-row">
+          <span class="copy-status" aria-live="polite"></span>
+          <button class="llm-copy-button" id="hero-say-hello" type="button">Say hello</button>
+        </div>
+        <div class="binary-puzzle binary-puzzle-card" aria-hidden="true">
+          <span class="bit-group"><i class="b0"></i><i class="b0"></i><i class="b1"></i></span>
+          <span class="bit-group"><i class="b1"></i><i class="b0"></i><i class="b1"></i></span>
+          <span class="bit-group"><i class="b1"></i><i class="b1"></i><i class="b0"></i></span>
+          <span class="bit-group"><i class="b0"></i><i class="b1"></i><i class="b1"></i></span>
+          <span class="bit-group"><i class="b1"></i><i class="b0"></i><i class="b0"></i></span>
+          <span class="bit-group"><i class="b0"></i><i class="b0"></i><i class="b1"></i></span>
+          <span class="bit-group"><i class="b1"></i><i class="b0"></i><i class="b0"></i></span>
+          <span class="bit-group"><i class="b1"></i><i class="b0"></i><i class="b1"></i></span>
+        </div>
+      </aside>
+    </section>
+
+    <section id="welcome" class="section">
+      <div class="section-heading">
+        <div>
+          <h2 class="section-with-icon"><span class="section-icon section-icon-glance" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M4 4h16v12l-4 4H4z"></path><path d="M16 20v-4h4"></path><path d="M8 9h8M8 13h5"></path></svg></span>Welcome Reception</h2>
+        </div>
+        <div class="pc-head-actions">
+          <a class="link-button pc-add-note" href="#" role="button" id="welcome-add">+ Note</a>
+        </div>
+      </div>
+      <div id="welcome-board"></div>
+    </section>
+
+    <section id="papers" class="section">
+      <div class="section-heading">
+        <div>
+          <h2 class="section-with-icon"><span class="section-icon section-icon-upcoming" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="4" y="3" width="13" height="17" rx="1"></rect><path d="M8 3v0M7.5 8h6M7.5 12h6M7.5 16h3"></path><path d="M20 7v14H8"></path></svg></span>Paper Hall</h2>
+        </div>
+      </div>
+      <div id="paper-hall"></div>
+    </section>
+
+    <section id="lbd" class="section">
+      <div class="section-heading">
+        <div>
+          <h2 class="section-with-icon"><span class="section-icon section-icon-completed" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 2.5l2.6 6 6.4.6-4.9 4.2 1.5 6.3L12 16.3l-5.6 3.3 1.5-6.3L3 9.1l6.4-.6z"></path></svg></span>LBD Hall</h2>
+          <p class="section-note">Late-Breaking Demos.</p>
+        </div>
+      </div>
+      <div class="pc-lbd-placeholder"><strong>Opening soon</strong>Late-Breaking Demo boards will appear here once the LBD list is published.</div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span><span data-conf="name">ISMIR 2026</span> Pre-Conference Lounge</span>
+    <span>Be kind: notes are visible to every attendee. <a id="helpdesk-link" href="#" target="_blank" rel="noopener noreferrer">Helpdesk</a></span>
+  </footer>
+
+  <dialog class="pc-composer" id="composer">
+    <form method="dialog">
+      <h3 id="composer-title">New note</h3>
+      <div class="pc-where" id="composer-where"></div>
+      <textarea id="composer-text" maxlength="600" placeholder="Write something nice…" required></textarea>
+      <div class="pc-swatches" id="composer-swatches" role="group" aria-label="Note color"></div>
+      <div class="pc-composer-foot">
+        <span class="pc-counter" id="composer-counter">0 / 600</span>
+        <span>
+          <button class="pc-btn pc-btn-ghost" type="button" id="composer-cancel">Cancel</button>
+          <button class="pc-btn pc-btn-primary" type="submit" id="composer-submit">Stick it</button>
+        </span>
+      </div>
+    </form>
+  </dialog>
+  <div class="pc-toast-stack" id="toasts" aria-live="polite"></div>
+
+  <script src="/site-config.js"></script>
+  <script src="/vendor/timezone-preference.js"></script>
+  <script type="module" src="/app.js"></script>
+  <script src="/canon-egg.js"></script>
+</body>
+</html>

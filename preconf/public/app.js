@@ -1,0 +1,503 @@
+import { Room } from './room.js';
+import { BoardView, timeAgo } from './board.js';
+import { apiFetch, apiUrl, takeTokenFromHash, clearToken } from './api.js';
+
+const COLORS = { sun: '#ffe27a', mint: '#a8f0c6', sky: '#a9dcff', rose: '#ffbfd0', lilac: '#dccbff', sand: '#f3dcae' };
+const USER_KEY = 'pcUser';
+const COLS_KEY = 'pcPapersPerRow';
+const COLOR_KEY = 'pcLastColor';
+
+const $ = sel => document.querySelector(sel);
+const el = (tag, cls, text) => {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text !== undefined) node.textContent = text;
+  return node;
+};
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { v === undefined ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch { /* blocked */ } },
+};
+
+// ---------- toasts ----------
+function toast(message, { error = false, action, ms = 4200 } = {}) {
+  const t = el('div', 'pc-toast' + (error ? ' error' : ''));
+  t.append(el('span', '', message));
+  if (action) {
+    const b = el('button', 'pc-btn pc-btn-sm pc-btn-primary', action.label);
+    b.type = 'button';
+    b.addEventListener('click', () => { action.run(); t.remove(); });
+    t.append(b);
+  }
+  $('#toasts').append(t);
+  setTimeout(() => t.remove(), ms);
+}
+
+// ---------- composer dialog ----------
+const composer = {
+  dialog: $('#composer'),
+  open({ heading, where = '', text = '', color, max = 600, colors = true, submit = 'Stick it' }) {
+    const d = this.dialog, area = $('#composer-text'), counter = $('#composer-counter');
+    $('#composer-title').textContent = heading;
+    $('#composer-where').textContent = where;
+    $('#composer-submit').textContent = submit;
+    area.value = text;
+    area.maxLength = max;
+    let chosen = color || store.get(COLOR_KEY, 'sun');
+    const swatches = $('#composer-swatches');
+    swatches.hidden = !colors;
+    swatches.replaceChildren(...Object.entries(COLORS).map(([name, hex]) => {
+      const b = el('button', 'pc-swatch');
+      b.type = 'button'; b.style.setProperty('--sw', hex); b.title = name; b.setAttribute('aria-label', name);
+      b.setAttribute('aria-pressed', String(name === chosen));
+      b.addEventListener('click', () => {
+        chosen = name; area.dataset.color = name;
+        swatches.querySelectorAll('.pc-swatch').forEach(s => s.setAttribute('aria-pressed', String(s === b)));
+      });
+      return b;
+    }));
+    area.dataset.color = colors ? chosen : 'sun';
+    const count = () => {
+      const n = [...area.value].length;
+      counter.textContent = `${n} / ${max}`;
+      counter.classList.toggle('over', n > max);
+    };
+    area.oninput = count;
+    count();
+    return new Promise(resolve => {
+      const done = value => {
+        d.close();
+        d.onclose = null;
+        resolve(value);
+      };
+      d.querySelector('form').onsubmit = e => {
+        e.preventDefault();
+        const value = area.value.trim();
+        if (!value) return;
+        if (colors) store.set(COLOR_KEY, chosen);
+        done({ text: value, color: chosen });
+      };
+      area.onkeydown = e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) d.querySelector('form').requestSubmit(); };
+      $('#composer-cancel').onclick = () => done(null);
+      d.onclose = () => resolve(null);
+      d.showModal();
+      area.focus();
+      area.setSelectionRange(area.value.length, area.value.length);
+    });
+  },
+};
+
+// ---------- auth ----------
+const app = {
+  user: store.get(USER_KEY, null),
+  composer,
+  // Sign-in pages live on the Worker; `return` brings the visitor back to this exact page.
+  loginUrl() { return apiUrl('/auth/start?return=' + encodeURIComponent(location.href)); },
+  login() { location.href = this.loginUrl(); },
+  /** Returns true when signed in; otherwise nudges toward Slack sign-in. */
+  requireLogin(what) {
+    if (this.user) return true;
+    toast(`Sign in to ${what}.`, { action: { label: 'Sign in', run: () => this.login() }, ms: 7000 });
+    return false;
+  },
+};
+
+function initials(name) {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(s => [...s][0].toUpperCase()).join('') || '?';
+}
+
+function renderAuth() {
+  const slot = $('#auth-slot');
+  if (!app.user) {
+    const b = el('a', 'theme-toggle pc-signin', 'Sign in');
+    b.title = 'Sign in with the lounge link from Slack';
+    b.href = app.loginUrl();
+    b.addEventListener('click', e => { e.preventDefault(); app.login(); });
+    slot.replaceChildren(b);
+    return;
+  }
+  const chip = el('span', 'pc-user-chip');
+  chip.append(el('span', 'pc-avatar', initials(app.user.name)));
+  const name = el('a', 'pc-name', app.user.name);
+  name.href = apiUrl('/auth/name?return=' + encodeURIComponent(location.href));
+  name.title = 'Change the name shown on your notes';
+  chip.append(name);
+  const out = el('button', 'pc-signout', 'Sign out');
+  out.type = 'button';
+  out.addEventListener('click', async () => {
+    clearToken();
+    await fetch(apiUrl('/auth/logout'), { method: 'POST' }).catch(() => {});
+    store.set(USER_KEY, undefined);
+    location.reload();
+  });
+  slot.replaceChildren(chip, out);
+}
+
+async function refreshUser() {
+  try {
+    const res = await apiFetch('/api/me', { cache: 'no-store' });
+    const data = await res.json();
+    app.user = data.user;
+    if (!data.user) clearToken();   // expired or revoked
+    store.set(USER_KEY, data.user || undefined);
+  } catch { /* offline: keep the cached name for display only; the server decides on writes */ }
+  renderAuth();
+}
+
+// ---------- time helpers ----------
+function zonedToDate(date, hhmm, timeZone) {
+  // Interpret date+time as wall-clock in `timeZone` and return the real instant.
+  const [h, m] = hhmm.split(':').map(Number);
+  const guess = new Date(`${date}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00Z`);
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+    .formatToParts(guess).map(p => [p.type, p.value]));
+  const asIfUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute);
+  return new Date(guess.getTime() - (asIfUtc - guess.getTime()));
+}
+
+const viewerZone = () => window.ISMIRTimeZone?.getTimeZone?.() || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+const SLOT_LABELS = { oral: 'Oral', poster: 'Poster', session: '' };
+
+/** One slot in the zone chosen in the hero, plus the venue time when they differ. */
+function slotTimes(slot) {
+  const venue = hall.program.conference.timezone;
+  const venueDay = slot.date ? new Date(slot.date + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }) : '';
+  const venueText = `${venueDay} ${slot.start}–${slot.end}`.trim();
+  if (!slot.date || !slot.start) return { main: venueText, venue: '' };
+  const zone = viewerZone();
+  const start = zonedToDate(slot.date, slot.start, venue), end = zonedToDate(slot.date, slot.end, venue);
+  const day = new Intl.DateTimeFormat('en-US', { timeZone: zone, weekday: 'short' }).format(start);
+  const hm = d => new Intl.DateTimeFormat('en-GB', { timeZone: zone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(d);
+  const offset = window.ISMIRTimeZone?.getUTCOffset?.(start) || '';
+  const main = `${day} ${hm(start)}–${hm(end)}${offset ? ' ' + offset : ''}`;
+  return { main, venue: zone === venue ? '' : `Abu Dhabi ${venueText}` };
+}
+
+function refreshSessionTimes() {
+  if (!hall.program) return;
+  document.querySelectorAll('[data-session-time]').forEach(node => {
+    const slots = hall.program.sessions[node.dataset.sessionTime].slots;
+    node.querySelectorAll('[data-slot]').forEach(line => {
+      const t = slotTimes(slots[Number(line.dataset.slot)]);
+      line.querySelector('.pc-time-main').textContent = t.main;
+      const venue = line.querySelector('.pc-time-venue');
+      venue.textContent = t.venue;
+      venue.hidden = !t.venue;
+    });
+  });
+}
+
+/** "Oral · Mon 10:00–10:30 UTC+4" and "Poster · Mon 10:30–11:30 UTC+4", one per line. */
+function timeBlock(session, cls) {
+  const box = el('span', cls);
+  box.dataset.sessionTime = session.id;
+  session.slots.forEach((slot, i) => {
+    const line = el('span', 'pc-time-line');
+    line.dataset.slot = i;
+    const label = SLOT_LABELS[slot.kind];
+    if (label) line.append(el('b', 'pc-time-kind', label), el('span', 'pc-time-sep', '·'));
+    line.append(el('span', 'pc-time-main'), el('span', 'pc-time-venue'));
+    box.append(line);
+  });
+  return box;
+}
+
+function prettyDate(iso) {
+  if (!iso) return '';
+  return new Date(iso + 'T12:00:00Z').toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+// ---------- paper hall ----------
+const hall = { program: null, counts: {}, open: null };
+
+function sessionNoteCount(session) {
+  return session.papers.reduce((sum, uid) => sum + (hall.counts['paper:' + uid] || 0), 0);
+}
+
+function renderHall() {
+  const { program } = hall;
+  const root = $('#paper-hall');
+  root.replaceChildren(...program.days.map(day => {
+    const row = el('div', 'pc-day-row');
+    row.dataset.day = day.day;
+    const label = el('h3', 'pc-day-label');
+    label.append(el('strong', '', day.day), el('span', '', `${prettyDate(day.date)} · ${day.sessions.length} session${day.sessions.length > 1 ? 's' : ''}`));
+    const grid = el('div', 'pc-session-grid');
+    for (const id of day.sessions) grid.append(sessionCard(program.sessions[id]));
+    const slot = el('div', 'pc-session-slot');
+    row.append(label, grid, slot);
+    return row;
+  }));
+}
+
+function sessionCard(s) {
+  const card = el('button', 'pc-session-card');
+  card.type = 'button';
+  card.dataset.session = s.id;
+  card.setAttribute('aria-expanded', String(hall.open?.id === s.id));
+  card.append(el('span', 'pc-session-id', s.id));
+  card.append(timeBlock(s, 'pc-session-time'));
+  const stats = el('span', 'pc-session-stats');
+  stats.append(el('span', 'pc-stat', `${s.papers.length} papers`), el('span', 'pc-stat-sep', '·'));
+  const notes = el('span', 'pc-stat pc-note-count', `${sessionNoteCount(s)} notes`);
+  notes.dataset.sessionCount = s.id;
+  stats.append(notes);
+  card.append(stats);
+  card.addEventListener('click', () => (hall.open?.id === s.id ? closeSession() : openSession(s.id, true)));
+  return card;
+}
+
+function closeSession({ keepHash = false } = {}) {
+  if (!hall.open) return;
+  for (const b of hall.open.boards) b.destroy();
+  hall.open.room.close();
+  hall.open.panel.remove();
+  document.querySelectorAll('.pc-session-card[aria-expanded="true"]').forEach(c => c.setAttribute('aria-expanded', 'false'));
+  hall.open = null;
+  if (!keepHash && location.hash.startsWith('#session=')) history.replaceState(null, '', '#papers');
+}
+
+function openSession(id, scroll) {
+  const s = hall.program.sessions[id];
+  if (!s) return;
+  closeSession({ keepHash: true });
+  history.replaceState(null, '', '#session=' + encodeURIComponent(id));
+  const card = document.querySelector(`.pc-session-card[data-session="${CSS.escape(id)}"]`);
+  card?.setAttribute('aria-expanded', 'true');
+  const slot = card.closest('.pc-day-row').querySelector('.pc-session-slot');
+
+  const room = new Room('session:' + id);
+  const panel = el('section', 'pc-session-panel');
+  panel.setAttribute('aria-label', `Session ${id}`);
+  const head = el('div', 'pc-session-panel-head');
+  const left = el('div');
+  left.append(el('h3', '', `Poster session ${id}`));
+  const sub = el('div', 'pc-sub');
+  sub.append(timeBlock(s, 'pc-panel-time'));
+  left.append(sub);
+  const tools = el('div', 'pc-head-actions');
+  const segLabel = el('span', 'pc-seg-label', 'Per row');
+  const seg = el('div', 'pc-seg');
+  seg.setAttribute('role', 'group');
+  seg.setAttribute('aria-label', 'Papers per row');
+  let cols = store.get(COLS_KEY, 2);
+  // The overview's paper-card styles are scoped to #live-events; only one session panel is
+  // open at a time, so its grid can borrow that id and render the overview's cards as-is.
+  const grid = el('div', 'pc-paper-grid live-poster-paper-panel');
+  grid.id = 'live-events';
+  const setCols = n => {
+    cols = n; store.set(COLS_KEY, n);
+    grid.style.setProperty('--cols', n);
+    requestAnimationFrame(() => syncAuthorOverflow(grid));
+    seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.n) === n)));
+  };
+  for (const n of [1, 2, 3, 4]) {
+    const b = el('button', '', String(n));
+    b.type = 'button'; b.dataset.n = n;
+    b.addEventListener('click', () => setCols(n));
+    seg.append(b);
+  }
+  const collapse = el('button', 'pc-btn pc-btn-sm', '▲ Collapse');
+  collapse.type = 'button';
+  collapse.addEventListener('click', () => { const c = card; closeSession(); c?.scrollIntoView({ block: 'nearest' }); });
+  tools.append(segLabel, seg, collapse);
+  head.append(left, tools);
+  panel.append(head, grid);
+  slot.append(panel);
+  setCols(cols);
+  requestAnimationFrame(() => syncAuthorOverflow(grid));
+  refreshSessionTimes();
+
+  const boards = [];
+  const counters = new Map();
+  for (const uid of s.papers) {
+    const p = hall.program.papers[uid];
+    const cardEl = paperCard(p);
+    grid.append(cardEl);
+    const mount = cardEl.querySelector('.pc-paper-board');
+    const board = new BoardView(mount, { room, board: 'paper:' + uid, title: `#${uid} ${p.title}`, app, emptyText: 'No notes yet: double-click to start the discussion' });
+    boards.push(board);
+    cardEl.querySelector('[data-add]').addEventListener('click', e => { e.preventDefault(); board.compose(); });
+    counters.set('paper:' + uid, cardEl.querySelector('[data-count]'));
+  }
+  const updateCounts = () => {
+    let total = 0;
+    for (const [bid, node] of counters) {
+      const n = room.countFor(bid);
+      total += n;
+      node.textContent = `${n} note${n === 1 ? '' : 's'}`;
+      hall.counts[bid] = n;
+    }
+    const badge = document.querySelector(`[data-session-count="${CSS.escape(id)}"]`);
+    if (badge) badge.textContent = `${total} notes`;
+  };
+  room.subscribe(ev => {
+    if (ev.type === 'error') {
+      handleRoomError(ev);
+    }
+    if (['reset', 'upsert', 'remove'].includes(ev.type)) updateCounts();
+  });
+  hall.open = { id, room, panel, boards };
+  if (scroll) requestAnimationFrame(() => panel.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+}
+
+const PRESENTER_LABELS = { online: 'Presented Virtual', mixed: 'Presented In-person + Virtual', onsite: 'Presented In-person' };
+
+/** Overview-style link button; only https targets are rendered. */
+function linkButton(href, label) {
+  if (!/^https:\/\//.test(href || '')) return null;
+  const a = el('a', 'link-button', label);
+  a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer';
+  return a;
+}
+
+/** Same markup and classes as the live overview's paper card, minus its Zoom/speaker parts. */
+function paperCard(p) {
+  const card = el('article', 'paper-card live-paper-card');
+  card.id = 'paper-' + p.uid;
+
+  const status = el('div', 'paper-card-status-row');
+  const count = el('span', 'pc-note-count', '0 notes');
+  count.dataset.count = '';
+  status.append(el('div', 'paper-id', p.displayId || '#' + p.uid), count);
+
+  const copy = el('div', 'paper-card-copy');
+  const title = el('h4', 'paper-title');
+  const titleLink = linkButton(p.posterUrl, p.title);
+  if (titleLink) { titleLink.className = ''; title.append(titleLink); } else title.textContent = p.title;
+  const authorsWrap = el('div', 'paper-authors-wrap');
+  const authors = el('div', 'paper-authors', p.authors);
+  authors.id = 'paper-authors-' + p.uid;
+  authors.dataset.paperAuthors = '';
+  const more = el('button', 'paper-authors-toggle', 'more');
+  more.type = 'button';
+  more.hidden = true;
+  more.dataset.paperAuthorsToggle = '';
+  more.setAttribute('aria-controls', authors.id);
+  more.setAttribute('aria-expanded', 'false');
+  more.addEventListener('click', () => {
+    const opening = !card.classList.contains('authors-expanded');
+    card.classList.toggle('authors-expanded', opening);
+    more.setAttribute('aria-expanded', String(opening));
+    more.textContent = opening ? 'less' : 'more';
+  });
+  authorsWrap.append(authors, more);
+  copy.append(title, authorsWrap);
+
+  const controls = el('div', 'paper-card-controls');
+  const modeRow = el('div', 'presenter-mode-row');
+  modeRow.append(el('div', 'presenter-mode-line', PRESENTER_LABELS[p.presenterMode] || 'Presentation mode TBA'));
+  const links = el('div', 'link-row');
+  const L = p.links || {};
+  for (const a of [linkButton(p.channelUrl, 'Slack'), linkButton(L.pdf, 'PDF'), linkButton(L.video, 'Video'), linkButton(L.poster, 'Poster'), linkButton(L.slides, 'Slides')]) {
+    if (a) links.append(a);
+  }
+  controls.append(modeRow);
+  if (links.childElementCount) controls.append(links);
+
+  const boardHead = el('div', 'pc-paper-board-head');
+  // Same light-blue overview button as Slack / PDF / Video above it.
+  // An <a> so overview.css styles it exactly like those links (it styles <button> differently).
+  const add = el('a', 'link-button pc-add-note', '+ Note');
+  add.href = '#';
+  add.setAttribute('role', 'button');
+  add.dataset.add = '';
+  boardHead.append(add);
+  card.append(status, copy, controls, boardHead, el('div', 'pc-paper-board'));
+  return card;
+}
+
+/** Show "more" only where the author list is actually clamped (as the overview does). */
+function syncAuthorOverflow(scope) {
+  for (const card of scope.querySelectorAll('.live-paper-card')) {
+    const authors = card.querySelector('[data-paper-authors]');
+    const toggle = card.querySelector('[data-paper-authors-toggle]');
+    if (card.classList.contains('authors-expanded')) { toggle.hidden = false; continue; }
+    toggle.hidden = authors.scrollHeight <= authors.clientHeight + 1;
+  }
+}
+
+function handleRoomError(ev) {
+  if (ev.code === 'AUTH') {
+    // Session expired or revoked server-side: drop the cached identity.
+    app.user = null; store.set(USER_KEY, undefined); renderAuth();
+    app.requireLogin('post or move notes');
+  } else {
+    toast(ev.message || 'Something went wrong.', { error: true });
+  }
+}
+
+async function refreshCounts() {
+  try {
+    const res = await apiFetch('/api/counts?rooms=' + encodeURIComponent(Object.keys(hall.program.sessions).join(',')));
+    if (!res.ok) return;
+    const fresh = await res.json();
+    // Live numbers from the open session win over the cached edge counts.
+    const openBoards = new Set(hall.open ? hall.program.sessions[hall.open.id].papers.map(u => 'paper:' + u) : []);
+    for (const [k, v] of Object.entries(fresh)) if (!openBoards.has(k)) hall.counts[k] = v;
+    for (const s of Object.values(hall.program.sessions)) {
+      if (hall.open?.id === s.id) continue;
+      const badge = document.querySelector(`[data-session-count="${CSS.escape(s.id)}"]`);
+      if (badge) badge.textContent = `${sessionNoteCount(s)} notes`;
+    }
+  } catch { /* badges are best effort */ }
+}
+
+// ---------- welcome reception ----------
+function initWelcome() {
+  const room = new Room('welcome');
+  const board = new BoardView($('#welcome-board'), { room, board: 'welcome', title: 'Welcome Reception', app, tour: true, emptyText: 'Be the first to say hello: double-click anywhere' });
+  $('#welcome-add').addEventListener('click', e => { e.preventDefault(); board.compose(); });
+  $('#hero-say-hello').addEventListener('click', () => {
+    $('#welcome').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    board.compose();
+  });
+  room.subscribe(ev => { if (ev.type === 'error') handleRoomError(ev); });
+}
+
+function applyConference(conf) {
+  const text = { name: conf.name, date: conf.date };
+  document.querySelectorAll('[data-conf]').forEach(n => { if (text[n.dataset.conf]) n.textContent = text[n.dataset.conf]; });
+  const links = { miniconf: conf.miniconfUrl ? conf.miniconfUrl.replace(/\/+$/, '') + '/' : '', official: conf.officialSiteUrl };
+  document.querySelectorAll('[data-site-link]').forEach(a => { if (/^https:\/\//.test(links[a.dataset.siteLink] || '')) a.href = links[a.dataset.siteLink]; });
+  const help = $('#helpdesk-link');
+  if (/^https:\/\//.test(conf.helpdeskUrl || '')) help.href = conf.helpdeskUrl; else help.remove();
+}
+
+// ---------- boot ----------
+async function main() {
+  takeTokenFromHash();
+  renderAuth();
+  const params = new URLSearchParams(location.search);
+  if (params.get('login_error')) {
+    toast(params.get('login_error').slice(0, 160), { error: true, ms: 8000 });
+    history.replaceState(null, '', location.pathname + location.hash);
+  }
+  await refreshUser();
+  initWelcome();
+
+  // Relative to this module, so it resolves on the Worker and in the GitHub Pages build alike.
+  const program = await fetch(new URL('./data/program.json', import.meta.url)).then(r => r.json());
+  hall.program = program;
+  window.PC_PROGRAM = program; // read by canon-egg.js for paper fun facts
+  applyConference(program.conference);
+  renderHall();
+  refreshSessionTimes();
+  window.addEventListener('ismir-timezone-change', refreshSessionTimes);
+  window.addEventListener('resize', () => { if (hall.open) syncAuthorOverflow(hall.open.panel); });
+  refreshCounts();
+  setInterval(refreshCounts, 60_000);
+
+  const m = location.hash.match(/^#session=(.+)$/);
+  if (m) openSession(decodeURIComponent(m[1]), true);
+
+  setInterval(() => {
+    document.querySelectorAll('.pc-note-time[data-ts]').forEach(n => {
+      const edited = n.textContent.endsWith(' · edited') ? ' · edited' : '';
+      n.textContent = timeAgo(Number(n.dataset.ts)) + edited;
+    });
+  }, 60_000);
+}
+
+main();

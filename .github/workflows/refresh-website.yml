@@ -118,6 +118,20 @@ jobs:
         run: |
           if [ -f live_overview/build/live.html ]; then cp -r live_overview/build/. build/; fi
 
+      # Re-freezes paper data from the sheets pulled above, so the lounge follows every refresh.
+      # Its backend (Cloudflare Worker) is deployed separately and needs no data, so no secrets here.
+      # Like Live Overview, a failure here never blocks miniconf.
+      - name: Build Pre-Conference Lounge
+        continue-on-error: true
+        working-directory: preconf
+        run: |
+          bash install.sh
+          bash build.sh ${{ inputs.mockup && '--mockup' || '' }}
+
+      - name: Merge Pre-Conference Lounge
+        run: |
+          if [ -f preconf/build/lounge.html ]; then cp -r preconf/build/. build/; fi
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6.0.0
 

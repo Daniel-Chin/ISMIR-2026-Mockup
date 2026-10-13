@@ -1,0 +1,379 @@
+/* ISMIR 2026 Pre-Conference Lounge: components only.
+   Page chrome (header, hero, piano, binary puzzle, section headings, footer, time-zone picker)
+   is the live overview's own stylesheet, vendored as /vendor/overview.css. Everything here is
+   prefixed pc- so the two stylesheets never fight, and leans on the overview's colour tokens
+   (--ink, --muted, --gold, --cyan, --magenta, --good, --danger) so both sites stay in step. */
+
+:root {
+  --pc-title: #fff2b0;
+  --pc-accent-ink: #ffcb68;
+  --pc-panel: rgba(12, 17, 31, .9);
+  --pc-panel-2: rgba(18, 26, 44, .94);
+  --pc-border: #39485a;
+  --pc-shadow: 6px 6px 0 rgba(0, 0, 0, .55);
+  --pc-shadow-sm: 3px 3px 0 #000;
+  --pc-board-bg: #0b1120;
+  --pc-board-dot: rgba(78, 230, 255, .11);
+  --pc-note-ink: #17181a;
+  --pc-note-border: #000;
+  --pc-note-shadow: 5px 5px 0 rgba(0, 0, 0, .55);
+  /* Session tiles = the live overview's poster-session card. */
+  --pc-session-bg: rgba(13, 18, 32, .94);
+  --pc-session-border: var(--gold);
+  --pc-session-shadow: 7px 7px 0 #000, 0 0 0 2px rgba(255, 183, 51, .14);
+  --pc-session-hover-shadow: 10px 10px 0 #000, 0 0 0 3px rgba(78, 230, 255, .18);
+  --pc-session-open-shadow: 10px 10px 0 #000, 0 0 0 4px rgba(71, 245, 138, .20);
+  --pc-note-count: #47f58a;
+}
+html[data-theme="light"] {
+  --pc-title: #102a52;
+  --pc-accent-ink: #7b4c00;
+  --pc-panel: #ffffff;
+  --pc-panel-2: #f9fafc;
+  --pc-border: rgba(16, 25, 40, .28);
+  --pc-shadow: 6px 6px 0 rgba(16, 25, 40, .10);
+  --pc-shadow-sm: 3px 3px 0 rgba(16, 25, 40, .14);
+  --pc-board-bg: #fffdf8;
+  --pc-board-dot: rgba(16, 42, 82, .13);
+  --pc-note-border: #1c2433;
+  --pc-note-shadow: 4px 4px 0 rgba(16, 25, 40, .22);
+  --pc-session-bg:
+    linear-gradient(135deg, rgba(0, 127, 163, .14), transparent 34%),
+    linear-gradient(225deg, rgba(216, 149, 20, .20), transparent 36%),
+    #fff7df;
+  --pc-session-border: #172033;
+  --pc-session-shadow: 8px 8px 0 rgba(18, 21, 31, .24), 0 0 0 3px rgba(0, 127, 163, .10);
+  --pc-session-hover-shadow: 10px 10px 0 rgba(18, 21, 31, .26), 0 0 0 3px rgba(0, 127, 163, .18);
+  --pc-session-open-shadow: 10px 10px 0 rgba(18, 21, 31, .26), 0 0 0 4px rgba(22, 128, 82, .20);
+  --pc-note-count: #168052;
+}
+
+html { overflow-y: scroll; }
+[hidden] { display: none !important; }
+
+/* overview.css styles bare button/input elements (cyan, uppercase, hard shadow).
+   Reset ours here; component rules below add back what they want. */
+.pc-btn, .pc-icon-btn, .pc-swatch, .pc-signout, .pc-session-card,
+.pc-seg button, .pc-composer textarea {
+  box-shadow: none; text-transform: none; letter-spacing: normal; border-radius: 0;
+}
+
+/* In dark mode overview.css paints every <button> as a console key with !important
+   (html:not([data-theme="light"]) button:not(.detail-backdrop)). Our .pc-btn keeps that look;
+   the controls below are restored to their own styling, at higher specificity. */
+html:not([data-theme="light"]) button.pc-icon-btn:not(.detail-backdrop),
+html:not([data-theme="light"]) button.pc-signout:not(.detail-backdrop) {
+  background: transparent !important; box-shadow: none !important; border-color: transparent !important; color: inherit !important;
+}
+html:not([data-theme="light"]) .pc-note button.pc-icon-btn:not(.detail-backdrop) { color: var(--pc-note-ink) !important; }
+html:not([data-theme="light"]) .pc-note button.pc-icon-btn:not(.detail-backdrop):hover { border-color: #000 !important; background: rgba(255, 255, 255, .55) !important; }
+html:not([data-theme="light"]) button.pc-signout:not(.detail-backdrop) { color: var(--muted) !important; }
+html:not([data-theme="light"]) button.pc-swatch:not(.detail-backdrop) { background: var(--sw) !important; border-color: #000 !important; box-shadow: none !important; }
+html:not([data-theme="light"]) .pc-seg button:not(.detail-backdrop) { background: var(--pc-panel-2) !important; color: var(--ink) !important; border-color: var(--pc-border) !important; box-shadow: none !important; }
+html:not([data-theme="light"]) .pc-seg button[aria-pressed="true"]:not(.detail-backdrop) { background: var(--gold) !important; color: #0b0e17 !important; }
+/* Dark mode paints every <button> as a console key; give the session tile its own surface back. */
+html:not([data-theme="light"]) button.pc-session-card:not(.detail-backdrop) {
+  background: var(--pc-session-bg) !important; color: var(--ink) !important;
+  border-color: var(--pc-session-border) !important; box-shadow: var(--pc-session-shadow) !important;
+}
+html:not([data-theme="light"]) button.pc-session-card:not(.detail-backdrop):hover,
+html:not([data-theme="light"]) button.pc-session-card:not(.detail-backdrop):focus-visible {
+  border-color: var(--cyan) !important; box-shadow: var(--pc-session-hover-shadow) !important;
+}
+html:not([data-theme="light"]) button.pc-session-card[aria-expanded="true"]:not(.detail-backdrop) {
+  border-color: var(--good) !important; box-shadow: var(--pc-session-open-shadow) !important;
+}
+
+/* Same treatment as the overview's own sections: icon only, no "▮▯▮ ♬" prefix. */
+#welcome .section-heading h2::before, #welcome .section-heading h2::after,
+#papers .section-heading h2::before, #papers .section-heading h2::after,
+#lbd .section-heading h2::before, #lbd .section-heading h2::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* The lounge title is longer than "What's going on now": keep it on one line in the fixed-height hero. */
+@media (min-width: 761px) {
+  .home-hero .hero-copy h1 { font-size: clamp(1.5rem, 3.2vw, 3.05rem) !important; white-space: nowrap; }
+}
+
+/* ---------- header additions: Slack sign-in sits beside Lights Off ---------- */
+/* The overview centres its nav between the brand and one button. We have two buttons on the
+   right, so pin the nav to the page centre with equal side columns; narrow screens keep the
+   overview's own wrapping rules. */
+@media (min-width: 901px) {
+  .site-header { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+  .site-header > .brand { justify-self: start; }
+  .site-header > .pc-header-tools { justify-self: end; }
+}
+.pc-header-tools { display: flex; align-items: center; gap: 10px; }
+#auth-slot { display: flex; align-items: center; gap: 8px; }
+.pc-signin { display: inline-flex; align-items: center; gap: 7px; text-decoration: none; }
+.pc-signin::before {
+  content: ""; width: 12px; height: 12px; flex: none;
+  background:
+    linear-gradient(#e01e5a, #e01e5a) 0 50%/50% 25% no-repeat,
+    linear-gradient(#36c5f0, #36c5f0) 25% 0/25% 50% no-repeat,
+    linear-gradient(#2eb67d, #2eb67d) 100% 50%/50% 25% no-repeat,
+    linear-gradient(#ecb22e, #ecb22e) 75% 100%/25% 50% no-repeat;
+}
+.pc-user-chip { display: inline-flex; align-items: center; gap: 7px; font-size: .74rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--ink); }
+.pc-user-chip img, .pc-avatar {
+  width: 24px; height: 24px; flex: none; object-fit: cover;
+  border-left: 3px solid var(--cyan); border-bottom: 3px solid var(--gold);
+  display: inline-grid; place-items: center; font-size: .66rem; font-weight: 900;
+  background: rgba(78, 230, 255, .14); color: var(--ink);
+}
+.pc-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pc-signout {
+  border: 0; background: none; padding: 2px 0; cursor: pointer; color: var(--muted);
+  font: inherit; font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; text-decoration: underline; text-underline-offset: 3px;
+}
+.pc-signout:hover { color: var(--gold); }
+
+/* ---------- hero: sticky-note glyph in the robot's frame ---------- */
+.robot-logo.pc-note-logo::before,
+html[data-theme="light"] .robot-logo.pc-note-logo::before {
+  width: 24px !important; height: 24px !important; border: 0 !important;
+  background:
+    linear-gradient(135deg, transparent 0 70%, #c9971f 70% 100%) right bottom / 9px 9px no-repeat,
+    linear-gradient(#17181a, #17181a) 5px 7px / 13px 2px no-repeat,
+    linear-gradient(#17181a, #17181a) 5px 12px / 9px 2px no-repeat,
+    #ffd85e !important;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, .45) !important;
+  clip-path: polygon(0 0, 100% 0, 100% 62%, 62% 100%, 0 100%);
+}
+
+/* ---------- shared bits ---------- */
+.pc-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 30px; padding: 5px 11px; cursor: pointer; text-decoration: none; white-space: nowrap;
+  border: 2px solid var(--pc-border); background: var(--pc-panel); color: var(--ink);
+  box-shadow: var(--pc-shadow-sm); font: inherit; font-size: .72rem; font-weight: 900; text-transform: uppercase; letter-spacing: .05em;
+}
+.pc-btn:hover { transform: translate(-1px, -1px); border-color: var(--cyan); }
+.pc-btn:active { transform: translate(2px, 2px); box-shadow: none; }
+.pc-btn-primary { background: var(--gold); color: #0b0e17; border-color: #000; }
+html[data-theme="light"] .pc-btn-primary { background: #102a52; color: #fff; border-color: #102a52; }
+.pc-btn-ghost { background: transparent; box-shadow: none; border-color: transparent; }
+.pc-btn-sm { min-height: 25px; padding: 2px 8px; font-size: .66rem; }
+.pc-chip {
+  display: inline-flex; align-items: center; min-height: 22px; padding: 2px 7px;
+  border: 1.5px solid var(--pc-border); font-size: .68rem; font-weight: 800; white-space: nowrap; color: var(--ink);
+}
+.pc-chip-gold { border-color: var(--gold); color: var(--pc-accent-ink); }
+.pc-chip-cyan { border-color: var(--cyan); color: var(--cyan); }
+.pc-chip-magenta { border-color: var(--magenta); color: var(--magenta); }
+.pc-head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* ---------- boards ---------- */
+.pc-board-frame { position: relative; border: 2px solid var(--pc-border); box-shadow: var(--pc-shadow); background: var(--pc-board-bg); }
+.pc-board-scroll { position: relative; overflow: auto; scrollbar-width: none; }
+.pc-board-scroll::-webkit-scrollbar { display: none; }   /* navigate by dragging the board, like Miro */
+.pc-board-surface { cursor: grab; }
+.pc-board-surface.is-panning { cursor: grabbing; }
+.pc-zoom-btn { min-width: 28px; }
+.pc-zoom-hint {
+  position: absolute; left: 50%; top: 50%; z-index: 6; transform: translate(-50%, -50%);
+  padding: 8px 14px; pointer-events: none; opacity: 0; transition: opacity .25s ease;
+  background: rgba(7, 10, 18, .82); color: #fff6c9; font-size: .8rem; font-weight: 800; letter-spacing: .04em;
+  border-left: 3px solid var(--cyan); border-bottom: 3px solid var(--gold);
+}
+.pc-zoom-hint.is-visible { opacity: 1; }
+.pc-board-surface {
+  position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden;
+  background-color: var(--pc-board-bg);
+  background-image: radial-gradient(var(--pc-board-dot) 1.6px, transparent 1.7px);
+  background-size: 24px 24px;
+}
+.pc-board-sizer { pointer-events: none; }
+.pc-board-empty {
+  position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; padding: 20px;
+  color: var(--muted); font-size: 1.1rem; text-transform: uppercase; letter-spacing: .14em; text-align: center;
+}
+.pc-board-tools { position: absolute; right: 8px; top: 8px; z-index: 5; display: flex; gap: 6px; }
+.pc-board-frame.is-fullscreen { position: fixed; inset: 70px 14px 14px; z-index: 60; display: flex; flex-direction: column; }
+.pc-board-frame.is-fullscreen .pc-board-scroll { flex: 1; height: auto !important; }
+.pc-scrim { position: fixed; inset: 0; z-index: 55; background: rgba(4, 6, 12, .62); }
+.pc-fullscreen-title { padding: 9px 150px 9px 12px; border-bottom: 2px solid var(--pc-border); background: var(--pc-panel); color: var(--pc-title); font-weight: 900; font-size: .84rem; }
+
+/* ---------- sticky notes (pastel in both themes) ---------- */
+.pc-note {
+  --c: #ffe27a; --c2: #f4cf4f;
+  position: absolute; width: 230px; color: var(--pc-note-ink); background: var(--c);
+  border: 2px solid var(--pc-note-border); box-shadow: var(--pc-note-shadow);
+  font-family: "Courier New", ui-monospace, monospace; font-size: 14px; touch-action: none; user-select: none;
+}
+.pc-note[data-color="mint"] { --c: #a8f0c6; --c2: #7fdca8; }
+.pc-note[data-color="sky"] { --c: #a9dcff; --c2: #7fc4f2; }
+.pc-note[data-color="rose"] { --c: #ffbfd0; --c2: #f799b3; }
+.pc-note[data-color="lilac"] { --c: #dccbff; --c2: #c0a6fb; }
+.pc-note[data-color="sand"] { --c: #f3dcae; --c2: #e2c184; }
+.pc-note.remote-drag { transition: left .09s linear, top .09s linear; outline: 2px dashed var(--magenta); }
+.pc-note.dragging { box-shadow: 10px 10px 0 rgba(0, 0, 0, .4); cursor: grabbing; transform: rotate(-1.2deg); }
+.pc-note.fresh { animation: pc-pop .35s steps(4, end); }
+@keyframes pc-pop { 0% { transform: scale(.6); } 100% { transform: scale(1); } }
+.pc-note-body { padding: 10px 10px 6px; line-height: 1.32; white-space: pre-wrap; overflow-wrap: anywhere; cursor: grab; }
+.pc-note-foot { cursor: grab; display: flex; align-items: center; gap: 6px; padding: 0 8px 7px 10px; font-size: 11px; font-weight: 800; }
+.pc-note-author { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.pc-note-author .mine { color: #6a28d9; }
+.pc-note-time { opacity: .65; white-space: nowrap; }
+.pc-note-actions { display: flex; gap: 2px; }
+.pc-icon-btn {
+  display: inline-grid; place-items: center; min-width: 24px; height: 22px; padding: 0 4px; cursor: pointer;
+  border: 1.5px solid transparent; background: transparent; color: var(--pc-note-ink); font: inherit; font-size: 12px; font-weight: 900;
+}
+.pc-icon-btn:hover { border-color: #000; background: rgba(255, 255, 255, .55); }
+
+/* ---------- paper hall ---------- */
+.pc-day-row { margin-top: 22px; }
+.pc-day-label { display: flex; align-items: baseline; gap: 12px; margin: 0 0 10px; font-size: 1rem; }
+.pc-day-label strong { color: var(--pc-accent-ink); text-transform: uppercase; letter-spacing: .14em; }
+.pc-day-label span { color: var(--muted); font-size: .8rem; font-weight: 600; }
+.pc-session-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: 16px; }
+.pc-session-grid > *, .pc-paper-grid > * { min-width: 0; }
+.pc-session-card {
+  position: relative; display: grid; gap: 6px; padding: 16px 16px 14px; text-align: left; cursor: pointer; font: inherit; color: var(--ink);
+  border: 3px solid var(--pc-session-border); background: var(--pc-session-bg); box-shadow: var(--pc-session-shadow);
+  transition: transform .12s steps(2, end), box-shadow .12s steps(2, end), border-color .12s steps(2, end);
+}
+.pc-session-card:hover, .pc-session-card:focus-visible {
+  transform: translate(-2px, -2px); border-color: var(--cyan); box-shadow: var(--pc-session-hover-shadow); outline: none;
+}
+.pc-session-card:active { transform: translate(2px, 2px); }
+.pc-session-card[aria-expanded="true"] { border-color: var(--good); box-shadow: var(--pc-session-open-shadow); }
+.pc-session-card[aria-expanded="true"]::after {
+  content: ""; position: absolute; left: 50%; bottom: -21px; transform: translateX(-50%);
+  border: 9px solid transparent; border-top-color: var(--good);
+}
+.pc-session-id { font-size: 1.3rem; font-weight: 900; color: var(--pc-title); letter-spacing: .02em; }
+/* Oral / Poster lines share one grid so the labels, dots and times line up in columns. */
+.pc-session-time, .pc-panel-time {
+  display: inline-grid; grid-template-columns: max-content max-content max-content; column-gap: 6px; row-gap: 2px;
+  justify-content: start; color: var(--cyan); font-size: .74rem; font-weight: 800; white-space: nowrap;
+}
+.pc-time-line { display: contents; }
+.pc-time-kind { font-weight: 900; }
+.pc-time-main { grid-column: 3; }
+.pc-time-line > .pc-time-main:first-child { grid-column: 1 / -1; }
+.pc-time-venue { grid-column: 3; color: var(--muted); font-size: .66rem; font-weight: 600; }
+.pc-session-stats { display: flex; gap: 6px; flex-wrap: wrap; align-items: baseline; margin-top: 2px; }
+.pc-stat { font-size: .74rem; font-weight: 900; letter-spacing: .04em; white-space: nowrap; color: var(--ink); }
+.pc-stat-sep { color: var(--muted); font-size: .74rem; }
+
+.pc-session-panel {
+  margin-top: 20px; padding: 16px; border: 0; border-left: 3px solid var(--gold); border-bottom: 2px solid rgba(78, 230, 255, .45);
+  background: var(--pc-panel); box-shadow: var(--pc-shadow);
+}
+.pc-session-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-bottom: 12px; border-bottom: 2px dashed var(--pc-border); }
+.pc-session-panel-head h3 { margin: 0; color: var(--pc-title); font-size: 1.4rem; letter-spacing: -.02em; }
+.pc-sub { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px; margin-top: 4px; color: var(--muted); font-size: .78rem; }
+.pc-seg { display: inline-flex; border: 2px solid var(--pc-border); }
+.pc-seg button { border: 0; border-right: 2px solid var(--pc-border); background: var(--pc-panel-2); color: var(--ink); padding: 3px 9px; cursor: pointer; font: inherit; font-size: .72rem; font-weight: 900; }
+.pc-seg button:last-child { border-right: 0; }
+.pc-seg button[aria-pressed="true"] { background: var(--gold); color: #0b0e17; }
+.pc-seg-label { font-size: .68rem; color: var(--muted); text-transform: uppercase; font-weight: 800; letter-spacing: .08em; }
+
+.pc-paper-grid { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); gap: 18px; margin-top: 16px; }
+/* Paper cards are the live overview's own .live-paper-card (see app.js paperCard). */
+#live-events.pc-paper-grid .live-paper-card { min-height: 0; }
+/* Paper titles stay links, but at rest without the overview's underline, highlighter band and ↗. */
+/* Hover / focus keep the overview's highlight block. */
+#live-events.pc-paper-grid .paper-title a:not(:hover):not(:focus-visible),
+html[data-theme="light"] #live-events.pc-paper-grid .paper-title a:not(:hover):not(:focus-visible) {
+  text-decoration: none !important; background: none !important;
+}
+#live-events.pc-paper-grid .paper-title a::after { content: none !important; }
+#live-events.pc-paper-grid .paper-title a { text-decoration: none !important; }
+.pc-add-note::after { content: none !important; }   /* not an external link: no ↗ */
+/* The paper-card copy gets its size from a #live-events rule; give the Welcome one the same. */
+#welcome-add.pc-add-note { font-size: .76rem; height: 28px; }
+/* "+ Note" is the overview link button, one shade deeper than Slack / PDF / Poster beside it. */
+/* Resting state only, so hover/focus stay identical to the other buttons. */
+html[data-theme="light"] .pc-add-note:not(:hover):not(:focus-visible) { background: #cdeef7 !important; }
+html:not([data-theme="light"]) .pc-add-note:not(:hover):not(:focus-visible) { background: linear-gradient(180deg, #1d3a57 0%, #11253d 100%) !important; }
+.pc-note-count { color: var(--pc-note-count); font-size: .74rem; font-weight: 900; letter-spacing: .04em; white-space: nowrap; }
+.pc-paper-board-head { display: flex; justify-content: flex-end; margin-top: 10px; }
+.pc-paper-board { margin-top: 8px; }
+.pc-paper-board { --pc-board-bg: #ffffff; }
+html:not([data-theme="light"]) .pc-paper-board { --pc-board-bg: #4a5770; --pc-board-dot: rgba(255, 255, 255, .13); }
+
+/* ---------- dark mode: boards and notes ----------
+   A near-black board swallows the notes' hard shadows, so in the dark the board is a
+   mid-tone slate: light enough for the black offset shadow to read, still dark enough to
+   sit quietly in the night page. Welcome wall and paper boards differ by one step. */
+html:not([data-theme="light"]) {
+  --pc-board-bg: #3d4964;
+  --pc-board-dot: rgba(255, 255, 255, .12);
+  --pc-note-border: #0b0f1a;
+  --pc-note-shadow: 5px 5px 0 rgba(5, 8, 15, .75);
+}
+html:not([data-theme="light"]) .pc-board-frame { border-color: #5a6a86; box-shadow: 6px 6px 0 rgba(0, 0, 0, .6); }
+html:not([data-theme="light"]) .pc-note.dragging { box-shadow: 10px 10px 0 rgba(5, 8, 15, .6); }
+html:not([data-theme="light"]) .pc-board-empty { color: rgba(255, 255, 255, .55); }
+
+.pc-lbd-placeholder { padding: 28px; text-align: center; color: var(--muted); border: 2px dashed var(--pc-border); background: var(--pc-panel); }
+.pc-lbd-placeholder strong { display: block; color: var(--pc-title); font-size: 1.15rem; margin-bottom: 6px; }
+
+/* ---------- composer & toasts ---------- */
+dialog.pc-composer {
+  width: min(460px, calc(100vw - 28px)); padding: 0; color: var(--ink);
+  border: 0; border-left: 3px solid var(--cyan); border-bottom: 3px solid var(--gold);
+  background: var(--pc-panel); box-shadow: 10px 10px 0 rgba(0, 0, 0, .5);
+}
+html[data-theme="light"] dialog.pc-composer { background: #fff; }
+/* Dark: the same slate as the boards, so composing feels like writing on the wall itself. */
+html:not([data-theme="light"]) dialog.pc-composer { background: #46536e; box-shadow: 10px 10px 0 rgba(0, 0, 0, .55); }
+html:not([data-theme="light"]) .pc-composer .pc-where,
+html:not([data-theme="light"]) .pc-composer .pc-counter { color: #d3dbe8; }
+dialog.pc-composer::backdrop { background: rgba(4, 6, 12, .6); }
+.pc-composer form { display: grid; gap: 12px; padding: 16px; }
+.pc-composer h3 { margin: 0; color: var(--pc-title); font-size: 1.05rem; }
+.pc-where { margin-top: -6px; font-size: .72rem; color: var(--muted); }
+.pc-composer textarea {
+  width: 100%; min-height: 130px; resize: vertical; padding: 10px; border: 2px solid #000; box-sizing: border-box;
+  background: var(--c, #ffe27a); color: var(--pc-note-ink); font: inherit; font-size: .92rem; line-height: 1.35;
+}
+.pc-composer textarea[data-color="mint"] { --c: #a8f0c6; } .pc-composer textarea[data-color="sky"] { --c: #a9dcff; }
+.pc-composer textarea[data-color="rose"] { --c: #ffbfd0; } .pc-composer textarea[data-color="lilac"] { --c: #dccbff; }
+.pc-composer textarea[data-color="sand"] { --c: #f3dcae; }
+.pc-swatches { display: flex; gap: 8px; align-items: center; }
+.pc-swatch { width: 26px; height: 26px; border: 2px solid #000; cursor: pointer; padding: 0; background: var(--sw); }
+.pc-swatch[aria-pressed="true"] { outline: 3px solid var(--cyan); outline-offset: 2px; }
+.pc-composer-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pc-counter { font-size: .72rem; color: var(--muted); }
+.pc-counter.over { color: var(--danger); font-weight: 900; }
+
+.pc-toast-stack { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 90; display: grid; gap: 8px; width: min(440px, calc(100vw - 28px)); }
+.pc-toast {
+  display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 10px 14px; font-size: .82rem; font-weight: 800;
+  border: 0; border-left: 3px solid var(--cyan); background: var(--pc-panel); color: var(--ink); box-shadow: var(--pc-shadow-sm);
+}
+.pc-toast.error { border-left-color: var(--danger); }
+
+/* sign-in pages served by src/auth.js */
+.pc-auth-page { display: grid; place-items: center; min-height: 100vh; padding: 20px; }
+.pc-auth-card {
+  display: grid; gap: 14px; width: min(520px, 100%); padding: 26px 26px 22px;
+  border: 3px solid var(--pc-session-border); background: var(--pc-session-bg); box-shadow: var(--pc-session-shadow);
+}
+.pc-auth-card h1 { margin: 0; color: var(--pc-title); font-size: 1.7rem; letter-spacing: -.02em; }
+.pc-auth-card .eyebrow { margin: 0; }
+.pc-auth-copy { margin: 0; color: var(--ink); font-size: .92rem; line-height: 1.5; }
+.pc-auth-copy a { color: var(--cyan); }
+.pc-auth-form { display: grid; gap: 10px; }
+.pc-auth-label { color: var(--muted); font-size: .78rem; text-transform: none; letter-spacing: 0; }
+.pc-auth-form input { padding: 10px 12px; border: 2px solid var(--pc-border); background: var(--pc-panel); color: var(--ink); font: inherit; font-size: 1rem; }
+.pc-auth-form button { justify-self: start; }
+.pc-auth-error { margin: 0; color: var(--danger); font-size: .85rem; font-weight: 800; }
+a.pc-name { color: inherit; text-decoration: none; }
+a.pc-name:hover { color: var(--gold); text-decoration: underline; text-underline-offset: 3px; }
+
+@media (max-width: 900px) { .pc-paper-grid { grid-template-columns: 1fr !important; } }
+@media (max-width: 760px) {
+  .pc-header-tools { gap: 6px; }
+  .pc-name { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pc-note, .pc-note.fresh, .pc-note.remote-drag { animation: none !important; transition: none !important; }
+}

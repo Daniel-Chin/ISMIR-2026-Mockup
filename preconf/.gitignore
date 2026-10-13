@@ -1,0 +1,27 @@
+node_modules/
+.wrangler/
+.wrangler-dev.log
+.devdata/
+build/
+dist/
+
+# Secrets (scripts/init-secrets.mjs) and local Worker vars
+.dev.vars*
+.env*
+secrets*.json
+*private*.json
+*.key
+
+# Generated from ../sitedata and ../live_overview by scripts/build_data.py (rebuilt in CI)
+public/data/
+public/vendor/
+
+# Backend (Cloudflare Worker): source, config, tooling and tests stay out of this repo.
+# The miniconf build only needs public/, build.sh, install.sh and the two build scripts below.
+src/
+wrangler.jsonc
+package.json
+package-lock.json
+README.md
+scripts/*.mjs
+test/
