@@ -56,15 +56,24 @@ def parse_authors(authors_and_affil: Any) -> str:
     raw = clean_text(authors_and_affil)
     if not raw:
         return "Authors TBA"
-    parts = []
-    for part in raw.split(";"):
-        part = clean_text(part)
-        if not part:
-            continue
-        name = re.sub(r"\s*\([^)]*\)", "", part).replace("*", "").strip()
-        if name:
-            parts.append(name)
-    return "; ".join(parts) if parts else raw
+    # Affiliations may nest parentheses ("... (AIST))") and contain ';' ("FIST, XJTU; IRC, XJTU"),
+    # so drop parenthesised text by depth and split authors only on ';' outside parentheses.
+    parts, current, depth = [], [], 0
+    for ch in raw:
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth = max(0, depth - 1)
+        elif depth == 0:
+            if ch == ";":
+                parts.append("".join(current))
+                current = []
+            else:
+                current.append(ch)
+    parts.append("".join(current))
+    names = [clean_text(part.replace("*", "")) for part in parts]
+    names = [name for name in names if name]
+    return "; ".join(names) if names else raw
 
 
 def parse_subjects(row: dict[str, Any]) -> list[str]:
