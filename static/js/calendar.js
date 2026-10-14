@@ -155,8 +155,8 @@ function make_cal(name) {
                         return '<span class="calendar-font-icon ic-milestone-b"></span> <span style="background-color: ' + schedule.bgColor + '"> M: ' + schedule.title + '</span>';
                     },
                     weekDayname: function (model) {
-                        const parts = model.renderDate.split('-');
-                        return '<span class="tui-full-calendar-dayname-name"> ' + parts[1] + '/' + parts[2] + '</span>&nbsp;&nbsp;<span class="tui-full-calendar-dayname-name">' + model.dayName + '</span>';
+                        const date = moment(model.renderDate, 'YYYY-MM-DD').format('MMM D');
+                        return '<span class="tui-full-calendar-dayname-name">' + date + ' (' + model.dayName + ')</span>';
                     },
                 },
             });
