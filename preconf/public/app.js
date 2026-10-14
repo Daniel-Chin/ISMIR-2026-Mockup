@@ -289,6 +289,17 @@ function closeSession({ keepHash = false } = {}) {
   if (!keepHash && location.hash.startsWith('#session=')) history.replaceState(null, '', '#papers');
 }
 
+function openPaper(uid) {
+  const paper = hall.program.papers[uid];
+  if (!paper) { document.getElementById('papers')?.scrollIntoView(); return; }
+  openSession(paper.session, false);
+  const card = document.getElementById('paper-' + uid);
+  if (!card) return;
+  card.classList.add('pc-paper-focus');
+  setTimeout(() => card.classList.remove('pc-paper-focus'), 2600);
+  requestAnimationFrame(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+}
+
 function openSession(id, scroll) {
   const s = hall.program.sessions[id];
   if (!s) return;
@@ -550,8 +561,12 @@ async function main() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshCounts(); });
   window.addEventListener('focus', refreshCounts);
 
+  // Deep links: #session=PS-01 opens a session; #paper=<uid> (from the miniconf paper page)
+  // opens that paper's session and brings its card into view.
   const m = location.hash.match(/^#session=(.+)$/);
+  const mp = location.hash.match(/^#paper=([\w-]+)$/);
   if (m) openSession(decodeURIComponent(m[1]), true);
+  else if (mp) openPaper(mp[1]);
 
   setInterval(() => {
     document.querySelectorAll('.pc-note-time[data-ts]').forEach(n => {
