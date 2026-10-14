@@ -12,17 +12,48 @@ const TOKEN_KEY = 'pcSession';
 function readToken() { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; } }
 function writeToken(v) { try { v ? localStorage.setItem(TOKEN_KEY, v) : localStorage.removeItem(TOKEN_KEY); } catch { /* storage blocked */ } }
 
-/** Pick up a session handed back by sign-in, then restore the page's own hash. */
+const TOKEN_RE = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+
+/** Expiry (ms) of a signed link token, read from its payload; 0 if unreadable. */
+function linkExpiry(t) {
+  try { return JSON.parse(atob(t.split('.')[0].replace(/-/g, '+').replace(/_/g, '/'))).exp || 0; } catch { return 0; }
+}
+
+/**
+ * Pick up a session handed back by sign-in. A Slack-app sign-in also carries its link
+ * (pc_link): it stays in the address bar until it expires, so "Open in Safari" from Slack's
+ * in-app browser lands here with it, and that browser signs in too (see redeemLink on the
+ * Worker). Returns a sign-in URL to follow, or ''.
+ */
 export function takeTokenFromHash() {
-  if (!location.hash.startsWith('#pc_auth=')) return;
   const params = new URLSearchParams(location.hash.slice(1));
   const token = params.get('pc_auth') || '';
-  if (/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) writeToken(token);
+  const link = params.get('pc_link') || '';
+  if (!token && !link) return '';
+  if (TOKEN_RE.test(token)) writeToken(token);
+  const keepLink = TOKEN_RE.test(link) && linkExpiry(link) > Date.now() + 5000;
+  const rest = params.get('pc_hash');
+  const hash = new URLSearchParams();
+  if (keepLink) hash.set('pc_link', link);
+  if (rest) hash.set('pc_hash', rest);
+  history.replaceState(null, '', location.pathname + location.search + (hash.toString() ? '#' + hash : ''));
+  if (keepLink) {
+    // Drop the link from the address bar once it can no longer be used.
+    setTimeout(() => dropLinkFromUrl(), Math.max(0, linkExpiry(link) - Date.now()));
+    // Opened in another browser (no session here yet): redeem the link for this one.
+    if (!readToken()) return apiUrl('/auth/slack/link?t=' + encodeURIComponent(link));
+  }
+  return '';
+}
+
+function dropLinkFromUrl() {
+  const params = new URLSearchParams(location.hash.slice(1));
+  if (!params.has('pc_link')) return;
   const rest = params.get('pc_hash');
   history.replaceState(null, '', location.pathname + location.search + (rest ? '#' + rest : ''));
 }
 
-export const clearToken = () => writeToken('');
+export const clearToken = () => { writeToken(''); dropLinkFromUrl(); };
 export const apiUrl = path => API + path;
 
 export function apiFetch(path, opts = {}) {

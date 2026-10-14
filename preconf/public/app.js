@@ -109,7 +109,14 @@ const app = {
       setTimeout(() => {
         document.removeEventListener('visibilitychange', onHide);
         if (left || document.hidden) return;
-        toast('Slack app didn’t open?', { action: { label: 'Sign in in the browser', run: () => { location.href = this.loginUrl(); } }, ms: 15000 });
+        // Inside Slack's in-app browser the slack:// link does nothing. Never send phones to the
+        // web sign-in here: with the Slack app installed it ends in Slackbot. Point to the Home
+        // tab instead; devices without Slack can still use the browser sign-in.
+        toast('Open the ISMIR2026 Lounge app in Slack and tap “Enter the Lounge”.', {
+          action: { label: 'Open Slack', run: () => { location.href = `https://slack.com/app_redirect?team=${encodeURIComponent(team)}&app=${encodeURIComponent(id)}`; } },
+          ms: 20000,
+        });
+        toast('No Slack app on this device?', { action: { label: 'Sign in in the browser', run: () => { location.href = this.loginUrl(); } }, ms: 20000 });
       }, 3000);
       location.href = `slack://app?team=${encodeURIComponent(team)}&id=${encodeURIComponent(id)}&tab=home`;
       return;
@@ -491,7 +498,8 @@ function applyConference(conf) {
 
 // ---------- boot ----------
 async function main() {
-  takeTokenFromHash();
+  const handoff = takeTokenFromHash();
+  if (handoff) { location.replace(handoff); return; }
   renderAuth();
   const params = new URLSearchParams(location.search);
   if (params.get('login_error')) {
