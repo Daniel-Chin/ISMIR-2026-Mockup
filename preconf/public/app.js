@@ -97,7 +97,7 @@ const app = {
   login() {
     // Phones and tablets: if the Slack app is installed, Slack's web sign-in jumps into it after
     // the email code and never comes back. So go to the app on purpose: our Home tab there shows
-    // "Enter the Lounge", a one-tap sign-in link. Never redirect again on our own afterwards:
+    // "Enter the Discussion", a one-tap sign-in link. Never redirect again on our own afterwards:
     // iOS may still be showing its "Open in Slack?" prompt, and a second (web) sign-in would
     // pull the user away from our Home tab into Slackbot. If the app really isn't there, offer
     // the browser sign-in as a tap instead.
@@ -112,7 +112,7 @@ const app = {
         // Inside Slack's in-app browser the slack:// link does nothing. Never send phones to the
         // web sign-in here: with the Slack app installed it ends in Slackbot. Point to the Home
         // tab instead; devices without Slack can still use the browser sign-in.
-        toast('Open the ISMIR2026 Lounge app in Slack and tap “Enter the Lounge”.', {
+        toast('Open the ISMIR2026 Lounge app in Slack and tap “Enter the Discussion”.', {
           action: { label: 'Open Slack', run: () => { location.href = `https://slack.com/app_redirect?team=${encodeURIComponent(team)}&app=${encodeURIComponent(id)}`; } },
           ms: 20000,
         });
