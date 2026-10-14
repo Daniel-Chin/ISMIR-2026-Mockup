@@ -141,7 +141,6 @@ endif %}
     </a>
     {% endif %} -->
   </div>
-  {% if paper.content.channel_url or paper.zoom_url %}
   <div class="btn-group ml-3 mb-3">
     {% if paper.content.channel_url %}
     <a href="{{paper.content.channel_url}}" class="btn btn-outline-primary"
@@ -152,8 +151,10 @@ endif %}
     <a href="{{paper.zoom_url}}" class="btn btn-outline-primary"
       target="_blank" rel="noopener noreferrer">Zoom for Poster Session</a>
     {% endif %}
+    {# This paper's discussion board in the Pre-Conference Lounge (preconf/). #}
+    <a href="lounge.html#paper={{paper.id}}" class="btn btn-outline-primary"
+      target="_blank" rel="noopener">Lounge</a>
   </div>
-  {% endif %}
 </div>
 <div class="poster-content">
   <div id="details" class="pp-card m-3 collapse">
