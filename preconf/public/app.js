@@ -478,7 +478,7 @@ async function refreshCounts() {
 // ---------- welcome reception ----------
 function initWelcome() {
   const room = new Room('welcome');
-  const board = new BoardView($('#welcome-board'), { room, board: 'welcome', title: 'Welcome Reception', app, tour: true, emptyText: 'Be the first to say hello: double-click anywhere' });
+  const board = new BoardView($('#welcome-board'), { room, board: 'welcome', title: 'Welcome Reception', app, tour: true, dblclickExpands: true, emptyText: 'Be the first to say hello: tap + Note' });
   $('#welcome-add').addEventListener('click', e => { e.preventDefault(); board.compose(); });
   $('#hero-say-hello').addEventListener('click', () => {
     $('#welcome').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -496,6 +496,17 @@ function applyConference(conf) {
   if (/^https:\/\//.test(conf.helpdeskUrl || '')) help.href = conf.helpdeskUrl; else help.remove();
 }
 
+// ---------- collapsible nav ----------
+/** Below 1100px the nav sits behind a menu button (styles.css); this opens and closes it. */
+function initNavToggle() {
+  const button = $('#nav-toggle'), nav = $('#main-nav');
+  const set = open => { nav.classList.toggle('is-open', open); button.setAttribute('aria-expanded', String(open)); };
+  button.addEventListener('click', e => { e.stopPropagation(); set(!nav.classList.contains('is-open')); });
+  nav.addEventListener('click', e => { if (e.target.closest('a')) set(false); });
+  document.addEventListener('click', e => { if (!e.target.closest('.site-header')) set(false); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') set(false); });
+}
+
 // ---------- boot ----------
 async function main() {
   const handoff = takeTokenFromHash();
@@ -510,6 +521,7 @@ async function main() {
   });
   window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
   renderAuth();
+  initNavToggle();
   const params = new URLSearchParams(location.search);
   if (params.get('login_error')) {
     toast(params.get('login_error').slice(0, 160), { error: true, ms: 8000 });
