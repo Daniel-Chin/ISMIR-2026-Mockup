@@ -15,8 +15,10 @@ function idFraction(id) {
   return (h >>> 0) / 4294967296;
 }
 const DRAG_SEND_MS = 70;
-const MAX_SCALE = 3;
-const FIT_MAX_SCALE = 1.5;     // paper boards open zoomed to their notes, but no closer than this           // absolute: notes at 3x their logical size
+const MAX_SCALE = 3;           // absolute: notes at 3x their logical size
+// The fitted "all notes" view zooms in at most 2x (in width and height) past the whole-board
+// view, i.e. no closer than 100%: a lone note should not blow up to fill the screen.
+const FIT_MAX_ZOOM = 2;
 const TOUR_MOVE_MS = 4500;     // intro camera: one glide between shots
 const TOUR_HOLD_MS = 2200;     // ...then rest on the shot
 const ZOOM_EASE = 0.22;        // fraction of the remaining distance covered per frame
@@ -76,7 +78,7 @@ export class BoardView {
       b.addEventListener('click', fn);
       return b;
     };
-    this.zoomLabel = tool('100%', 'Back to 100%, centred', () => this.resetView());
+    this.zoomLabel = tool('100%', 'Show all notes', () => this.resetView());
     this.tools.append(
       tool('−', 'Zoom out', () => this.zoomTo(this.target / 1.4)),
       this.zoomLabel,
@@ -153,12 +155,12 @@ export class BoardView {
 
   clampScale(v) { return Math.min(Math.max(MAX_SCALE, this.base), Math.max(this.minScale, v)); }
 
-  /** The 100% button: back to 100%, looking at the centre of the board (smooth). */
+  /** The middle zoom button: glide back to the default view (all notes in view). */
   resetView() {
     this.stopTour();
     cancelAnimationFrame(this.raf);
     this.raf = 0;
-    const from = this.camera(), to = { s: this.base, cx: this.W / 2, cy: this.H / 2 };
+    const from = this.camera(), to = this.fitCamera();
     const t0 = performance.now(), ms = 450;
     const ease = t => 1 - (1 - t) ** 3;
     const step = now => {
@@ -240,10 +242,13 @@ export class BoardView {
     return { s: this.scale, cx: (this.scroller.scrollLeft + w / 2) / this.scale, cy: (this.scroller.scrollTop + h / 2) / this.scale };
   }
 
-  /** Zoom so every note on this board just fits, centred on them. Nothing to fit: whole board. */
-  fitToNotes() {
+  /**
+   * The board's default view: zoomed so every note just fits, centred on them, but never more
+   * than FIT_MAX_ZOOM x the whole-board view. An empty board shows the whole board.
+   */
+  fitCamera() {
     const nodes = [...this.els.values()];
-    if (!nodes.length) return;
+    if (!nodes.length) return { s: this.minScale, cx: this.W / 2, cy: this.H / 2 };
     const pad = 24;
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const n of nodes) {
@@ -252,10 +257,11 @@ export class BoardView {
       x1 = Math.max(x1, x + n.offsetWidth); y1 = Math.max(y1, y + n.offsetHeight);
     }
     const vw = this.scroller.clientWidth, vh = this.scroller.clientHeight;
-    // Cap at 1.5x natural size: a lone note should not blow up to fill the whole card.
-    const s = this.clampScale(Math.min(vw / (x1 - x0 + 2 * pad), vh / (y1 - y0 + 2 * pad), FIT_MAX_SCALE));
-    this.setCamera({ s, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 });
+    const s = this.clampScale(Math.min(vw / (x1 - x0 + 2 * pad), vh / (y1 - y0 + 2 * pad), this.minScale * FIT_MAX_ZOOM));
+    return { s, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
   }
+
+  fitToNotes() { this.setCamera(this.fitCamera()); }
 
   setCamera({ s, cx, cy }) {
     const w = this.scroller.clientWidth, h = this.scroller.clientHeight;
@@ -394,7 +400,8 @@ export class BoardView {
       document.body.style.overflow = '';
     }
     this.layout(true);
-    if (this.fitNotes) this.fitToNotes();
+    // Expanding or collapsing opens on the default view: all notes in sight.
+    this.fitToNotes();
   }
 
   // ---------- room events ----------
