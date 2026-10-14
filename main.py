@@ -489,7 +489,7 @@ def format_paper(v):
                 "summary_of_updates_post_review", ""
             ),
             "paper_presentation": v["paper_presentation"],
-            "long_presentation": v["long_presentation"],
+            "award_nominee": v["AwardNominee"],
             "authors": remove_affiliation(v["authors_and_affil"]),
             "authors_and_affil": list_fields["authors_and_affil"],
             "keywords": list(

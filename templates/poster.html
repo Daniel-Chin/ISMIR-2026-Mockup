@@ -48,13 +48,9 @@
     <h4 class="text-muted text-center">
       Presented {{paper.content.paper_presentation}}
     </h4>
-    <h4 class="text-muted text-center">
-      {% if paper.content.long_presentation in ['TRUE', 'Yes'] %}
-      10-minute long-format presentation
-      {% else %}
-      4-minute short-format presentation
-      {% endif %}
-    </h4>
+    {% if paper.content.award_nominee in ['TRUE', 'Yes'] %}
+    <h4 class="text-muted text-center">Award Nominee</h4>
+    {% endif %}
 
   </div>
 </div>
