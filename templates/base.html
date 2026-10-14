@@ -150,14 +150,14 @@
           class="collapse navbar-collapse text-right flex-grow-1"
           id="navbarNav">
           <ul class="navbar-nav ml-auto">
-            {# Newly launched pages get a small star before their name. #}
-            {% set new_features = ['Live Overview', 'Warm-up Discussion'] %}
+            {# Experimental features get a test-tube icon in the nav. #}
+            {% set experimental_features = ['Live Overview', 'Warm-up Discussion'] %}
             {% for href, id in navigation_bar %}
             <li class="nav-item {% if id == active_page %}active{% endif %}">
               {% if href.startswith('http') %}
-              <a class="nav-link" href="{{href}}" target="_blank" rel="noopener noreferrer">{% if id in new_features %}<svg class="nav-new-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 0.5l1.6 4.6 4.9 0.2-3.9 3 1.4 4.7L8 10.2 3.9 13l1.4-4.7-3.9-3 4.9-0.2z"/></svg><span class="sr-only">New: </span>{% endif %}{{id}}</a>
+              <a class="nav-link" href="{{href}}" target="_blank" rel="noopener noreferrer">{% if id in experimental_features %}<svg class="nav-lab-icon" width="16" height="16" fill="#e0a100" color="#e0a100" aria-hidden="true" focusable="false" viewBox="0 0 16 16"><g transform="rotate(30 8 8)"><path d="M4.5 1.25h7M5.75 1.25v11a2.25 2.25 0 0 0 4.5 0v-11" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.75 7.75h4.5v4.5a2.25 2.25 0 0 1-4.5 0z" fill="currentColor"/></g></svg><span class="sr-only">Experimental: </span>{% endif %}{{id}}</a>
               {% else %}
-              <a class="nav-link" href="{{href}}">{% if id in new_features %}<svg class="nav-new-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 0.5l1.6 4.6 4.9 0.2-3.9 3 1.4 4.7L8 10.2 3.9 13l1.4-4.7-3.9-3 4.9-0.2z"/></svg><span class="sr-only">New: </span>{% endif %}{{id}}</a>
+              <a class="nav-link" href="{{href}}">{% if id in experimental_features %}<svg class="nav-lab-icon" width="16" height="16" fill="#e0a100" color="#e0a100" aria-hidden="true" focusable="false" viewBox="0 0 16 16"><g transform="rotate(30 8 8)"><path d="M4.5 1.25h7M5.75 1.25v11a2.25 2.25 0 0 0 4.5 0v-11" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.75 7.75h4.5v4.5a2.25 2.25 0 0 1-4.5 0z" fill="currentColor"/></g></svg><span class="sr-only">Experimental: </span>{% endif %}{{id}}</a>
               {% endif %}
             </li>
             {% endfor %}
