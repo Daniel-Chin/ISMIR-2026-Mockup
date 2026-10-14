@@ -107,7 +107,7 @@
     {% block header %}
     {% set navigation_bar = [
     ('live.html', 'Live Overview'),
-    ('lounge.html', 'Pre-Conference'),
+    ('lounge.html', 'Warm-up Discussion'),
     ('calendar.html', 'Schedule'),
     ('papers.html', 'Papers'),
     ('music.html', 'Music'),
@@ -151,7 +151,7 @@
           id="navbarNav">
           <ul class="navbar-nav ml-auto">
             {# Newly launched pages get a small star before their name. #}
-            {% set new_features = ['Live Overview', 'Pre-Conference'] %}
+            {% set new_features = ['Live Overview', 'Warm-up Discussion'] %}
             {% for href, id in navigation_bar %}
             <li class="nav-item {% if id == active_page %}active{% endif %}">
               {% if href.startswith('http') %}
