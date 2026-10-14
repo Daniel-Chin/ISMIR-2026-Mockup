@@ -57,14 +57,16 @@ export class BoardView {
     this.dragging = null;
 
     this.frame = el('div', 'pc-board-frame');
-    this.titleBar = el('div', 'pc-fullscreen-title', o.title || '');
+    this.titleBar = el('div', 'pc-fullscreen-title');
+    this.titleBar.append(el('div', 'pc-fullscreen-name', o.title || ''));
+    if (o.dblclickExpands) this.titleBar.append(el('div', 'pc-fullscreen-hint', 'Double click to leave a note'));
     this.titleBar.hidden = true;
     this.scroller = el('div', 'pc-board-scroll');
     this.sizer = el('div', 'pc-board-sizer');
     this.surface = el('div', 'pc-board-surface');
     this.empty = el('div', 'pc-board-empty', o.emptyText || 'Double-click anywhere to leave the first note');
     this.tools = el('div', 'pc-board-tools');
-    this.fsButton = el('button', 'pc-btn pc-btn-sm', '⤢ Expand');
+    this.fsButton = el('button', 'pc-btn pc-btn-sm pc-fs-btn', '⤢ Expand');
     this.fsButton.type = 'button';
     this.fsButton.addEventListener('click', () => this.toggleFullscreen());
     const tool = (label, title, fn) => {
@@ -347,7 +349,7 @@ export class BoardView {
     const on = !this.frame.classList.contains('is-fullscreen');
     this.frame.classList.toggle('is-fullscreen', on);
     this.titleBar.hidden = !on;
-    this.fsButton.textContent = on ? '✕ Close' : '⤢ Expand';
+    this.fsButton.textContent = on ? '⤡ Collapse' : '⤢ Expand';
     if (on) {
       this.scrim = el('div', 'pc-scrim');
       this.scrim.addEventListener('click', () => this.toggleFullscreen());
