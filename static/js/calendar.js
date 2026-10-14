@@ -12,8 +12,6 @@ function make_cal(name) {
     const current_tz = getUrlParameter('tz') || moment.tz.guess();
     const tzNames = [...moment.tz.names()];
     // console.log(current_tz);
-    let localStart = 7 // 07:00 local time
-    let startOffsets = [0,0]
 
     const eventTitle = schedule => {
         const className = schedule.raw && schedule.raw.endTimeTbd
@@ -61,9 +59,6 @@ function make_cal(name) {
 
     $.get('serve_config.json').then(config => {
         $.get(name).then(events => {
-            const scroll_ref1 = config.opening_ref_title_1;
-            const scroll_ref2 = config.opening_ref_title_2;
-
             const all_cals = [];
             const timezoneName = current_tz;
 
@@ -75,6 +70,18 @@ function make_cal(name) {
                 max_hours = 24;
             }
             // console.log(min_hours, max_hours);
+            // Grow the container until the time grid fits, so only the page scrolls.
+            // Skips hidden calendars (desktop on mobile and vice versa); resize refits.
+            const fitHeight = (cal, container) => {
+                cal.render(true);
+                const grid = $(container + ' .tui-full-calendar-timegrid-container')[0];
+                if (!grid || !grid.clientHeight) return;
+                const overflow = grid.scrollHeight - grid.clientHeight;
+                if (overflow <= 0) return;
+                const el = $(container)[0];
+                el.style.height = (el.offsetHeight + overflow) + 'px';
+                cal.render(true);
+            };
             const Calendar = tui.Calendar;
             // tui.Calendar v1 weeks are always 7 days; show only the conference days.
             const [firstDay, lastDay] = config.calendar_days.map(d => moment(d).toDate());
@@ -96,8 +103,8 @@ function make_cal(name) {
                     // workweek: !config.calendar["sunday_friday"],
                     daynames: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
                     startDayOfWeek: firstDay.getDay(),
-                    // hourStart: min_hours,
-                    // hourEnd: max_hours,
+                    hourStart: min_hours,
+                    hourEnd: max_hours,
                     // narrowWeekend: true,
                 },
                 timezones: [{
@@ -127,27 +134,7 @@ function make_cal(name) {
                       return hour + ':' + min;
                     },
                     time: function (schedule) {
-                        var class_name=""
-                        if (schedule.title == scroll_ref1) {
-                          startOffsets[0] = parseInt(moment(schedule.start.getTime())
-                            .tz(timezoneName)
-                            .format('HH')) + parseInt(moment(schedule.start.getTime())
-                            .tz(timezoneName)
-                            .format('mm')) / 60 - localStart;
-                          class_name = 'openingA';
-                          // console.log(startOffsets);
-                        } else if (schedule.title == scroll_ref2) {
-                          startOffsets[1] = parseInt(
-                            moment(schedule.start.getTime())
-                            .tz(timezoneName)
-                            .format('HH')) + parseInt(
-                            moment(schedule.start.getTime())
-                            .tz(timezoneName)
-                            .format('mm')) / 60 - localStart;
-                          class_name = 'openingB';
-                          // console.log(startOffsets);
-                        }
-                        return `<strong class=${class_name}>` + moment(schedule.start.getTime())
+                        return '<strong>' + moment(schedule.start.getTime())
                           .tz(timezoneName)
                           .format('HH:mm') + '</strong> ' + eventTitle(schedule);
                     },
@@ -171,7 +158,7 @@ function make_cal(name) {
                 },
             })
 
-            all_cals.push(calendar);
+            all_cals.push([calendar, '#calendar']);
 
             const cols = config.calendar.colors;
             if (cols) {
@@ -193,6 +180,7 @@ function make_cal(name) {
                 c_sm.append('div').attr('id', 'cal__' + i);
                 const cal = new Calendar('#cal__' + i, {
                     defaultView: 'day',
+                    week: { hourStart: min_hours, hourEnd: max_hours },
                     template: {
                         time: function (schedule) {
                             return '<strong>' + moment(schedule.start.getTime())
@@ -233,7 +221,7 @@ function make_cal(name) {
                     },
                 })
 
-                all_cals.push(cal);
+                all_cals.push([cal, '#cal__' + i]);
                 const cols = config.calendar.colors;
                 if (cols) {
                     const cals = [];
@@ -251,51 +239,13 @@ function make_cal(name) {
             // console.log(week_dates.map(d => d.format()), "--- week_dates ");
 
 
-            // Re-rendering rebuilds the time grids, so keep the user's scroll position.
-            let isResizing = false;
+            const fitAll = () => all_cals.forEach(([c, container]) => fitHeight(c, container));
+            fitAll();
             $(window).on('resize', _.debounce(function () {
-                isResizing = true;
                 const pageScroll = window.scrollY;
-                const gridScrolls = $('.tui-full-calendar-timegrid-container')
-                  .map((_i, el) => el.scrollTop).get();
-                all_cals.forEach(c => c.render(true));
-                setTimeout(function () {
-                    $('.tui-full-calendar-timegrid-container').each(function (i, el) {
-                        if (i < gridScrolls.length) el.scrollTop = gridScrolls[i];
-                    });
-                    window.scrollTo(window.scrollX, pageScroll);
-                    isResizing = false;
-                }, 0);
+                fitAll();
+                window.scrollTo(window.scrollX, pageScroll);
             }, 100));
-            calendar.on('afterRenderSchedule', function() {
-              if (isResizing) {
-                return;
-              }
-              // console.log(startOffsets);
-              const contain = $('.tui-full-calendar-timegrid-container');
-              if (!contain.length) {
-                return;
-              }
-
-              const openingABlocks = $('.openingA').parents('.tui-full-calendar-time-date-schedule-block');
-              const openingBBlocks = $('.openingB').parents('.tui-full-calendar-time-date-schedule-block');
-              const fallbackBlocks = $('.tui-full-calendar-time-date-schedule-block');
-
-              let targetBlock = null;
-
-              if (startOffsets[0] < -3 || startOffsets[0] >= 11) {
-                targetBlock = openingBBlocks[0] || openingABlocks[0] || fallbackBlocks[0];
-              }
-              else {
-                targetBlock = openingABlocks[0] || openingBBlocks[0] || fallbackBlocks[0];
-              }
-
-              if (!targetBlock || typeof targetBlock.offsetTop !== 'number') {
-                return;
-              }
-
-              contain.scrollTop(Math.max(targetBlock.offsetTop - 20, 0));
-            });
             // d3.selectAll('.tui-full-calendar-vlayout-area').attr('style',null);
         })
 

@@ -44,6 +44,10 @@
 }
 #calendar .tui-full-calendar-time-schedule-content strong,
 #calendar_small .tui-full-calendar-time-schedule-content strong { font-weight: 800; }
+/* Fixed-width digits so times line up: hour axis and the leading time in event captions. */
+#calendar .tui-full-calendar-timegrid-hour, #calendar_small .tui-full-calendar-timegrid-hour,
+#calendar .tui-full-calendar-time-schedule-content strong,
+#calendar_small .tui-full-calendar-time-schedule-content strong { font-variant-numeric: tabular-nums; }
 
 
 strong {
