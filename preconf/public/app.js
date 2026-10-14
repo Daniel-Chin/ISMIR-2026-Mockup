@@ -97,8 +97,10 @@ const app = {
   login() {
     // Phones and tablets: if the Slack app is installed, Slack's web sign-in jumps into it after
     // the email code and never comes back. So go to the app on purpose: our Home tab there shows
-    // "Enter the Lounge", a one-tap sign-in link. No app installed → the deep link does nothing,
-    // the page stays visible, and we fall back to the normal browser sign-in.
+    // "Enter the Lounge", a one-tap sign-in link. Never redirect again on our own afterwards:
+    // iOS may still be showing its "Open in Slack?" prompt, and a second (web) sign-in would
+    // pull the user away from our Home tab into Slackbot. If the app really isn't there, offer
+    // the browser sign-in as a tap instead.
     if (this.slackApp && matchMedia('(pointer: coarse)').matches) {
       const { team, app: id } = this.slackApp;
       let left = false;
@@ -106,8 +108,9 @@ const app = {
       document.addEventListener('visibilitychange', onHide);
       setTimeout(() => {
         document.removeEventListener('visibilitychange', onHide);
-        if (!left && !document.hidden) location.href = this.loginUrl();
-      }, 1800);
+        if (left || document.hidden) return;
+        toast('Slack app didn’t open?', { action: { label: 'Sign in in the browser', run: () => { location.href = this.loginUrl(); } }, ms: 15000 });
+      }, 3000);
       location.href = `slack://app?team=${encodeURIComponent(team)}&id=${encodeURIComponent(id)}&tab=home`;
       return;
     }
