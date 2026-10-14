@@ -187,6 +187,8 @@ function make_cal(name) {
               calendar.getDateRangeStart().toDate(),
               calendar.getDateRangeEnd().toDate())
 
+            // Re-rendering rebuilds the time grids, so keep the user's scroll position.
+            let isResizing = false;
             const c_sm = d3.select('#calendar_small')
             let i = 0
             for (const day of week_dates) {
@@ -233,6 +235,16 @@ function make_cal(name) {
                     },
                 })
 
+                const dayContainer = '#cal__' + i;
+                cal.on('afterRenderSchedule', function () {
+                    if (isResizing) return;
+                    const grid = $(dayContainer + ' .tui-full-calendar-timegrid-container')[0];
+                    const blocks = $(dayContainer + ' .tui-full-calendar-time-date-schedule-block').get();
+                    if (!grid || !blocks.length) return;
+                    const firstTop = Math.min(...blocks.map(b => b.offsetTop));
+                    grid.scrollTop = Math.max(firstTop - 20, 0);
+                });
+
                 all_cals.push(cal);
                 const cols = config.calendar.colors;
                 if (cols) {
@@ -251,8 +263,6 @@ function make_cal(name) {
             // console.log(week_dates.map(d => d.format()), "--- week_dates ");
 
 
-            // Re-rendering rebuilds the time grids, so keep the user's scroll position.
-            let isResizing = false;
             $(window).on('resize', _.debounce(function () {
                 isResizing = true;
                 const pageScroll = window.scrollY;
@@ -272,14 +282,14 @@ function make_cal(name) {
                 return;
               }
               // console.log(startOffsets);
-              const contain = $('.tui-full-calendar-timegrid-container');
+              const contain = $('#calendar .tui-full-calendar-timegrid-container');
               if (!contain.length) {
                 return;
               }
 
-              const openingABlocks = $('.openingA').parents('.tui-full-calendar-time-date-schedule-block');
-              const openingBBlocks = $('.openingB').parents('.tui-full-calendar-time-date-schedule-block');
-              const fallbackBlocks = $('.tui-full-calendar-time-date-schedule-block');
+              const openingABlocks = $('#calendar .openingA').parents('.tui-full-calendar-time-date-schedule-block');
+              const openingBBlocks = $('#calendar .openingB').parents('.tui-full-calendar-time-date-schedule-block');
+              const fallbackBlocks = $('#calendar .tui-full-calendar-time-date-schedule-block');
 
               let targetBlock = null;
 
