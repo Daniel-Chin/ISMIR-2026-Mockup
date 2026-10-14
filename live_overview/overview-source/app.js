@@ -908,12 +908,26 @@ function renderPaperCard(p, opts = {}) {
     <div class="paper-card-controls">
       <div class="presenter-mode-row">
         <div class="presenter-mode-line" data-presenter-mode>${presenterLabel(p.presenterMode)}</div>
-        ${sessionZoomUrl ? `<a class="paper-session-zoom-link" href="${esc(sessionZoomUrl)}" target="_blank" rel="noopener">Zoom <span class="paper-session-zoom-arrow" aria-hidden="true">↗</span></a>` : ''}
       </div>
       <div class="speech-row">${renderSpeakerBlock(p)}</div>
-      ${linkRow(p.links, { infoUrl: detailUrl, showInfo: false })}
+      ${paperLinkRow(p, detailUrl, sessionZoomUrl)}
     </div>
   </article>`;
+}
+
+// Paper cards: Zoom (the session's room) · Slack · Paper · Poster. Paper and Poster open the
+// miniconf paper page at that section (its poster.js opens the section named by the #fragment).
+function paperLinkRow(p, detailUrl, sessionZoomUrl) {
+  const links = p?.links || {};
+  const section = (id, has) => (has && detailUrl ? `${detailUrl}#${id}` : '');
+  const buttons = [
+    [sessionZoomUrl || links.zoom, 'Zoom'],
+    [links.slack, 'Slack'],
+    [section('paper', links.pdf), 'Paper'],
+    [section('poster', links.poster), 'Poster'],
+  ].filter(([url]) => url);
+  if (!buttons.length) return '';
+  return `<div class="link-row">${buttons.map(([url, label]) => `<a class="link-button" href="${esc(url)}" target="_blank" rel="noopener">${label}</a>`).join('')}</div>`;
 }
 
 function syncPaperAuthorOverflow(scope = document) {

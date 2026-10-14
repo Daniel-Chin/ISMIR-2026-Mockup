@@ -32,7 +32,21 @@
 
   setTheme(getStoredTheme());
 
+  // Below 1100px (narrow windows, or a zoomed-in browser) the nav sits behind a menu
+  // button (styles.css "collapsible nav"); this opens and closes it.
+  function initNavToggle() {
+    const button = document.getElementById("nav-toggle");
+    const nav = document.getElementById("main-nav");
+    if (!button || !nav) return;
+    const set = (open) => { nav.classList.toggle("is-open", open); button.setAttribute("aria-expanded", String(open)); };
+    button.addEventListener("click", (event) => { event.stopPropagation(); set(!nav.classList.contains("is-open")); });
+    nav.addEventListener("click", (event) => { if (event.target.closest("a")) set(false); });
+    document.addEventListener("click", (event) => { if (!event.target.closest(".site-header")) set(false); });
+    document.addEventListener("keydown", (event) => { if (event.key === "Escape") set(false); });
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
+    initNavToggle();
     updateButtons(root.dataset.theme || getStoredTheme());
     document.querySelectorAll("#theme-toggle, [data-theme-toggle]").forEach((button) => {
       button.addEventListener("click", () => {

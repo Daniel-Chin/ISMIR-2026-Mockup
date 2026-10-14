@@ -15,7 +15,7 @@ from urllib.parse import urlsplit
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-PUBLIC_RELEASE = '1.0.0-ui.7'
+PUBLIC_RELEASE = '1.0.0-ui.8'
 ASSETS = ('index.html', 'history.html', 'app.js', 'history.js', 'styles.css',
           'timezone-preference.js', 'cursor-avatars.js', 'theme-toggle.js', 'public-connection.js', 'prompt-config.js', 'llm-prompts.json',
           'site-integration.js')
