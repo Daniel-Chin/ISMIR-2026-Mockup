@@ -297,12 +297,12 @@ function openPaper(uid) {
   if (!card) return;
   card.classList.add('pc-paper-focus');
   setTimeout(() => card.classList.remove('pc-paper-focus'), 2600);
-  // Put the paper's title just under the sticky header. Content above (boards, fonts) can
-  // still shift while the page settles, so re-align a few times, unless the user scrolls.
-  const title = card.querySelector('.paper-title') || card;
+  // Put the card's top edge just inside the view, right under the sticky header. Content above
+  // (boards, fonts) can still shift while the page settles, so re-align a few times, unless
+  // the user scrolls.
   const align = () => {
     const header = document.querySelector('.site-header')?.getBoundingClientRect().bottom || 0;
-    const y = title.getBoundingClientRect().top + scrollY - header - 14;
+    const y = card.getBoundingClientRect().top + scrollY - header - 8;   // 8px: the focus outline shows
     if (Math.abs(y - scrollY) > 2) window.scrollTo({ top: y, behavior: 'instant' });
   };
   let userScrolled = false;
