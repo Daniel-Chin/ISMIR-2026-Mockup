@@ -159,6 +159,13 @@ body .nav-pills .nav-link.active {
   margin-top: 10px;
 }
 
+/* One cap instead of bootstrap's per-breakpoint widths, which shrink the
+ * container on screen when zooming in crosses a breakpoint.
+ * `body` prefix: bootstrap loads after this file. */
+body .container {
+  max-width: 1140px;
+}
+
 .card {
   font-family: "Ambiant";
 }
