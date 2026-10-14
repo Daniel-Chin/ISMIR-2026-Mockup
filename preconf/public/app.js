@@ -286,13 +286,44 @@ function closeSession({ keepHash = false } = {}) {
   hall.open.panel.remove();
   document.querySelectorAll('.pc-session-card[aria-expanded="true"]').forEach(c => c.setAttribute('aria-expanded', 'false'));
   hall.open = null;
-  if (!keepHash && location.hash.startsWith('#session=')) history.replaceState(null, '', '#papers');
+  if (!keepHash && location.hash.startsWith('#session=')) setLink('#papers');
+}
+
+/**
+ * Shareable addresses (the URL always shows where you are, so it can be copied as is):
+ *   lounge.html#welcome                    Welcome Reception
+ *   lounge.html#papers                     Paper Hall
+ *   lounge.html#session=PS-03              a poster session, opened
+ *   lounge.html#session=PS-03&paper=3      one paper's board in it (paper = papers.csv uid)
+ *   lounge.html#paper=3                    same; the session is looked up (miniconf links use this)
+ */
+function setLink(hash) {
+  if (location.hash !== hash) history.replaceState(null, '', location.pathname + location.search + hash);
+}
+
+function paperLink(uid) {
+  const p = hall.program.papers[uid];
+  return p ? `#session=${encodeURIComponent(p.session)}&paper=${encodeURIComponent(uid)}` : '#papers';
+}
+
+/** Go to whatever the current #fragment names. */
+function route() {
+  const params = new URLSearchParams(location.hash.slice(1));
+  const paper = params.get('paper'), session = params.get('session');
+  if (paper && hall.program.papers[paper]) return openPaper(paper);
+  if (session && hall.program.sessions[session]) {
+    if (hall.open?.id !== session) openSession(session, true);
+    return;
+  }
+  const section = location.hash.slice(1);
+  if (['welcome', 'papers', 'lbd', 'home'].includes(section)) document.getElementById(section)?.scrollIntoView();
 }
 
 function openPaper(uid) {
   const paper = hall.program.papers[uid];
   if (!paper) { document.getElementById('papers')?.scrollIntoView(); return; }
-  openSession(paper.session, false);
+  if (hall.open?.id !== paper.session) openSession(paper.session, false);
+  setLink(paperLink(uid));
   const card = document.getElementById('paper-' + uid);
   if (!card) return;
   card.classList.add('pc-paper-focus');
@@ -315,7 +346,7 @@ function openSession(id, scroll) {
   const s = hall.program.sessions[id];
   if (!s) return;
   closeSession({ keepHash: true });
-  history.replaceState(null, '', '#session=' + encodeURIComponent(id));
+  setLink('#session=' + encodeURIComponent(id));
   const card = document.querySelector(`.pc-session-card[data-session="${CSS.escape(id)}"]`);
   card?.setAttribute('aria-expanded', 'true');
   const slot = card.closest('.pc-day-row').querySelector('.pc-session-slot');
@@ -413,7 +444,12 @@ function paperCard(p) {
   const status = el('div', 'paper-card-status-row');
   const count = el('span', 'pc-note-count', '0 notes');
   count.dataset.count = '';
-  status.append(el('div', 'paper-id', p.displayId || '#' + p.uid), count);
+  // The paper id is a permalink: click it and the address bar holds a link to this exact board.
+  const id = el('a', 'paper-id pc-permalink', p.displayId || '#' + p.uid);
+  id.href = paperLink(p.uid);
+  id.title = 'Link to this paper\u2019s board';
+  id.addEventListener('click', e => { e.preventDefault(); setLink(paperLink(p.uid)); toast('Link to this paper\u2019s board is in the address bar.'); });
+  status.append(id, count);
 
   const copy = el('div', 'paper-card-copy');
   const title = el('h4', 'paper-title');
@@ -572,12 +608,9 @@ async function main() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshCounts(); });
   window.addEventListener('focus', refreshCounts);
 
-  // Deep links: #session=PS-01 opens a session; #paper=<uid> (from the miniconf paper page)
-  // opens that paper's session and brings its card into view.
-  const m = location.hash.match(/^#session=(.+)$/);
-  const mp = location.hash.match(/^#paper=([\w-]+)$/);
-  if (m) openSession(decodeURIComponent(m[1]), true);
-  else if (mp) openPaper(mp[1]);
+  // Deep links (see setLink): go there now, and whenever the #fragment changes.
+  route();
+  window.addEventListener('hashchange', () => { if (!/(^#|&)(pc_auth|pc_link)=/.test(location.hash)) route(); });
 
   setInterval(() => {
     document.querySelectorAll('.pc-note-time[data-ts]').forEach(n => {

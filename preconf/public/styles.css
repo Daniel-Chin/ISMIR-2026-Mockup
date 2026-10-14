@@ -356,6 +356,8 @@ html[data-theme="light"] .pc-add-note:not(:hover):not(:focus-visible) { backgrou
 html:not([data-theme="light"]) .pc-add-note:not(:hover):not(:focus-visible) { background: linear-gradient(180deg, #1d3a57 0%, #11253d 100%) !important; }
 /* A paper opened from its miniconf page (#paper=<uid>) flashes briefly. */
 #live-events.pc-paper-grid .live-paper-card.pc-paper-focus { outline: 3px solid var(--gold); outline-offset: 3px; transition: outline-color .6s ease; }
+a.paper-id.pc-permalink { text-decoration: none; cursor: pointer; }
+a.paper-id.pc-permalink:hover { text-decoration: underline; text-underline-offset: 3px; }
 .pc-note-count { color: var(--pc-note-count); font-size: .74rem; font-weight: 900; letter-spacing: .04em; white-space: nowrap; }
 .pc-paper-board-head { display: flex; justify-content: flex-end; margin-top: 10px; }
 .pc-paper-board { margin-top: 8px; }
