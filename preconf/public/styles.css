@@ -98,11 +98,12 @@ html:not([data-theme="light"]) button.pc-session-card[aria-expanded="true"]:not(
 }
 
 /* ---------- header additions: Slack sign-in sits beside Lights Off ---------- */
-/* The overview centres its nav between the brand and one button. We have two buttons on the
-   right, so pin the nav to the page centre with equal side columns; narrow screens keep the
-   overview's own wrapping rules. */
+/* The overview centres its nav between the brand and one button. We have more on the right,
+   so the side columns share the leftover space equally (nav stays centred) but never shrink
+   below their content: when space is tight the nav moves aside instead of being overlapped.
+   Narrow screens keep the overview's own wrapping rules. */
 @media (min-width: 901px) {
-  .site-header { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+  .site-header { display: grid; grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr); column-gap: 16px; }
   .site-header > .brand { justify-self: start; }
   .site-header > .pc-header-tools { justify-self: end; }
 }
@@ -124,7 +125,22 @@ html:not([data-theme="light"]) button.pc-session-card[aria-expanded="true"]:not(
   display: inline-grid; place-items: center; font-size: .66rem; font-weight: 900;
   background: rgba(78, 230, 255, .14); color: var(--ink);
 }
-.pc-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pc-signout { white-space: nowrap; }
+.site-header .top-nav a { white-space: nowrap; }
+/* Not enough room beside the full nav: initials only, the full name still shows on hover. */
+@media (min-width: 901px) and (max-width: 1240px) {
+  .pc-user-chip .pc-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .pc-user-chip { cursor: default; }
+}
+/* Fixed-width name with an ellipsis; the full name pops up on hover / keyboard focus. */
+.pc-name { position: relative; display: block; width: 7.5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: default; }
+.pc-user-chip { position: relative; }
+.pc-user-chip:hover::after, .pc-user-chip:focus-within::after {
+  content: attr(data-full); position: absolute; top: calc(100% + 8px); right: 0; z-index: 50;
+  padding: 6px 10px; white-space: nowrap; font-size: .76rem; font-weight: 800; text-transform: none; letter-spacing: 0;
+  color: var(--ink); background: var(--pc-panel); border-left: 3px solid var(--cyan); border-bottom: 3px solid var(--gold);
+  box-shadow: var(--pc-shadow-sm); pointer-events: none;
+}
 .pc-signout {
   border: 0; background: none; padding: 2px 0; cursor: pointer; color: var(--muted);
   font: inherit; font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; text-decoration: underline; text-underline-offset: 3px;

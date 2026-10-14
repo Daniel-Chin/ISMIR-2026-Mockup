@@ -118,7 +118,11 @@ function renderAuth() {
   }
   const chip = el('span', 'pc-user-chip');
   chip.append(el('span', 'pc-avatar', initials(app.user.name)));
-  chip.append(el('span', 'pc-name', app.user.name));   // your Slack name
+  // Your Slack name, cut to a fixed width so it never pushes into the nav; hover shows it all.
+  const name = el('span', 'pc-name', app.user.name);
+  chip.tabIndex = 0;                    // keyboard users can reach the full-name tooltip too
+  chip.dataset.full = app.user.name;   // read by the CSS tooltip
+  chip.append(name);
   const out = el('button', 'pc-signout', 'Sign out');
   out.type = 'button';
   out.addEventListener('click', async () => {
