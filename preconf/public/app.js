@@ -461,7 +461,7 @@ function handleRoomError(ev) {
 
 async function refreshCounts() {
   try {
-    const res = await apiFetch('/api/counts?rooms=' + encodeURIComponent(Object.keys(hall.program.sessions).join(',')));
+    const res = await apiFetch('/api/counts?rooms=' + encodeURIComponent(Object.keys(hall.program.sessions).join(',')), { cache: 'no-store' });
     if (!res.ok) return;
     const fresh = await res.json();
     // Live numbers from the open session win over the cached edge counts.
@@ -540,8 +540,12 @@ async function main() {
   refreshSessionTimes();
   window.addEventListener('ismir-timezone-change', refreshSessionTimes);
   window.addEventListener('resize', () => { if (hall.open) syncAuthorOverflow(hall.open.panel); });
+  // Session badges: refresh every 20 s while the page is visible, and at once when it comes
+  // back to the foreground (another tab, another app, a phone waking up).
   refreshCounts();
-  setInterval(refreshCounts, 60_000);
+  setInterval(() => { if (!document.hidden) refreshCounts(); }, 20_000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshCounts(); });
+  window.addEventListener('focus', refreshCounts);
 
   const m = location.hash.match(/^#session=(.+)$/);
   if (m) openSession(decodeURIComponent(m[1]), true);
