@@ -328,7 +328,11 @@ export class BoardView {
 
   startTour() {
     if (!this.tourEnabled || this.tourStopped || this.tourRaf) return;
-    this.tourSegment(this.camera());
+    // First "shot" is the whole wall we are already on: start it as finished, so the camera
+    // rests for TOUR_HOLD_MS before gliding to the first note.
+    const wall = { s: this.minScale, cx: this.W / 2, cy: this.H / 2 };
+    this.setCamera(wall);
+    this.tour = { from: wall, to: wall, t0: performance.now() - TOUR_MOVE_MS };
     let last = performance.now();
     const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
     const tick = now => {
@@ -412,7 +416,11 @@ export class BoardView {
       this.layout(true);   // the server's hello carries this room's board size
       // Initial view only: reconnects and later notes never move the user's camera.
       if (this.fitNotes && !this.fitted) { this.fitted = true; this.fitToNotes(); }
-      if (this.tourEnabled && !this.tourStopped) setTimeout(() => this.startTour(), 900);
+      if (this.tourEnabled && !this.tourStopped && !this.tourRaf) {
+        // The tour opens on the whole wall and rests there before the first note.
+        this.setCamera({ s: this.minScale, cx: this.W / 2, cy: this.H / 2 });
+        setTimeout(() => this.startTour(), 900);
+      }
       return;
     }
     if (ev.type === 'upsert') {
