@@ -28,7 +28,8 @@
 <div class="pp-card m-3" style>
   <div class="card-header">
     <h2 class="card-title main-title text-center" style>
-      P{{paper.session}}-{{paper.position}}: {{paper.content.title}}
+      P<a href="papers.html?session={{paper.session}}"
+        style="color: inherit; text-decoration: underline;">{{paper.session}}</a>-{{paper.position}}: {{paper.content.title}}
     </h2>
     <h3 class="card-subtitle mb-2 text-muted text-center">
       {% for author in paper.content.authors %}
