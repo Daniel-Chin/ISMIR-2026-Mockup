@@ -19,6 +19,15 @@ body a:hover {
   border-color: #444444 !important;
 }
 
+/* Star marking newly launched pages in the nav (templates/base.html, new_features). */
+.nav-new-icon {
+  width: 0.85em;
+  height: 0.85em;
+  margin-right: 0.3em;
+  vertical-align: -0.05em;
+  fill: #e0a100;
+}
+
 .navbar-light .navbar-nav .active > .nav-link {
   font-weight: bold;
 }

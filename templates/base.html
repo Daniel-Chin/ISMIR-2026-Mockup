@@ -106,8 +106,8 @@
     <!-- NAV -->
     {% block header %}
     {% set navigation_bar = [
-    ('live.html', 'Live Overview (Experimental)'),
-    ('lounge.html', 'Pre-Conference Lounge'),
+    ('live.html', 'Live Overview'),
+    ('lounge.html', 'Pre-Conference'),
     ('calendar.html', 'Schedule'),
     ('papers.html', 'Papers'),
     ('music.html', 'Music'),
@@ -150,12 +150,14 @@
           class="collapse navbar-collapse text-right flex-grow-1"
           id="navbarNav">
           <ul class="navbar-nav ml-auto">
+            {# Newly launched pages get a small star before their name. #}
+            {% set new_features = ['Live Overview', 'Pre-Conference'] %}
             {% for href, id in navigation_bar %}
             <li class="nav-item {% if id == active_page %}active{% endif %}">
               {% if href.startswith('http') %}
-              <a class="nav-link" href="{{href}}" target="_blank" rel="noopener noreferrer">{{id}}</a>
+              <a class="nav-link" href="{{href}}" target="_blank" rel="noopener noreferrer">{% if id in new_features %}<svg class="nav-new-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 0.5l1.6 4.6 4.9 0.2-3.9 3 1.4 4.7L8 10.2 3.9 13l1.4-4.7-3.9-3 4.9-0.2z"/></svg><span class="sr-only">New: </span>{% endif %}{{id}}</a>
               {% else %}
-              <a class="nav-link" href="{{href}}">{{id}}</a>
+              <a class="nav-link" href="{{href}}">{% if id in new_features %}<svg class="nav-new-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 0.5l1.6 4.6 4.9 0.2-3.9 3 1.4 4.7L8 10.2 3.9 13l1.4-4.7-3.9-3 4.9-0.2z"/></svg><span class="sr-only">New: </span>{% endif %}{{id}}</a>
               {% endif %}
             </li>
             {% endfor %}
