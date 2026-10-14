@@ -95,7 +95,7 @@ def build(output, api_origin, schedule=None, domain=''):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--api-origin', default='https://ismir-backend-test.linliwei3916.workers.dev')
+    parser.add_argument('--api-origin', default='https://live-api.liweilin.org')
     parser.add_argument('--schedule', help='Deployed schedule JSON for an optional metadata-only fallback')
     parser.add_argument('--output', default=str(ROOT / 'dist' / 'public'))
     parser.add_argument('--domain', default='', help='Optional custom domain; configure Pages settings and DNS separately')

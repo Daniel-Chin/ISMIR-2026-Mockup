@@ -27,7 +27,9 @@ import update_schedule  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 REPO = ROOT.parent
-DEFAULT_API_ORIGIN = 'https://ismir-backend-test.linliwei3916.workers.dev'
+# Custom domain of the same Worker: *.workers.dev is blocked on some networks (e.g. mainland China).
+# The Zoom App Observers keep using the workers.dev origin they are registered with.
+DEFAULT_API_ORIGIN = 'https://live-api.liweilin.org'
 PAGE = 'live.html'
 ASSET_DIR = 'live_overview'
 

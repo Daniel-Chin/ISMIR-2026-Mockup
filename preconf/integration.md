@@ -27,7 +27,7 @@ Both assume `./preconf` is the current directory.
 - Only public paper fields are exported. Reviews and raw Drive paths for anything other than PDF/video/poster/slides links are never written to the build.
 
 ## Backend URL
-- Default: `https://ismir-preconf-test.linliwei3916.workers.dev`. Override with the env var `PRECONF_API_ORIGIN` or `build.sh --api-origin …`.
+- Default: `https://lounge.liweilin.org` (the Worker's custom domain; `*.workers.dev` is blocked on some networks, e.g. mainland China). Override with the env var `PRECONF_API_ORIGIN` or `build.sh --api-origin …`.
 - The Worker must list the Pages host in its `EXTRA_ORIGINS`.
 - The Worker validates rooms and boards by pattern, not against the paper list. Data refreshes therefore never require a backend redeploy.
 
