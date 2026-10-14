@@ -275,14 +275,15 @@ export class BoardView {
   /**
    * Intro tour order: start at a random note (fresh on every page load), then visit every
    * note once, always moving to the nearest one not yet shown so the camera glides short
-   * distances. Once every note has been shown, the camera pulls back to the whole wall, then
+   * distances. Once every note has been shown, the camera pulls back to the default view, then
    * a new round starts from a new random note. Notes posted mid-round join the current round.
    */
   nextShot() {
-    const overview = { s: this.minScale, cx: this.W / 2, cy: this.H / 2 };
+    // "Overview" = the board's default view (all notes just in view, at most 200%; see fitCamera).
+    const overview = this.fitCamera();
     const notes = [...this.room.notes.values()].filter(n => n.board === this.board && this.els.has(n.id));
     if (!notes.length) {
-      // Empty wall: drift between random spots and the whole wall.
+      // Empty wall: drift between random spots and the default view.
       this.shotIndex = (this.shotIndex || 0) + 1;
       if (this.shotIndex % 2 === 0) return overview;
       return { s: this.clampScale(this.base * 1.8), cx: this.W * (0.2 + Math.random() * 0.6), cy: this.H * (0.25 + Math.random() * 0.5) };
@@ -290,7 +291,7 @@ export class BoardView {
     this.shown = this.shown || new Set();
     let pool = notes.filter(n => !this.shown.has(n.id));
     if (!pool.length) {
-      // Round complete: show the whole wall, then start the next round.
+      // Round complete: back to the default view, then start the next round.
       this.shown.clear();
       this.lastShown = null;
       return overview;
@@ -328,9 +329,9 @@ export class BoardView {
 
   startTour() {
     if (!this.tourEnabled || this.tourStopped || this.tourRaf) return;
-    // First "shot" is the whole wall we are already on: start it as finished, so the camera
+    // First "shot" is the default view we are already on: start it as finished, so the camera
     // rests for TOUR_HOLD_MS before gliding to the first note.
-    const wall = { s: this.minScale, cx: this.W / 2, cy: this.H / 2 };
+    const wall = this.fitCamera();
     this.setCamera(wall);
     this.tour = { from: wall, to: wall, t0: performance.now() - TOUR_MOVE_MS };
     let last = performance.now();
@@ -417,8 +418,8 @@ export class BoardView {
       // Initial view only: reconnects and later notes never move the user's camera.
       if (this.fitNotes && !this.fitted) { this.fitted = true; this.fitToNotes(); }
       if (this.tourEnabled && !this.tourStopped && !this.tourRaf) {
-        // The tour opens on the whole wall and rests there before the first note.
-        this.setCamera({ s: this.minScale, cx: this.W / 2, cy: this.H / 2 });
+        // The tour opens on the default view (all notes in sight) and rests there first.
+        this.setCamera(this.fitCamera());
         setTimeout(() => this.startTour(), 900);
       }
       return;
