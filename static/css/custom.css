@@ -32,6 +32,18 @@
   line-height: 1.35;
 }
 .tui-full-calendar-time-schedule-content strong { font-weight: 700; color: #111827; }
+/* Schedule font: Plus Jakarta Sans (loaded in cal_head.html, so only the schedule page uses it). */
+/* main.css sets Ambiant on every element (*), so name the descendants too. */
+#calendar, #calendar *, #calendar_small, #calendar_small * {
+  font-family: 'Plus Jakarta Sans', Ambiant, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+#calendar .tui-full-calendar-time-schedule-content, #calendar_small .tui-full-calendar-time-schedule-content,
+#calendar .tui-full-calendar-time-schedule-content-time, #calendar_small .tui-full-calendar-time-schedule-content-time {
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+#calendar .tui-full-calendar-time-schedule-content strong,
+#calendar_small .tui-full-calendar-time-schedule-content strong { font-weight: 800; }
 
 
 strong {
