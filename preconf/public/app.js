@@ -297,7 +297,18 @@ function openPaper(uid) {
   if (!card) return;
   card.classList.add('pc-paper-focus');
   setTimeout(() => card.classList.remove('pc-paper-focus'), 2600);
-  requestAnimationFrame(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  // Put the paper's title just under the sticky header. Content above (boards, fonts) can
+  // still shift while the page settles, so re-align a few times, unless the user scrolls.
+  const title = card.querySelector('.paper-title') || card;
+  const align = () => {
+    const header = document.querySelector('.site-header')?.getBoundingClientRect().bottom || 0;
+    const y = title.getBoundingClientRect().top + scrollY - header - 14;
+    if (Math.abs(y - scrollY) > 2) window.scrollTo({ top: y, behavior: 'instant' });
+  };
+  let userScrolled = false;
+  const stop = () => { userScrolled = true; };
+  for (const ev of ['wheel', 'touchstart', 'keydown', 'pointerdown']) addEventListener(ev, stop, { once: true, passive: true });
+  for (const ms of [0, 150, 500, 1200, 2500]) setTimeout(() => { if (!userScrolled) align(); }, ms);
 }
 
 function openSession(id, scroll) {
