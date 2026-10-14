@@ -45,8 +45,6 @@ organization: ISMIR Organization Committee
 #default_poster_pdf: /static/images/GLTR_poster.pdf
 
 
-opening_ref_title_1: Opening Session
-opening_ref_title_2: Opening Session
 
 # Configuration for auth
 #Test user
