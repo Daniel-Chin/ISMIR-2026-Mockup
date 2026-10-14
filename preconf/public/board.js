@@ -16,9 +16,9 @@ function idFraction(id) {
 }
 const DRAG_SEND_MS = 70;
 const MAX_SCALE = 3;           // absolute: notes at 3x their logical size
-// The fitted "all notes" view zooms in at most 4x (in width and height) past the whole-board
-// view, i.e. no closer than 200%: a lone note should not blow up to fill the screen.
-const FIT_MAX_ZOOM = 4;
+// The fitted "all notes" view zooms in no closer than 200%: a lone note should not blow up
+// to fill the screen. (100% = the base board fills the view; see BOARD_EXPAND on the server.)
+const FIT_MAX_PERCENT = 200;
 const TOUR_MOVE_MS = 4500;     // intro camera: one glide between shots
 const TOUR_HOLD_MS = 2200;     // ...then rest on the shot
 const ZOOM_EASE = 0.22;        // fraction of the remaining distance covered per frame
@@ -52,8 +52,8 @@ export class BoardView {
     this.fitNotes = !!o.fitNotes;
     this.dblclickExpands = !!o.dblclickExpands;
     this.scale = 1;          // current rendered scale
-    this.base = 1;           // the "100%" scale: the board's centre quarter fills the view
-    this.minScale = 0.5;     // smallest scale (50%): the whole board exactly covers the view
+    this.base = 1;           // the "100%" scale: the base board (the centre 1/expand) fills the view
+    this.minScale = 0.25;    // smallest scale (100/expand %): the whole board exactly covers the view
     this.target = 1;         // scale the zoom animation is heading to
     this.anchor = null;      // {cx, cy, px, py}: content point that stays under the cursor
     this.els = new Map();          // top-level note id -> element
@@ -142,7 +142,8 @@ export class BoardView {
     this.everLaidOut = true;
     // 50% = the whole board exactly covers the viewport; 100% = twice that, the centre quarter.
     this.minScale = Math.ceil(fit * 10000) / 10000;   // round up: never leave a sub-pixel gap
-    this.base = this.minScale * 2;
+    // The server says how many times the base board each board is (BOARD_EXPAND).
+    this.base = this.minScale * (Number(this.room.limits.expand) || 2);
     if (!full) this.scroller.style.height = Math.floor(this.H * width / this.W) + 'px';
     cancelAnimationFrame(this.raf);
     this.raf = 0;
@@ -244,7 +245,7 @@ export class BoardView {
 
   /**
    * The board's default view: zoomed so every note just fits, centred on them, but never more
-   * than FIT_MAX_ZOOM x the whole-board view. An empty board shows 100%, centred, so its
+   * than FIT_MAX_PERCENT %. An empty board shows 100%, centred, so its
    * "no notes yet" hint (centred on the board) sits in the middle of the view.
    */
   fitCamera() {
@@ -258,7 +259,7 @@ export class BoardView {
       x1 = Math.max(x1, x + n.offsetWidth); y1 = Math.max(y1, y + n.offsetHeight);
     }
     const vw = this.scroller.clientWidth, vh = this.scroller.clientHeight;
-    const s = this.clampScale(Math.min(vw / (x1 - x0 + 2 * pad), vh / (y1 - y0 + 2 * pad), this.minScale * FIT_MAX_ZOOM));
+    const s = this.clampScale(Math.min(vw / (x1 - x0 + 2 * pad), vh / (y1 - y0 + 2 * pad), this.base * FIT_MAX_PERCENT / 100));
     return { s, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
   }
 
