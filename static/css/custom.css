@@ -8,11 +8,30 @@
   margin-top: 0;
 }
 
-.tui-full-calendar-time-schedule-content, .tui-full-calendar-time-schedule-content-time {
-  border-color: #eeeeee !important;
-  font-weight: 400;
-  color: black;
+/* Schedule blocks: soft tint + a 3px accent stripe in the category colour (config.yml
+   calendar.colors), small gaps between blocks, rounded corners, calm dark text. */
+.tui-full-calendar-time-date-schedule-block-wrap { padding: 1px 2px 1px 0; }
+.tui-full-calendar-time-schedule {
+  border-radius: 6px !important;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(31, 41, 51, .08);
+  transition: box-shadow .15s ease, transform .15s ease;
 }
+.tui-full-calendar-time-schedule:hover {
+  box-shadow: 0 4px 12px rgba(31, 41, 51, .14);
+  transform: translateY(-1px);
+}
+.tui-full-calendar-time-schedule-content, .tui-full-calendar-time-schedule-content-time {
+  border-left-width: 3px !important;
+  border-top: 0 !important;
+  border-right: 0 !important;
+  border-bottom: 0 !important;
+  padding: 3px 6px !important;
+  font-weight: 400;
+  color: #1f2933;
+  line-height: 1.35;
+}
+.tui-full-calendar-time-schedule-content strong { font-weight: 700; color: #111827; }
 
 
 strong {

@@ -1,3 +1,10 @@
+// config.yml calendar.colors: {bg, border} per category (a plain colour string also works).
+function calendarStyle(id, v) {
+    const bg = typeof v === 'string' ? v : v.bg;
+    const border = typeof v === 'string' ? v : (v.border || v.bg);
+    return { id: id, name: id, bgColor: bg, dragBgColor: bg, borderColor: border, color: '#1f2933' };
+}
+
 function make_cal(name) {
 
     // console.log(location.search, "--- location.search");
@@ -169,14 +176,7 @@ function make_cal(name) {
             const cols = config.calendar.colors;
             if (cols) {
                 const cals = [];
-                Object.keys(cols).forEach(k => {
-                    const v = cols[k];
-                    cals.push({
-                        id: k,
-                        name: k,
-                        bgColor: v,
-                    })
-                })
+                Object.keys(cols).forEach(k => cals.push(calendarStyle(k, cols[k])))
 
                 calendar.setCalendars(cals);
 
@@ -237,14 +237,7 @@ function make_cal(name) {
                 const cols = config.calendar.colors;
                 if (cols) {
                     const cals = [];
-                    Object.keys(cols).forEach(k => {
-                        const v = cols[k];
-                        cals.push({
-                            id: k,
-                            name: k,
-                            bgColor: v,
-                        })
-                    })
+                    Object.keys(cols).forEach(k => cals.push(calendarStyle(k, cols[k])))
 
                     cal.setCalendars(cals);
 
