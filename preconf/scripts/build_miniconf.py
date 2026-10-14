@@ -12,6 +12,7 @@ $PRECONF_API_ORIGIN. Paper data is re-frozen from sitedata on every run.
   python scripts/build_miniconf.py [--mockup] [--out build] [--api-origin https://…]
 """
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -35,9 +36,11 @@ ASSETS = ["app.js", "board.js", "room.js", "api.js", "canon-egg.js", "theme.js",
 ASSET_DIRS = ["vendor", "data"]
 
 
-def render_page(text, api_origin):
+def render_page(text, api_origin, version):
     # Root-absolute paths were written for the Worker; on the miniconf they live under lounge/.
-    text = re.sub(r'(src|href)="/(?!/)([^"]*)"', lambda m: f'{m[1]}="{ASSET_DIR}/{m[2]}"', text)
+    # ?v=<content hash>: GitHub Pages lets browsers cache files for 10 minutes, so without it a
+    # visitor can run a fresh page against stale scripts (e.g. an old backend address).
+    text = re.sub(r'(src|href)="/(?!/)([^"?]*)"', lambda m: f'{m[1]}="{ASSET_DIR}/{m[2]}?v={version}"', text)
     # GitHub Pages cannot send headers, so the CSP the Worker sends goes in a meta tag.
     ws = re.sub(r"^http", "ws", api_origin)
     csp = (f"default-src 'self'; base-uri 'none'; object-src 'none'; script-src 'self'; "
@@ -82,14 +85,26 @@ def main():
             "window.ISMIRSite = window.ISMIRSite || { timeZone: window.PC_CONFIG.timeZone };\n",
             encoding="utf-8",
         )
-        (stage / PAGE).write_text(render_page((PUBLIC / "index.html").read_text(encoding="utf-8"), api), encoding="utf-8")
+        # One version for the whole build: a hash of everything shipped, so it changes exactly
+        # when any script, style, data file or the backend address changes.
+        digest = hashlib.sha256()
+        for f in sorted(x for x in assets.rglob("*") if x.is_file()):
+            digest.update(f.relative_to(assets).as_posix().encode() + b"\0" + f.read_bytes())
+        version = digest.hexdigest()[:12]
+        # Module imports and the data fetch carry the same version (they are cached separately).
+        for f in assets.glob("*.js"):
+            code = f.read_text(encoding="utf-8")
+            code = re.sub(r"""(from\s+'\./[\w-]+\.js)'""", rf"\1?v={version}'", code)
+            code = code.replace("'./data/program.json'", f"'./data/program.json?v={version}'")
+            f.write_text(code, encoding="utf-8")
+        (stage / PAGE).write_text(render_page((PUBLIC / "index.html").read_text(encoding="utf-8"), api, version), encoding="utf-8")
 
         # Replace only the paths this component owns.
         (out / PAGE).unlink(missing_ok=True)
         shutil.rmtree(out / ASSET_DIR, ignore_errors=True)
         shutil.move(str(stage / PAGE), out / PAGE)
         shutil.move(str(assets), out / ASSET_DIR)
-    print(f"Lounge -> {out / PAGE} (API {api})")
+    print(f"Lounge -> {out / PAGE} (API {api}, version {version})")
 
 
 if __name__ == "__main__":
