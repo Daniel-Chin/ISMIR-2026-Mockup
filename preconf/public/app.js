@@ -419,9 +419,12 @@ function paperCard(p) {
   const controls = el('div', 'paper-card-controls');
   const modeRow = el('div', 'presenter-mode-row');
   modeRow.append(el('div', 'presenter-mode-line', PRESENTER_LABELS[p.presenterMode] || 'Presentation mode TBA'));
+  // Paper / Poster / Video open the miniconf paper page in a new tab, at that section
+  // (poster.js there opens the section named by the #fragment).
   const links = el('div', 'link-row');
-  const L = p.links || {};
-  for (const a of [linkButton(p.channelUrl, 'Slack'), linkButton(L.pdf, 'PDF'), linkButton(L.video, 'Video'), linkButton(L.poster, 'Poster'), linkButton(L.slides, 'Slides')]) {
+  const has = new Set(p.materials || []);
+  const section = id => (has.has(id) && p.posterUrl ? `${p.posterUrl}#${id}` : '');
+  for (const a of [linkButton(p.channelUrl, 'Slack'), linkButton(section('paper'), 'Paper'), linkButton(section('poster'), 'Poster'), linkButton(section('video'), 'Video')]) {
     if (a) links.append(a);
   }
   controls.append(modeRow);

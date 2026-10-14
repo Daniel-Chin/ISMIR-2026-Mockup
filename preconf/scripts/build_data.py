@@ -96,8 +96,10 @@ def presenter_mode(raw):
     return "onsite"
 
 
-# Paper materials, exactly the ones the live overview links (https only).
-MATERIAL_LINKS = [("raw_pdf_path", "pdf"), ("raw_video", "video"), ("raw_poster_pdf", "poster"), ("raw_slides_pdf", "slides")]
+# Paper materials, by the miniconf poster-page section that shows them (poster_<uid>.html#<id>).
+# Same conditions as templates/poster.html: the section exists only when its column is filled.
+# (The page embeds them, so no raw Drive links leave the build.)
+MATERIAL_SECTIONS = [("paper", "raw_pdf_path"), ("poster", "raw_poster_pdf"), ("video", "video")]
 
 
 def hhmm(value):
@@ -169,8 +171,7 @@ def main():
             paper["displayId"] = f"P{int(number.group())}-{pos:02d}" if number else f"#{uid}"
             paper["authors"] = overview_authors(row.get("authors_and_affil", ""))
             paper["presenterMode"] = presenter_mode(row.get("paper_presentation", ""))
-            paper["links"] = {dst: row[src].strip() for src, dst in MATERIAL_LINKS
-                              if row.get(src, "").strip().startswith("https://")}
+            paper["materials"] = [section for section, col in MATERIAL_SECTIONS if row.get(col, "").strip()]
             papers[uid] = paper
         found = slots.get(int(number.group()), {}) if number else {}
         # Oral first, then poster; fall back to the combined window when events.csv lacks them.
