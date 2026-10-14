@@ -92,12 +92,12 @@ const app = {
   user: store.get(USER_KEY, null),
   composer,
   // Sign-in pages live on the Worker; `return` brings the visitor back to this exact page.
-  loginUrl() { return apiUrl('/auth/start?return=' + encodeURIComponent(location.href)); },
+  loginUrl() { return apiUrl('/auth/slack/start?return=' + encodeURIComponent(location.href)); },
   login() { location.href = this.loginUrl(); },
   /** Returns true when signed in; otherwise nudges toward Slack sign-in. */
   requireLogin(what) {
     if (this.user) return true;
-    toast(`Sign in to ${what}.`, { action: { label: 'Sign in', run: () => this.login() }, ms: 7000 });
+    toast(`Sign in with Slack to ${what}.`, { action: { label: 'Sign in', run: () => this.login() }, ms: 7000 });
     return false;
   },
 };
@@ -110,7 +110,7 @@ function renderAuth() {
   const slot = $('#auth-slot');
   if (!app.user) {
     const b = el('a', 'theme-toggle pc-signin', 'Sign in');
-    b.title = 'Sign in with the lounge link from Slack';
+    b.title = 'Sign in with Slack';
     b.href = app.loginUrl();
     b.addEventListener('click', e => { e.preventDefault(); app.login(); });
     slot.replaceChildren(b);
@@ -118,10 +118,7 @@ function renderAuth() {
   }
   const chip = el('span', 'pc-user-chip');
   chip.append(el('span', 'pc-avatar', initials(app.user.name)));
-  const name = el('a', 'pc-name', app.user.name);
-  name.href = apiUrl('/auth/name?return=' + encodeURIComponent(location.href));
-  name.title = 'Change the name shown on your notes';
-  chip.append(name);
+  chip.append(el('span', 'pc-name', app.user.name));   // your Slack name
   const out = el('button', 'pc-signout', 'Sign out');
   out.type = 'button';
   out.addEventListener('click', async () => {
@@ -472,7 +469,8 @@ async function main() {
   const params = new URLSearchParams(location.search);
   if (params.get('login_error')) {
     toast(params.get('login_error').slice(0, 160), { error: true, ms: 8000 });
-    history.replaceState(null, '', location.pathname + location.hash);
+    params.delete('login_error');
+    history.replaceState(null, '', location.pathname + (params.toString() ? '?' + params : '') + location.hash);
   }
   await refreshUser();
   initWelcome();

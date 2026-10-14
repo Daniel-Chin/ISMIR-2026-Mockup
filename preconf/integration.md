@@ -32,6 +32,7 @@ Both assume `./preconf` is the current directory.
 - The Worker validates rooms and boards by pattern, not against the paper list. Data refreshes therefore never require a backend redeploy.
 
 ## Sign-in
-- Same model as the Zoom redirect (`utils/zoom_redirect.py`): the Slack link `https://<worker>/?token=<LOUNGE_ACCESS_TOKEN>` carries a shared code.
-- The Worker checks it, asks for a display name, then returns to `lounge.html` with the session in the URL fragment. The page keeps the session in localStorage.
+- Sign in with Slack (OpenID Connect). "Sign in" on `lounge.html` goes to the Worker, then to Slack's own sign-in page, and back.
+- The user id is the Slack user id (with the workspace id); the name is the Slack name.
+- The Worker exchanges the code with the Slack app's secret and returns to `lounge.html` with the session in the URL fragment. The page keeps the session in localStorage.
 - No secrets are needed by the build or by CI.

@@ -362,12 +362,8 @@ dialog.pc-composer::backdrop { background: rgba(4, 6, 12, .6); }
 .pc-auth-copy { margin: 0; color: var(--ink); font-size: .92rem; line-height: 1.5; }
 .pc-auth-copy a { color: var(--cyan); }
 .pc-auth-form { display: grid; gap: 10px; }
-.pc-auth-label { color: var(--muted); font-size: .78rem; text-transform: none; letter-spacing: 0; }
 .pc-auth-form input { padding: 10px 12px; border: 2px solid var(--pc-border); background: var(--pc-panel); color: var(--ink); font: inherit; font-size: 1rem; }
 .pc-auth-form button { justify-self: start; }
-.pc-auth-error { margin: 0; color: var(--danger); font-size: .85rem; font-weight: 800; }
-a.pc-name { color: inherit; text-decoration: none; }
-a.pc-name:hover { color: var(--gold); text-decoration: underline; text-underline-offset: 3px; }
 
 @media (max-width: 900px) { .pc-paper-grid { grid-template-columns: 1fr !important; } }
 @media (max-width: 760px) {
