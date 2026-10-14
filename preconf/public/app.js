@@ -500,6 +500,15 @@ function applyConference(conf) {
 async function main() {
   const handoff = takeTokenFromHash();
   if (handoff) { location.replace(handoff); return; }
+  // Sign-in can arrive without a page load: Safari may only change the #fragment of an open
+  // page ("Open in Safari" from another app), or restore the page from its back/forward cache.
+  // Either way the page would still look signed out, so pick the session up and reload.
+  window.addEventListener('hashchange', () => {
+    if (!/(^#|&)(pc_auth|pc_link)=/.test(location.hash)) return;
+    const next = takeTokenFromHash();
+    if (next) location.replace(next); else location.reload();
+  });
+  window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
   renderAuth();
   const params = new URLSearchParams(location.search);
   if (params.get('login_error')) {
