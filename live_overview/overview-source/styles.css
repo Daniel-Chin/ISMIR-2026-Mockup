@@ -7006,6 +7006,7 @@ html[data-theme="light"] #live-events .live-poster-conversation-line .active-con
   color: inherit !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: .78rem;
+  font-weight: 500;   /* Oral / Tutorial lists: medium titles, the gold IDs carry the weight */
   line-height: 1.35;
 }
 html[data-theme="light"] #live-events .live-session-paper-list-panel {
