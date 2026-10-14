@@ -354,6 +354,11 @@ export class BoardView {
       this.els.get(n.id)?.remove();
       this.els.delete(n.id);
       this.updateEmpty();
+    } else if (ev.type === 'error' && ev.id && this.els.has(ev.id) && this.dragging?.id !== ev.id) {
+      // The server refused a change to this note (e.g. a drop over the rate limit): put it
+      // back where the server has it, so the screen never shows a position nobody else sees.
+      const n = this.room.notes.get(ev.id);
+      if (n) this.upsertNote(n, false);
     } else if (ev.type === 'drag') {
       const node = this.els.get(ev.id);
       if (!node || this.dragging?.id === ev.id) return;
