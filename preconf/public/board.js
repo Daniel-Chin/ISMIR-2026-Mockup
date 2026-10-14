@@ -16,9 +16,9 @@ function idFraction(id) {
 }
 const DRAG_SEND_MS = 70;
 const MAX_SCALE = 3;           // absolute: notes at 3x their logical size
-// The fitted "all notes" view zooms in at most 2x (in width and height) past the whole-board
-// view, i.e. no closer than 100%: a lone note should not blow up to fill the screen.
-const FIT_MAX_ZOOM = 2;
+// The fitted "all notes" view zooms in at most 4x (in width and height) past the whole-board
+// view, i.e. no closer than 200%: a lone note should not blow up to fill the screen.
+const FIT_MAX_ZOOM = 4;
 const TOUR_MOVE_MS = 4500;     // intro camera: one glide between shots
 const TOUR_HOLD_MS = 2200;     // ...then rest on the shot
 const ZOOM_EASE = 0.22;        // fraction of the remaining distance covered per frame
