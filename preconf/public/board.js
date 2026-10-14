@@ -15,7 +15,8 @@ function idFraction(id) {
   return (h >>> 0) / 4294967296;
 }
 const DRAG_SEND_MS = 70;
-const MAX_SCALE = 3;           // absolute: notes at 3x their logical size
+const MAX_SCALE = 3;
+const FIT_MAX_SCALE = 1.5;     // paper boards open zoomed to their notes, but no closer than this           // absolute: notes at 3x their logical size
 const TOUR_MOVE_MS = 4500;     // intro camera: one glide between shots
 const TOUR_HOLD_MS = 2200;     // ...then rest on the shot
 const ZOOM_EASE = 0.22;        // fraction of the remaining distance covered per frame
@@ -39,11 +40,15 @@ export function timeAgo(ts) {
 export class BoardView {
   /**
    * @param {HTMLElement} mount
-   * @param {object} o { room, board, title, app, emptyText, tour }
+   * @param {object} o { room, board, title, app, emptyText, tour, fitNotes, dblclickExpands }
+   *   fitNotes: open zoomed so all notes just fit, centred on them (paper boards)
+   *   dblclickExpands: double-click opens the board full screen instead of starting a note
    */
   constructor(mount, o) {
     Object.assign(this, { room: o.room, board: o.board, title: o.title, app: o.app });
     this.tourEnabled = !!o.tour && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.fitNotes = !!o.fitNotes;
+    this.dblclickExpands = !!o.dblclickExpands;
     this.scale = 1;          // current rendered scale
     this.base = 1;           // smallest scale: the board exactly covers the viewport (100% readout)
     this.target = 1;         // scale the zoom animation is heading to
@@ -84,6 +89,8 @@ export class BoardView {
 
     this.surface.addEventListener('dblclick', e => {
       if (e.target !== this.surface && e.target !== this.empty) return;
+      // Small embedded boards expand on double-click; once expanded, double-click starts a note.
+      if (this.dblclickExpands && !this.frame.classList.contains('is-fullscreen')) { this.toggleFullscreen(); return; }
       const r = this.surface.getBoundingClientRect();
       this.compose((e.clientX - r.left) / this.scale - NOTE_W / 2, (e.clientY - r.top) / this.scale - 20);
     });
@@ -203,6 +210,23 @@ export class BoardView {
   camera() {
     const w = this.scroller.clientWidth, h = this.scroller.clientHeight;
     return { s: this.scale, cx: (this.scroller.scrollLeft + w / 2) / this.scale, cy: (this.scroller.scrollTop + h / 2) / this.scale };
+  }
+
+  /** Zoom so every note on this board just fits, centred on them. Nothing to fit: whole board. */
+  fitToNotes() {
+    const nodes = [...this.els.values()];
+    if (!nodes.length) return;
+    const pad = 24;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const n of nodes) {
+      const x = parseFloat(n.style.left) || 0, y = parseFloat(n.style.top) || 0;
+      x0 = Math.min(x0, x); y0 = Math.min(y0, y);
+      x1 = Math.max(x1, x + n.offsetWidth); y1 = Math.max(y1, y + n.offsetHeight);
+    }
+    const vw = this.scroller.clientWidth, vh = this.scroller.clientHeight;
+    // Cap at 1.5x natural size: a lone note should not blow up to fill the whole card.
+    const s = this.clampScale(Math.min(vw / (x1 - x0 + 2 * pad), vh / (y1 - y0 + 2 * pad), FIT_MAX_SCALE));
+    this.setCamera({ s, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 });
   }
 
   setCamera({ s, cx, cy }) {
@@ -334,6 +358,7 @@ export class BoardView {
       document.body.style.overflow = '';
     }
     this.layout(true);
+    if (this.fitNotes) this.fitToNotes();
   }
 
   // ---------- room events ----------
@@ -341,6 +366,8 @@ export class BoardView {
     if (ev.type === 'reset') {
       this.renderAll();
       this.layout(true);   // the server's hello carries this room's board size
+      // Initial view only: reconnects and later notes never move the user's camera.
+      if (this.fitNotes && !this.fitted) { this.fitted = true; this.fitToNotes(); }
       if (this.tourEnabled && !this.tourStopped) setTimeout(() => this.startTour(), 900);
       return;
     }

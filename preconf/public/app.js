@@ -347,7 +347,7 @@ function openSession(id, scroll) {
     const cardEl = paperCard(p);
     grid.append(cardEl);
     const mount = cardEl.querySelector('.pc-paper-board');
-    const board = new BoardView(mount, { room, board: 'paper:' + uid, title: `#${uid} ${p.title}`, app, emptyText: 'No notes yet: double-click to start the discussion' });
+    const board = new BoardView(mount, { room, board: 'paper:' + uid, title: `#${uid} ${p.title}`, app, fitNotes: true, dblclickExpands: true, emptyText: 'No notes yet: tap + Note to start the discussion' });
     boards.push(board);
     cardEl.querySelector('[data-add]').addEventListener('click', e => { e.preventDefault(); board.compose(); });
     counters.set('paper:' + uid, cardEl.querySelector('[data-count]'));
