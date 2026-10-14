@@ -93,7 +93,26 @@ const app = {
   composer,
   // Sign-in pages live on the Worker; `return` brings the visitor back to this exact page.
   loginUrl() { return apiUrl('/auth/slack/start?return=' + encodeURIComponent(location.href)); },
-  login() { location.href = this.loginUrl(); },
+  slackApp: null,   // {team, app} from /api/me when the Slack-app sign-in is set up
+  login() {
+    // Phones and tablets: if the Slack app is installed, Slack's web sign-in jumps into it after
+    // the email code and never comes back. So go to the app on purpose: our Home tab there shows
+    // "Enter the Lounge", a one-tap sign-in link. No app installed → the deep link does nothing,
+    // the page stays visible, and we fall back to the normal browser sign-in.
+    if (this.slackApp && matchMedia('(pointer: coarse)').matches) {
+      const { team, app: id } = this.slackApp;
+      let left = false;
+      const onHide = () => { if (document.hidden) left = true; };
+      document.addEventListener('visibilitychange', onHide);
+      setTimeout(() => {
+        document.removeEventListener('visibilitychange', onHide);
+        if (!left && !document.hidden) location.href = this.loginUrl();
+      }, 1800);
+      location.href = `slack://app?team=${encodeURIComponent(team)}&id=${encodeURIComponent(id)}&tab=home`;
+      return;
+    }
+    location.href = this.loginUrl();
+  },
   /** Returns true when signed in; otherwise nudges toward Slack sign-in. */
   requireLogin(what) {
     if (this.user) return true;
@@ -139,6 +158,7 @@ async function refreshUser() {
     const res = await apiFetch('/api/me', { cache: 'no-store' });
     const data = await res.json();
     app.user = data.user;
+    app.slackApp = data.slackApp || null;
     if (!data.user) clearToken();   // expired or revoked
     store.set(USER_KEY, data.user || undefined);
   } catch { /* offline: keep the cached name for display only; the server decides on writes */ }
