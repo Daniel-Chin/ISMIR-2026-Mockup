@@ -103,6 +103,7 @@ the workspace (workspace admin, or an app-approval flow).
 # 5. set event channel purpose for all event rows
 #    Run setup-zoom first: this step requires each event's live_url. See ./ZOOM.md
 .venv/bin/python miniconf_prep.py --mockup --action set-event-channel-desc
+# This command needs to be run again each time event uid changes (e.g. from adjustment of conference schedule)
 
 # 6. Tutorials.
 .venv/bin/python miniconf_prep.py --mockup --action setup-tutorial-channels
