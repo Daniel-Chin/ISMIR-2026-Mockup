@@ -50,7 +50,8 @@ export class BoardView {
     this.fitNotes = !!o.fitNotes;
     this.dblclickExpands = !!o.dblclickExpands;
     this.scale = 1;          // current rendered scale
-    this.base = 1;           // smallest scale: the board exactly covers the viewport (100% readout)
+    this.base = 1;           // the "100%" scale: the board's centre quarter fills the view
+    this.minScale = 0.5;     // smallest scale (50%): the whole board exactly covers the view
     this.target = 1;         // scale the zoom animation is heading to
     this.anchor = null;      // {cx, cy, px, py}: content point that stays under the cursor
     this.els = new Map();          // top-level note id -> element
@@ -75,7 +76,7 @@ export class BoardView {
       b.addEventListener('click', fn);
       return b;
     };
-    this.zoomLabel = tool('100%', 'Reset zoom', () => this.zoomTo(this.base));
+    this.zoomLabel = tool('100%', 'Back to 100%, centred', () => this.resetView());
     this.tools.append(
       tool('−', 'Zoom out', () => this.zoomTo(this.target / 1.4)),
       this.zoomLabel,
@@ -133,19 +134,44 @@ export class BoardView {
     if (!force && key === this.lastKey) return;
     this.lastKey = key;
     const fit = full ? Math.max(width / this.W, height / this.H) : width / this.W;
-    const zoomed = this.everLaidOut ? this.scale / this.base : 1;   // keep the user's zoom across resizes
+    const first = !this.everLaidOut;
+    const zoomed = first ? 1 : this.scale / this.base;   // keep the user's zoom across resizes
+    const centre = first ? null : this.camera();
     this.everLaidOut = true;
-    this.base = Math.ceil(fit * 10000) / 10000;   // round up: never leave a sub-pixel gap
+    // 50% = the whole board exactly covers the viewport; 100% = twice that, the centre quarter.
+    this.minScale = Math.ceil(fit * 10000) / 10000;   // round up: never leave a sub-pixel gap
+    this.base = this.minScale * 2;
     if (!full) this.scroller.style.height = Math.floor(this.H * width / this.W) + 'px';
     cancelAnimationFrame(this.raf);
     this.raf = 0;
     this.anchor = null;
     this.target = this.clampScale(this.base * zoomed);
-    this.applyScale(this.target);
+    // Open on the centre of the board; on later resizes keep looking at the same spot.
+    this.setCamera({ s: this.target, cx: centre ? centre.cx : this.W / 2, cy: centre ? centre.cy : this.H / 2 });
     if (this.tourRaf) this.tourSegment(this.camera());   // re-plan the glide for the new viewport
   }
 
-  clampScale(v) { return Math.min(Math.max(MAX_SCALE, this.base), Math.max(this.base, v)); }
+  clampScale(v) { return Math.min(Math.max(MAX_SCALE, this.base), Math.max(this.minScale, v)); }
+
+  /** The 100% button: back to 100%, looking at the centre of the board (smooth). */
+  resetView() {
+    this.stopTour();
+    cancelAnimationFrame(this.raf);
+    this.raf = 0;
+    const from = this.camera(), to = { s: this.base, cx: this.W / 2, cy: this.H / 2 };
+    const t0 = performance.now(), ms = 450;
+    const ease = t => 1 - (1 - t) ** 3;
+    const step = now => {
+      const k = ease(Math.min(1, (now - t0) / ms));
+      this.setCamera({
+        s: Math.exp(Math.log(from.s) + (Math.log(to.s) - Math.log(from.s)) * k),
+        cx: from.cx + (to.cx - from.cx) * k,
+        cy: from.cy + (to.cy - from.cy) * k,
+      });
+      if (k < 1) this.raf = requestAnimationFrame(step); else this.raf = 0;
+    };
+    this.raf = requestAnimationFrame(step);
+  }
 
   applyScale(scale) {
     this.scale = scale;
@@ -246,7 +272,7 @@ export class BoardView {
    * a new round starts from a new random note. Notes posted mid-round join the current round.
    */
   nextShot() {
-    const overview = { s: this.base, cx: this.W / 2, cy: this.H / 2 };
+    const overview = { s: this.minScale, cx: this.W / 2, cy: this.H / 2 };
     const notes = [...this.room.notes.values()].filter(n => n.board === this.board && this.els.has(n.id));
     if (!notes.length) {
       // Empty wall: drift between random spots and the whole wall.
