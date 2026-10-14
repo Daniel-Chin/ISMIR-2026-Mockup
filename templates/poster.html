@@ -208,8 +208,10 @@ endif %}
   <div id="video" class="collapse">
     {% if paper.content.video and config.paper_videos %}
     <div style="display: flex; justify-content: center;">
-      <iframe src="{{paper.content.video}}" width="960" height="540"
-        allow="encrypted-media" allowfullscreen></iframe>
+      <iframe src="https://www.youtube.com/embed/{{paper.content.video}}"
+        width="960" height="540" title="YouTube video player" frameborder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+        referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
     </div>
     {% endif %}
   </div>

@@ -512,7 +512,7 @@ def format_paper(v):
             "poster_pdf": convert_drive_link(v.get("raw_poster_pdf", "")),
             "slides": convert_drive_link(v.get("raw_slides_pdf", "")),
             "thumbnail": paper_thumbnail_path(v),
-            "video": (v.get("video") or "").strip().replace("/open?id=", "/uc?export=preview&id="),
+            "video": get_yt_id(v.get("video") or ""),
             "channel_url": v["channel_url"],
             "slack_channel": v["slack_channel"],
             "day": v["day"],
