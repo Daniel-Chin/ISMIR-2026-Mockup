@@ -8,6 +8,20 @@ $('.poster-buttons button').on('click', function() {
   }
 });
 
+// Deep links: poster_<uid>.html#paper (or #poster, #video, #slides, #details) opens that
+// section, as if its button had been pressed. Used by the Pre-Conference Lounge.
+// Returns false when the URL names no section on this page.
+function openSectionFromHash() {
+  var id = (window.location.hash || '').slice(1);
+  if (!/^[A-Za-z][\w-]*$/.test(id)) return false;
+  var button = $('.poster-buttons button[data-target="#' + id + '"]');
+  if (!button.length) return false;
+  if (!$('#' + id).hasClass('show')) button.trigger('click');
+  button[0].scrollIntoView({ block: 'start' });
+  return true;
+}
+$(window).on('hashchange', openSectionFromHash);
+
 $('.fullscreen-button').on('click', function() {
   fullscreen($(this).next('.fullscreen-iframe')[0])
 })
@@ -70,5 +84,6 @@ function fullscreenChange() {
 $("#fullscreen-iframe button#presentationMode").css('display', 'none !important');
 
 $(window).ready(function() {
-  $('.poster-buttons button').first().trigger("click");
+  // A #section in the URL wins; otherwise open the first section, as before.
+  if (!openSectionFromHash()) $('.poster-buttons button').first().trigger("click");
 })
