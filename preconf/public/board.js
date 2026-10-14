@@ -244,11 +244,12 @@ export class BoardView {
 
   /**
    * The board's default view: zoomed so every note just fits, centred on them, but never more
-   * than FIT_MAX_ZOOM x the whole-board view. An empty board shows the whole board.
+   * than FIT_MAX_ZOOM x the whole-board view. An empty board shows 100%, centred, so its
+   * "no notes yet" hint (centred on the board) sits in the middle of the view.
    */
   fitCamera() {
     const nodes = [...this.els.values()];
-    if (!nodes.length) return { s: this.minScale, cx: this.W / 2, cy: this.H / 2 };
+    if (!nodes.length) return { s: this.base, cx: this.W / 2, cy: this.H / 2 };
     const pad = 24;
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const n of nodes) {
