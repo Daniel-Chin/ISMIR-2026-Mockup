@@ -242,18 +242,26 @@ export class BoardView {
   /**
    * Intro tour order: start at a random note (fresh on every page load), then visit every
    * note once, always moving to the nearest one not yet shown so the camera glides short
-   * distances. Every third shot pulls back to the whole wall. When all notes have been shown
-   * the tour starts over from a new random note. Notes posted mid-tour join the current pass.
+   * distances. Once every note has been shown, the camera pulls back to the whole wall, then
+   * a new round starts from a new random note. Notes posted mid-round join the current round.
    */
   nextShot() {
-    this.shotIndex = (this.shotIndex || 0) + 1;
     const overview = { s: this.base, cx: this.W / 2, cy: this.H / 2 };
-    if (this.shotIndex % 3 === 0) return overview;
     const notes = [...this.room.notes.values()].filter(n => n.board === this.board && this.els.has(n.id));
-    if (!notes.length) return { s: this.clampScale(this.base * 1.8), cx: this.W * (0.2 + Math.random() * 0.6), cy: this.H * (0.25 + Math.random() * 0.5) };
+    if (!notes.length) {
+      // Empty wall: drift between random spots and the whole wall.
+      this.shotIndex = (this.shotIndex || 0) + 1;
+      if (this.shotIndex % 2 === 0) return overview;
+      return { s: this.clampScale(this.base * 1.8), cx: this.W * (0.2 + Math.random() * 0.6), cy: this.H * (0.25 + Math.random() * 0.5) };
+    }
     this.shown = this.shown || new Set();
     let pool = notes.filter(n => !this.shown.has(n.id));
-    if (!pool.length) { this.shown.clear(); this.lastShown = null; pool = notes; }
+    if (!pool.length) {
+      // Round complete: show the whole wall, then start the next round.
+      this.shown.clear();
+      this.lastShown = null;
+      return overview;
+    }
     const centre = n => { const node = this.els.get(n.id); return { x: n.x + node.offsetWidth / 2, y: n.y + node.offsetHeight / 2 }; };
     let n;
     const from = this.lastShown && this.room.notes.get(this.lastShown);
