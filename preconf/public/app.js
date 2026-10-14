@@ -329,7 +329,7 @@ function openSession(id, scroll) {
     b.addEventListener('click', () => setCols(n));
     seg.append(b);
   }
-  const collapse = el('button', 'pc-btn pc-btn-sm', '▲ Collapse');
+  const collapse = el('button', 'pc-btn pc-btn-sm pc-fs-btn', '▲ Collapse');
   collapse.type = 'button';
   collapse.addEventListener('click', () => { const c = card; closeSession(); c?.scrollIntoView({ block: 'nearest' }); });
   tools.append(segLabel, seg, collapse);

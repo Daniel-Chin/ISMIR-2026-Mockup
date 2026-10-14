@@ -248,14 +248,16 @@ html[data-theme="light"] .pc-btn-primary { background: #102a52; color: #fff; bor
 
 /* Expand / Collapse: the one board button people need to find. Same shape as its neighbours,
    but a stronger fill: deep navy on the light theme, bright cyan on the dark one. */
-html[data-theme="light"] .pc-board-tools .pc-fs-btn {
+html[data-theme="light"] .pc-board-tools .pc-fs-btn, html[data-theme="light"] .pc-session-panel-head .pc-fs-btn {
   background: #193762 !important; color: #fff !important; border-color: #10233d !important;
 }
-html[data-theme="light"] .pc-board-tools .pc-fs-btn:hover { background: #d89514 !important; color: #10233d !important; }
-html:not([data-theme="light"]) .pc-board-tools button.pc-fs-btn:not(.detail-backdrop) {
+html[data-theme="light"] .pc-board-tools .pc-fs-btn:hover, html[data-theme="light"] .pc-session-panel-head .pc-fs-btn:hover { background: #d89514 !important; color: #10233d !important; }
+html:not([data-theme="light"]) .pc-board-tools button.pc-fs-btn:not(.detail-backdrop),
+html:not([data-theme="light"]) .pc-session-panel-head button.pc-fs-btn:not(.detail-backdrop) {
   background: #4ee6ff !important; color: #07101b !important; border-color: #b7f5ff !important;
 }
-html:not([data-theme="light"]) .pc-board-tools button.pc-fs-btn:not(.detail-backdrop):hover { background: #ffd36d !important; border-color: #fff3c2 !important; }
+html:not([data-theme="light"]) .pc-board-tools button.pc-fs-btn:not(.detail-backdrop):hover,
+html:not([data-theme="light"]) .pc-session-panel-head button.pc-fs-btn:not(.detail-backdrop):hover { background: #ffd36d !important; border-color: #fff3c2 !important; }
 
 /* ---------- sticky notes (pastel in both themes) ---------- */
 .pc-note {
