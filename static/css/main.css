@@ -59,6 +59,14 @@ body {
   padding-top: 5px;
   padding-bottom: 5px;
   box-shadow: 0px 2px 5px 0px rgba(0, 0, 0, 0.3);
+  /* High browser zoom = short viewport in CSS px; don't let the sticky nav eat it. */
+  max-height: 10vh;
+  overflow-y: auto;
+}
+
+/* The opened hamburger menu needs the room. */
+#main-nav:has(.navbar-collapse.show, .navbar-collapse.collapsing) {
+  max-height: 100vh;
 }
 
 #main-nav .navbar-brand {
@@ -70,7 +78,7 @@ body {
   margin: 0;
   padding: 0;
   display: block;
-  max-height: 36px;
+  max-height: min(36px, 10vh - 10px); /* 10px = #main-nav vertical padding */
   width: auto;
 }
 
@@ -149,6 +157,13 @@ body .nav-pills .nav-link.active {
 
 .container {
   margin-top: 10px;
+}
+
+/* One cap instead of bootstrap's per-breakpoint widths, which shrink the
+ * container on screen when zooming in crosses a breakpoint.
+ * `body` prefix: bootstrap loads after this file. */
+body .container {
+  max-width: 1140px;
 }
 
 .card {
