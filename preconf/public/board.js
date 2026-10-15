@@ -148,6 +148,7 @@ export class BoardView {
     const full = this.frame.classList.contains('is-fullscreen');
     const rect = this.scroller.getBoundingClientRect();
     const width = Math.floor(rect.width), height = Math.floor(rect.height);
+    if (!width) return;   // hidden (e.g. the wall while the hall is shown): nothing to fit to
     const key = full ? `${width}x${height}` : String(width);
     if (!force && key === this.lastKey) return;
     this.lastKey = key;

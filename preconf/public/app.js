@@ -291,6 +291,8 @@ const paperTag = n => (n.board?.startsWith('paper:') ? hall.program.papers[n.boa
 /** Switch the Paper Hall section between the hall (session cards) and the wall. */
 function setPaperView(view, { link = true } = {}) {
   view = view === 'wall' ? 'wall' : 'hall';
+  // Leaving an expanded wall: collapse it first, while it is still visible to measure.
+  if (view === 'hall' && papers.wall?.frame.classList.contains('is-fullscreen')) papers.wall.toggleFullscreen();
   papers.view = view;
   store.set(VIEW_KEY, view);
   $('#paper-hall').hidden = view !== 'hall';
@@ -299,16 +301,15 @@ function setPaperView(view, { link = true } = {}) {
   document.querySelectorAll('#paper-view button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === view)));
   if (view === 'wall') {
     closeSession({ keepHash: true });
-    if (!papers.wall) {
-      // One live connection per session while the wall is shown; closed again in hall view.
+    if (papers.wall) papers.wall.shown();
+    else {
+      // One live connection per session. Kept (idle) while the hall is shown, so going back to
+      // the wall, or jumping to a paper on it, shows every note at once.
       const rooms = new WallRooms(hall.program);
       rooms.subscribe(ev => { if (ev.type === 'error') handleRoomError(ev); });
       papers.wall = new WallView($('#paper-wall'), { room: rooms, app, program: hall.program, layout: wallLayout(), buildPin: pinCard, regionHead: wallRegionHead, noteTag: paperTag });
       refreshSessionTimes();
     }
-  } else if (papers.wall) {
-    papers.wall.destroy();
-    papers.wall = null;
   }
   if (link) setLink(view === 'wall' ? '#wall' : '#papers');
 }
@@ -318,8 +319,8 @@ function initPaperView() {
     const b = e.target.closest('button[data-view]');
     if (b) setPaperView(b.dataset.view);
   });
-  const shared = new URLSearchParams(location.hash.slice(1)).has('wall');
-  setPaperView(shared ? 'wall' : store.get(VIEW_KEY, 'wall'), { link: false });
+  const shared = new URLSearchParams(location.hash.slice(1));
+  setPaperView(shared.has('wall') ? 'wall' : shared.has('hall') ? 'hall' : store.get(VIEW_KEY, 'wall'), { link: false });
 }
 
 /** A session's title band on the wall: "Mon · PS-01" and its Oral / Poster times. */
@@ -365,7 +366,7 @@ function pinCard(p) {
   const top = el('div', 'pc-pin-top');
   const comment = el('a', 'link-button pc-add-note pc-pin-comment', '+ Comment');
   comment.href = '#'; comment.setAttribute('role', 'button'); comment.dataset.comment = '';
-  top.append(paperIdLink(p, 'pc-pin-id pc-permalink'), comment);
+  top.append(paperIdLink(p, 'pc-pin-id pc-permalink', 'wall'), comment);
   const title = el('h4', 'pc-pin-title');
   const titleLink = linkButton(p.posterUrl, p.title);
   if (titleLink) { titleLink.className = ''; title.append(titleLink); } else title.textContent = p.title;
@@ -408,7 +409,8 @@ function closeSession({ keepHash = false } = {}) {
  *   lounge.html#welcome                    Welcome Reception
  *   lounge.html#papers                     Paper Hall
  *   lounge.html#wall                       Paper Hall, as the Paper Wall
- *   lounge.html#wall&paper=3               one paper on the wall (what "copy link" shares)
+ *   lounge.html#wall&paper=3               one paper on the wall    } what "copy link" shares,
+ *   lounge.html#hall&paper=3               one paper in the hall    } from the wall / the hall
  *   lounge.html#session=PS-03              a poster session, opened
  *   lounge.html#session=PS-03&paper=3      one paper's board in it (paper = papers.csv uid)
  *   lounge.html#paper=3                    same; the session is looked up (miniconf links use this)
@@ -426,8 +428,9 @@ function paperLink(uid) {
 function route() {
   const params = new URLSearchParams(location.hash.slice(1));
   const paper = params.get('paper'), session = params.get('session');
-  // Shared links (#wall&paper=…) always open the wall, whatever view the visitor used last.
+  // Shared links (#wall&paper=… / #hall&paper=…) open that view, whatever the visitor used last.
   if (params.has('wall') && papers.view !== 'wall') setPaperView('wall', { link: false });
+  if (params.has('hall') && papers.view !== 'hall') setPaperView('hall', { link: false });
   if (location.hash === '#wall') {
     document.getElementById('papers')?.scrollIntoView();
     return;
@@ -574,23 +577,24 @@ function linkButton(href, label) {
   return a;
 }
 
-/** The link people share: it opens the wall and flies to this paper. */
-const shareLink = uid => location.origin + location.pathname + location.search + '#wall&paper=' + encodeURIComponent(uid);
+/** The link people share: it opens this paper in `view` ('wall' or 'hall'), whatever view the
+ * visitor used last. */
+const shareLink = (uid, view) => location.origin + location.pathname + location.search + `#${view}&paper=${encodeURIComponent(uid)}`;
 
-/** The paper id as a permalink: click it to copy a link to this paper on the wall. */
-function paperIdLink(p, cls) {
+/** The paper id as a permalink: click it to copy a link to this paper in the view it sits in. */
+function paperIdLink(p, cls, view) {
   const label = p.displayId || '#' + p.uid;
   const id = el('a', cls, label);
-  id.href = paperLink(p.uid);
+  id.href = shareLink(p.uid, view);
   id.title = 'Copy a link to this paper';
   id.addEventListener('click', async e => {
     e.preventDefault();
     try {
-      await navigator.clipboard.writeText(shareLink(p.uid));
+      await navigator.clipboard.writeText(shareLink(p.uid, view));
       toast(`Link to ${label} copied. Feel free to share it with your friends!`);
     } catch {
       // No clipboard (old browser, or permission refused): leave the link in the address bar.
-      history.replaceState(null, '', shareLink(p.uid));
+      history.replaceState(null, '', shareLink(p.uid, view));
       toast(`Link to ${label} is in the address bar. Feel free to share it with your friends!`);
     }
   });
@@ -605,7 +609,7 @@ function paperCard(p) {
   const status = el('div', 'paper-card-status-row');
   const count = el('span', 'pc-note-count', '0 notes');
   count.dataset.count = '';
-  const id = paperIdLink(p, 'paper-id pc-permalink');
+  const id = paperIdLink(p, 'paper-id pc-permalink', 'hall');
   status.append(id, count);
 
   const copy = el('div', 'paper-card-copy');
