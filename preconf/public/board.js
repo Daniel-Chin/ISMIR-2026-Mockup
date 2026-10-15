@@ -210,7 +210,7 @@ export class BoardView {
     const zooming = Math.abs(Math.log(to.s / from.s)) > 0.05;
     const pivot = (a, b) => (a * from.s - b * to.s) / (from.s - to.s);
     const px = zooming ? pivot(from.cx, to.cx) : 0, py = zooming ? pivot(from.cy, to.cy) : 0;
-    this.setMoving(true);
+    this.setMoving(true, to.s > from.s * 1.001);
     const step = now => {
       // rAF's timestamp is the frame's start, which can be a moment before t0: never run backwards.
       const k = ease(Math.min(1, Math.max(0, (now - t0) / ms)));
@@ -244,7 +244,6 @@ export class BoardView {
     this.surface.style.width = this.W + 'px';
     this.surface.style.height = this.H + 'px';
     this.surface.style.transform = `scale(${scale})`;
-    this.updateFar();
     this.sizer.style.width = Math.floor(this.W * scale) + 'px';
     this.sizer.style.height = Math.floor(this.H * scale) + 'px';
     if (this.anchor) {
@@ -256,24 +255,20 @@ export class BoardView {
   }
 
   /**
-   * Zoomed out below 100% (only paper and Welcome boards go there; the wall's 100% is all of
-   * it), note and card text is left out (styles.css: .is-far): it is a few pixels tall there,
-   * yet the most expensive thing to draw while zooming. At 100% and above all text is drawn.
+   * A zoom/glide/pinch starts or stops. Zooming IN, the board becomes one compositor layer that
+   * is only scaled (cheap, and everything it needs is already drawn); when it stops the layer is
+   * dropped so text re-renders crisply. Zooming OUT it stays an ordinary layer drawn every frame:
+   * a scaled layer would show the parts coming into view as blank until drawn, which flickers.
    */
-  updateFar() {
-    const far = this.scale < this.base * 0.999;
-    if (far !== this.far) { this.far = far; this.surface.classList.toggle('is-far', far); }
+  setMoving(on, layer = false) {
+    this.moving = on;
+    const want = on && layer ? 'transform' : '';
+    if (this.surface.style.willChange !== want) this.surface.style.willChange = want;
   }
 
-  /**
-   * A zoom/glide/pinch starts or stops. While moving, the board is one compositor layer that is
-   * only scaled; when it stops, the layer is dropped so text re-renders crisply at its new size.
-   */
-  setMoving(on) {
-    if (this.moving === on) return;
-    this.moving = on;
-    this.surface.style.willChange = on ? 'transform' : '';
-    this.updateFar();
+  /** The motion turned into a zoom out: leave the scaled layer (see setMoving). */
+  dropLayerIfZoomingOut(next) {
+    if (next < this.scale && this.surface.style.willChange) this.surface.style.willChange = '';
   }
 
   /** Smoothly zoom to `scale`, keeping the content under viewport point (px, py) fixed. */
@@ -281,8 +276,8 @@ export class BoardView {
     if (px === undefined) { px = this.scroller.clientWidth / 2; py = this.scroller.clientHeight / 2; }
     this.target = this.clampScale(scale);
     this.anchor = { cx: (this.scroller.scrollLeft + px - (this.offX || 0)) / this.scale, cy: (this.scroller.scrollTop + py - (this.offY || 0)) / this.scale, px, py };
-    if (this.raf) return;
-    this.setMoving(true);
+    if (this.raf) { this.dropLayerIfZoomingOut(this.target); return; }
+    this.setMoving(true, this.target > this.scale);
     const step = () => {
       const diff = this.target - this.scale;
       if (Math.abs(diff) < this.target * 0.002) {
@@ -325,11 +320,12 @@ export class BoardView {
     // Touch events can outpace the screen: keep the latest and draw once per frame.
     this.pinch.next = { s: this.clampScale(this.pinch.s * dist / this.pinch.dist), px, py };
     if (this.pinch.raf) return;
-    this.setMoving(true);
+    if (!this.moving) this.setMoving(true, this.pinch.next.s > this.scale);
     this.pinch.raf = requestAnimationFrame(() => {
       const p = this.pinch;
       if (!p) return;
       p.raf = 0;
+      this.dropLayerIfZoomingOut(p.next.s);
       this.anchor = { cx: p.cx, cy: p.cy, px: p.next.px, py: p.next.py };
       this.applyScale(p.next.s);
       this.anchor = null;
