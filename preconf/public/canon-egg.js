@@ -1,6 +1,8 @@
-// Canon-in-D piano easter egg, ported verbatim from live_overview/overview-source/app.js
-// so the Lounge hero behaves exactly like the live overview's. Only the paper pool differs
-// (program.json instead of live state) and there is no debug mode here.
+// Canon-in-D piano easter egg, ported from live_overview/overview-source/app.js so the Lounge
+// hero plays exactly like the live overview's. Differences: the paper pool comes from
+// program.json, there is no debug mode, and solving it here counts: the first time a signed-in
+// attendee solves it they learn which finder they are; every later solve shows a random paper
+// fun fact. Both link to the finders' leaderboard (window.PC_EGG, set up by app.js).
 (function () {
 'use strict';
 const debugMode = false;
@@ -186,27 +188,139 @@ function canonEggCloseFunFact() {
   canonEggRenderProgress();
 }
 
-function canonEggShowFunFact() {
-  const pool = canonEggPaperPool();
-  // No fun facts yet: reset so the puzzle can be played again instead of staying "completed".
-  if (!pool.length) { canonEggCloseFunFact(); return; }
-  const paper = pool[Math.floor(Math.random() * pool.length)];
-  const backdrop = document.createElement('div');
-  backdrop.className = 'canon-egg-funfact-backdrop';
-  backdrop.innerHTML = `<section class="canon-egg-funfact-dialog" role="dialog" aria-modal="true" aria-labelledby="canon-egg-title">
-    <span class="canon-egg-funfact-kicker">Paper fun fact</span>
-    <h3 id="canon-egg-title"></h3>
-    <p class="canon-egg-funfact-copy"></p>
-    <button class="canon-egg-funfact-close" type="button">Close</button>
-  </section>`;
-  backdrop.querySelector('#canon-egg-title').textContent = paper.title;
-  backdrop.querySelector('.canon-egg-funfact-copy').textContent = paper.fact;
-  const close = backdrop.querySelector('.canon-egg-funfact-close');
-  close.addEventListener('click', canonEggCloseFunFact);
-  backdrop.addEventListener('click', (event) => { if (event.target === backdrop) canonEggCloseFunFact(); });
-  document.body.appendChild(backdrop);
-  requestAnimationFrame(() => backdrop.classList.add('is-visible'));
-  close.focus({ preventScroll: true });
+// ---------- result dialog: congratulations / fun fact / leaderboard ----------
+const CANON_EGG_FOUND_KEY = 'pcEggFound';       // this browser has solved it before
+const CANON_EGG_PENDING_KEY = 'pcEggPending';   // solved signed out: claim a rank after sign-in
+const canonEggStore = {
+  get(k) { try { return localStorage.getItem(k); } catch (_) { return null; } },
+  set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (_) {} },
+};
+
+function canonEggOrdinal(n) {
+  const tail = n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th');
+  return n + tail;
+}
+
+/** Open the dialog (once) and show `view`: {kind: 'congrats'|'congrats-signin'|'fact'|'leaderboard', ...}. */
+function canonEggOpenDialog(view) {
+  let backdrop = document.querySelector('.canon-egg-funfact-backdrop');
+  if (!backdrop) {
+    backdrop = document.createElement('div');
+    backdrop.className = 'canon-egg-funfact-backdrop';
+    backdrop.innerHTML = `<section class="canon-egg-funfact-dialog" role="dialog" aria-modal="true" aria-labelledby="canon-egg-title">
+      <span class="canon-egg-funfact-kicker"></span>
+      <h3 id="canon-egg-title"></h3>
+      <div class="canon-egg-funfact-copy"></div>
+      <p class="canon-egg-links"></p>
+      <button class="canon-egg-funfact-close" type="button">Close</button>
+    </section>`;
+    backdrop.querySelector('.canon-egg-funfact-close').addEventListener('click', canonEggCloseFunFact);
+    backdrop.addEventListener('click', (event) => { if (event.target === backdrop) canonEggCloseFunFact(); });
+    document.body.appendChild(backdrop);
+    requestAnimationFrame(() => backdrop.classList.add('is-visible'));
+    backdrop.querySelector('.canon-egg-funfact-close').focus({ preventScroll: true });
+  }
+  canonEggRender(backdrop, view);
+}
+
+function canonEggLink(label, run) {
+  const a = document.createElement('a');
+  a.className = 'canon-egg-link';
+  a.href = '#';
+  a.setAttribute('role', 'button');
+  a.textContent = label;
+  a.addEventListener('click', (event) => { event.preventDefault(); run(); });
+  return a;
+}
+
+function canonEggRender(backdrop, view) {
+  const kicker = backdrop.querySelector('.canon-egg-funfact-kicker');
+  const title = backdrop.querySelector('#canon-egg-title');
+  const copy = backdrop.querySelector('.canon-egg-funfact-copy');
+  const links = backdrop.querySelector('.canon-egg-links');
+  const para = (text) => { const p = document.createElement('p'); p.textContent = text; return p; };
+  const toBoard = () => canonEggLink('See the leaderboard →', () => canonEggOpenDialog({ kind: 'leaderboard' }));
+  copy.replaceChildren();
+  links.replaceChildren();
+  if (view.kind === 'congrats') {
+    kicker.textContent = 'Easter egg found';
+    title.textContent = 'Congratulations!';
+    copy.append(para(`You are the ${canonEggOrdinal(view.rank)} person to find the hidden easter egg!`));
+    links.append(toBoard());
+  } else if (view.kind === 'congrats-signin') {
+    kicker.textContent = 'Easter egg found';
+    title.textContent = 'Congratulations!';
+    copy.append(para('You found the hidden easter egg! Sign in with Slack to find out which finder you are.'));
+    links.append(canonEggLink('Sign in →', () => window.PC_EGG?.login()), toBoard());
+  } else if (view.kind === 'fact') {
+    const pool = canonEggPaperPool();
+    const paper = pool[Math.floor(Math.random() * pool.length)];
+    kicker.textContent = 'Paper fun fact';
+    title.textContent = paper ? paper.title : 'Fun facts are on their way';
+    copy.append(para(paper ? paper.fact : 'Authors are still sending them in. Solve it again later!'));
+    links.append(toBoard());
+  } else if (view.kind === 'leaderboard') {
+    kicker.textContent = 'Easter egg leaderboard';
+    title.textContent = 'First to find it';
+    copy.append(para('Loading…'));
+    const api = window.PC_EGG;
+    if (!api) { copy.replaceChildren(para('The leaderboard is not available here.')); return; }
+    api.leaderboard().then((data) => {
+      if (!data?.ok) throw new Error('leaderboard');
+      copy.replaceChildren();
+      if (!data.entries.length) { copy.append(para('Nobody has found it yet.')); return; }
+      const list = document.createElement('ol');
+      list.className = 'canon-egg-board';
+      const when = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      for (const e of data.entries) {
+        const li = document.createElement('li');
+        if (e.me) li.className = 'is-me';
+        const rank = document.createElement('b'); rank.textContent = '#' + e.rank;
+        const name = document.createElement('span'); name.textContent = e.name + (e.me ? ' (you)' : '');
+        const at = document.createElement('time'); at.textContent = when.format(new Date(e.at));
+        li.append(rank, name, at);
+        list.append(li);
+      }
+      copy.append(list);
+      const more = [`${data.total} ${data.total === 1 ? 'person has' : 'people have'} found it so far.`];
+      if (data.me && data.me > data.entries.length) more.push(`You are #${data.me}.`);
+      if (!api.user) more.push('Sign in with Slack and solve it to join.');
+      copy.append(para(more.join(' ')));
+    }).catch(() => { copy.replaceChildren(para('Could not load the leaderboard. Try again in a moment.')); });
+  }
+}
+
+/**
+ * Solved. Signed in: the server records it; the first time, show the rank. Signed out, first
+ * time on this browser: congratulate and offer sign-in (the rank is claimed on return). Every
+ * other solve: a random paper fun fact.
+ */
+async function canonEggShowResult() {
+  const api = window.PC_EGG;
+  let view = { kind: 'fact' };
+  if (api?.user) {
+    try {
+      const r = await api.solve();
+      if (r?.ok && r.first) view = { kind: 'congrats', rank: r.rank };
+    } catch (_) { /* offline: fall back to a fun fact */ }
+    canonEggStore.set(CANON_EGG_FOUND_KEY, '1');
+  } else if (!canonEggStore.get(CANON_EGG_FOUND_KEY)) {
+    canonEggStore.set(CANON_EGG_FOUND_KEY, '1');
+    canonEggStore.set(CANON_EGG_PENDING_KEY, '1');
+    view = { kind: 'congrats-signin' };
+  }
+  canonEggOpenDialog(view);
+}
+
+/** Back from signing in after solving signed out: claim the rank now and show it. */
+async function canonEggClaimPending() {
+  const api = window.PC_EGG;
+  if (!api?.user || !canonEggStore.get(CANON_EGG_PENDING_KEY)) return;
+  canonEggStore.set(CANON_EGG_PENDING_KEY, null);
+  try {
+    const r = await api.solve();
+    if (r?.ok && r.first) canonEggOpenDialog({ kind: 'congrats', rank: r.rank });
+  } catch (_) { canonEggStore.set(CANON_EGG_PENDING_KEY, '1'); }
 }
 
 function canonEggAdvance(key) {
@@ -217,7 +331,7 @@ function canonEggAdvance(key) {
     if (canonEggProgress === CANON_EGG_SEQUENCE.length) {
       canonEggCompleted = true;
       canonEggPlaySuccessPhrase();
-      canonEggShowFunFact();
+      canonEggShowResult();
     }
     return;
   }
@@ -303,6 +417,8 @@ function initCanonEasterEgg() {
 }
 
 initCanonEasterEgg();
+// app.js announces when it knows who is signed in (window.PC_EGG).
+if (window.PC_EGG) canonEggClaimPending(); else window.addEventListener('pc-egg-ready', canonEggClaimPending, { once: true });
 
 window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && document.querySelector('.canon-egg-funfact-backdrop')) canonEggCloseFunFact();

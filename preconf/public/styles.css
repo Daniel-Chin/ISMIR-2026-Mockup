@@ -508,3 +508,16 @@ html .pc-pin .link-row a.link-button { font-size: 11px; padding: 3px 7px; }
 .pc-pin-time { flex: none; text-align: right; font-weight: 800; color: #1c2433; white-space: nowrap; }
 .pc-pin-time .pc-time-venue { display: none; }
 .pc-pin.pc-paper-focus { outline: 6px solid var(--gold); outline-offset: 6px; }
+
+/* ---------- Canon easter egg: links and leaderboard in its dialog (canon-egg.js) ---------- */
+.canon-egg-funfact-copy p { margin: 0 0 8px; }
+.canon-egg-links { display: flex; flex-wrap: wrap; gap: 18px; margin: 4px 0 18px; }
+.canon-egg-links:empty { display: none; }
+a.canon-egg-link { font-weight: 900; color: var(--pc-jump); text-decoration: none; cursor: pointer; }
+a.canon-egg-link:hover, a.canon-egg-link:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
+.canon-egg-board { list-style: none; margin: 4px 0 10px; padding: 0; max-height: 46vh; overflow: auto; }
+.canon-egg-board li { display: grid; grid-template-columns: 3.2em minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 5px 2px; border-bottom: 1px dashed var(--pc-border); }
+.canon-egg-board li b { color: var(--gold); font-family: "Courier New", ui-monospace, monospace; }
+.canon-egg-board li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; }
+.canon-egg-board li time { font-size: .78em; opacity: .7; white-space: nowrap; }
+.canon-egg-board li.is-me span { color: var(--pc-jump); }

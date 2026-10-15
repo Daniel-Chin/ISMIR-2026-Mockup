@@ -757,6 +757,14 @@ async function main() {
     history.replaceState(null, '', location.pathname + (params.toString() ? '?' + params : '') + location.hash);
   }
   await refreshUser();
+  // The Canon easter egg (canon-egg.js, a classic script) records solves through these.
+  window.PC_EGG = {
+    get user() { return app.user; },
+    login: () => app.login(),
+    solve: () => apiFetch('/api/egg/solve', { method: 'POST' }).then(r => r.json()),
+    leaderboard: () => apiFetch('/api/egg/leaderboard', { cache: 'no-store' }).then(r => r.json()),
+  };
+  window.dispatchEvent(new Event('pc-egg-ready'));
   initWelcome();
 
   // Relative to this module, so it resolves on the Worker and in the GitHub Pages build alike.
