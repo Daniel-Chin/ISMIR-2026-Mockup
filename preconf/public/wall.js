@@ -313,7 +313,11 @@ export class WallView extends BoardView {
   focusPaper(uid) {
     const pin = this.wall.pins.get(String(uid));
     if (!pin) return;
-    this.glideTo({ s: this.clampScale(this.base * 10), cx: pin.x + pin.w / 2, cy: pin.y + pin.h / 2 });
+    // Start once the wall has its final size (it may have just been shown), or the first
+    // relayout would nudge the zoom back mid-glide.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      this.glideTo({ s: this.clampScale(this.base * 10), cx: pin.x + pin.w / 2, cy: pin.y + pin.h / 2 });
+    }));
     const card = this.surface.querySelector(`.pc-pin[data-uid="${CSS.escape(String(uid))}"]`);
     card?.classList.add('pc-paper-focus');
     setTimeout(() => card?.classList.remove('pc-paper-focus'), 2600);

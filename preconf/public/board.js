@@ -181,18 +181,35 @@ export class BoardView {
     cancelAnimationFrame(this.raf);
     this.raf = 0;
     const from = this.camera();
+    to = this.reachable(to);
     const t0 = performance.now(), ms = 450;
     const ease = t => 1 - (1 - t) ** 3;
+    // A zoom glides about the one board point that sits at the same screen spot in both views,
+    // so the picture only ever grows or shrinks towards its goal; panning the centre in a
+    // straight line while zooming would first drift the wrong way (and then snap back).
+    const zooming = Math.abs(Math.log(to.s / from.s)) > 0.05;
+    const pivot = (a, b) => (a * from.s - b * to.s) / (from.s - to.s);
+    const px = zooming ? pivot(from.cx, to.cx) : 0, py = zooming ? pivot(from.cy, to.cy) : 0;
     const step = now => {
-      const k = ease(Math.min(1, (now - t0) / ms));
-      this.setCamera({
-        s: Math.exp(Math.log(from.s) + (Math.log(to.s) - Math.log(from.s)) * k),
-        cx: from.cx + (to.cx - from.cx) * k,
-        cy: from.cy + (to.cy - from.cy) * k,
-      });
+      // rAF's timestamp is the frame's start, which can be a moment before t0: never run backwards.
+      const k = ease(Math.min(1, Math.max(0, (now - t0) / ms)));
+      const s = Math.exp(Math.log(from.s) + (Math.log(to.s) - Math.log(from.s)) * k);
+      this.setCamera(zooming
+        ? { s, cx: px - (px - from.cx) * from.s / s, cy: py - (py - from.cy) * from.s / s }
+        : { s, cx: from.cx + (to.cx - from.cx) * k, cy: from.cy + (to.cy - from.cy) * k });
       if (k < 1) this.raf = requestAnimationFrame(step); else this.raf = 0;
     };
     this.raf = requestAnimationFrame(step);
+  }
+
+  /** The camera closest to `to` that the board can show: near an edge, the view stops at it. */
+  reachable(to) {
+    const s = this.clampScale(to.s);
+    const half = (view, size, c) => {
+      const h = view / 2 / s;
+      return size * s <= view ? size / 2 : Math.min(Math.max(c, h), size - h);
+    };
+    return { s, cx: half(this.scroller.clientWidth, this.W, to.cx), cy: half(this.scroller.clientHeight, this.H, to.cy) };
   }
 
   applyScale(scale) {
