@@ -367,8 +367,8 @@ html[data-theme="light"] .pc-add-note:not(:hover):not(:focus-visible) { backgrou
 html:not([data-theme="light"]) .pc-add-note:not(:hover):not(:focus-visible) { background: linear-gradient(180deg, #1d3a57 0%, #11253d 100%) !important; }
 /* A paper opened from its miniconf page (#paper=<uid>) flashes briefly. */
 #live-events.pc-paper-grid .live-paper-card.pc-paper-focus { outline: 3px solid var(--gold); outline-offset: 3px; transition: outline-color .6s ease; }
-a.paper-id.pc-permalink { text-decoration: none; cursor: pointer; }
-a.paper-id.pc-permalink:hover { text-decoration: underline; text-underline-offset: 3px; }
+a.pc-permalink { text-decoration: none; cursor: pointer; }
+a.pc-permalink:hover { text-decoration: underline; text-underline-offset: 3px; }
 .pc-note-count { color: var(--pc-note-count); font-size: .74rem; font-weight: 900; letter-spacing: .04em; white-space: nowrap; }
 .pc-paper-board-head { display: flex; justify-content: flex-end; margin-top: 10px; }
 .pc-paper-board { margin-top: 8px; }
@@ -495,6 +495,13 @@ html .pc-pin a.link-button.pc-pin-comment { font-size: 11px; padding: 3px 8px; }
 .pc-pin-title a { color: #10233d; text-decoration: none; }
 .pc-pin-title a:hover, .pc-pin-title a:focus-visible { color: #0969da; text-decoration: underline; text-underline-offset: 3px; }
 .pc-pin .link-row { display: flex; flex-wrap: wrap; gap: 5px; margin: 0; }
+.pc-pin-mode { display: flex; align-items: baseline; gap: 10px; font-size: 11px; font-weight: 800; color: #8a5a00; }
+/* "On the Wall →" / "In the Hall →": the same paper in the other view. */
+a.pc-view-jump { font-size: .66rem; font-weight: 900; color: var(--pc-jump); text-decoration: none; white-space: nowrap; cursor: pointer; }
+a.pc-view-jump:hover, a.pc-view-jump:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
+.pc-pin a.pc-view-jump { font-size: 11px; --pc-jump: #0969da; }
+:root { --pc-jump: var(--cyan); }
+html[data-theme="light"] { --pc-jump: #0969da; }
 html .pc-pin .link-row a.link-button { font-size: 11px; padding: 3px 7px; }
 .pc-pin-foot { margin-top: auto; display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; font-size: 11px; line-height: 1.3; }
 .pc-pin-authors { min-width: 0; color: #3d4757; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

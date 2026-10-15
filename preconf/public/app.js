@@ -318,7 +318,8 @@ function initPaperView() {
     const b = e.target.closest('button[data-view]');
     if (b) setPaperView(b.dataset.view);
   });
-  setPaperView(location.hash === '#wall' ? 'wall' : store.get(VIEW_KEY, 'wall'), { link: false });
+  const shared = new URLSearchParams(location.hash.slice(1)).has('wall');
+  setPaperView(shared ? 'wall' : store.get(VIEW_KEY, 'wall'), { link: false });
 }
 
 /** A session's title band on the wall: "Mon · PS-01" and its Oral / Poster times. */
@@ -331,6 +332,32 @@ function wallRegionHead(s, region) {
   return head;
 }
 
+/** Hall -> Wall: show paper `uid` on the wall, at 1000%, in the middle of the view. */
+function showOnWall(uid) {
+  setPaperView('wall', { link: false });
+  setLink('#wall&paper=' + encodeURIComponent(uid));
+  document.getElementById('papers')?.scrollIntoView();
+  papers.wall.focusPaper(uid);
+}
+
+/** Wall -> Hall: open the paper's session and bring its card into view. */
+function showInHall(uid) {
+  setPaperView('hall', { link: false });
+  openPaper(uid);
+}
+
+/** "Presented In-person" plus a link to the same paper in the other view. */
+function presenterRow(p, cls, jump) {
+  const row = el('div', cls);
+  row.append(el('div', 'presenter-mode-line', PRESENTER_LABELS[p.presenterMode] || 'Presentation mode TBA'));
+  const a = el('a', 'pc-view-jump', jump.label);
+  a.href = '#';
+  a.title = jump.title;
+  a.addEventListener('click', e => { e.preventDefault(); jump.go(p.uid); });
+  row.append(a);
+  return row;
+}
+
 /** A paper pinned to the wall: title, links, a Comment button; authors and time at the foot. */
 function pinCard(p) {
   const card = el('article', '');
@@ -338,7 +365,7 @@ function pinCard(p) {
   const top = el('div', 'pc-pin-top');
   const comment = el('a', 'link-button pc-add-note pc-pin-comment', '+ Comment');
   comment.href = '#'; comment.setAttribute('role', 'button'); comment.dataset.comment = '';
-  top.append(el('span', 'pc-pin-id', p.displayId || '#' + p.uid), comment);
+  top.append(paperIdLink(p, 'pc-pin-id pc-permalink'), comment);
   const title = el('h4', 'pc-pin-title');
   const titleLink = linkButton(p.posterUrl, p.title);
   if (titleLink) { titleLink.className = ''; title.append(titleLink); } else title.textContent = p.title;
@@ -347,7 +374,8 @@ function pinCard(p) {
   const authors = el('span', 'pc-pin-authors', p.authors);
   authors.title = p.authors;
   foot.append(authors, presentTime(p));
-  card.append(top, title, paperLinks(p), foot);
+  const mode = presenterRow(p, 'pc-pin-mode', { label: 'In the Hall →', title: 'Open this paper in the Hall view', go: showInHall });
+  card.append(top, title, mode, paperLinks(p), foot);
   return card;
 }
 
@@ -380,6 +408,7 @@ function closeSession({ keepHash = false } = {}) {
  *   lounge.html#welcome                    Welcome Reception
  *   lounge.html#papers                     Paper Hall
  *   lounge.html#wall                       Paper Hall, as the Paper Wall
+ *   lounge.html#wall&paper=3               one paper on the wall (what "copy link" shares)
  *   lounge.html#session=PS-03              a poster session, opened
  *   lounge.html#session=PS-03&paper=3      one paper's board in it (paper = papers.csv uid)
  *   lounge.html#paper=3                    same; the session is looked up (miniconf links use this)
@@ -397,8 +426,9 @@ function paperLink(uid) {
 function route() {
   const params = new URLSearchParams(location.hash.slice(1));
   const paper = params.get('paper'), session = params.get('session');
+  // Shared links (#wall&paper=…) always open the wall, whatever view the visitor used last.
+  if (params.has('wall') && papers.view !== 'wall') setPaperView('wall', { link: false });
   if (location.hash === '#wall') {
-    if (papers.view !== 'wall') setPaperView('wall', { link: false });
     document.getElementById('papers')?.scrollIntoView();
     return;
   }
@@ -544,6 +574,29 @@ function linkButton(href, label) {
   return a;
 }
 
+/** The link people share: it opens the wall and flies to this paper. */
+const shareLink = uid => location.origin + location.pathname + location.search + '#wall&paper=' + encodeURIComponent(uid);
+
+/** The paper id as a permalink: click it to copy a link to this paper on the wall. */
+function paperIdLink(p, cls) {
+  const label = p.displayId || '#' + p.uid;
+  const id = el('a', cls, label);
+  id.href = paperLink(p.uid);
+  id.title = 'Copy a link to this paper';
+  id.addEventListener('click', async e => {
+    e.preventDefault();
+    try {
+      await navigator.clipboard.writeText(shareLink(p.uid));
+      toast(`Link to ${label} copied. Feel free to share it with your friends!`);
+    } catch {
+      // No clipboard (old browser, or permission refused): leave the link in the address bar.
+      history.replaceState(null, '', shareLink(p.uid));
+      toast(`Link to ${label} is in the address bar. Feel free to share it with your friends!`);
+    }
+  });
+  return id;
+}
+
 /** Same markup and classes as the live overview's paper card, minus its Zoom/speaker parts. */
 function paperCard(p) {
   const card = el('article', 'paper-card live-paper-card');
@@ -552,11 +605,7 @@ function paperCard(p) {
   const status = el('div', 'paper-card-status-row');
   const count = el('span', 'pc-note-count', '0 notes');
   count.dataset.count = '';
-  // The paper id is a permalink: click it and the address bar holds a link to this exact board.
-  const id = el('a', 'paper-id pc-permalink', p.displayId || '#' + p.uid);
-  id.href = paperLink(p.uid);
-  id.title = 'Link to this paper\u2019s board';
-  id.addEventListener('click', e => { e.preventDefault(); setLink(paperLink(p.uid)); toast('Link to this paper\u2019s board is in the address bar.'); });
+  const id = paperIdLink(p, 'paper-id pc-permalink');
   status.append(id, count);
 
   const copy = el('div', 'paper-card-copy');
@@ -583,8 +632,7 @@ function paperCard(p) {
   copy.append(title, authorsWrap);
 
   const controls = el('div', 'paper-card-controls');
-  const modeRow = el('div', 'presenter-mode-row');
-  modeRow.append(el('div', 'presenter-mode-line', PRESENTER_LABELS[p.presenterMode] || 'Presentation mode TBA'));
+  const modeRow = presenterRow(p, 'presenter-mode-row', { label: 'On the Wall →', title: 'Show this paper on the Paper Wall', go: showOnWall });
   const links = paperLinks(p);
   controls.append(modeRow);
   if (links.childElementCount) controls.append(links);

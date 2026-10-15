@@ -276,12 +276,25 @@ export class WallView extends BoardView {
       card.querySelector('[data-comment]')?.addEventListener('click', e => { e.preventDefault(); this.commentOn(pin.uid); });
       card.addEventListener('dblclick', e => {
         e.stopPropagation();
-        if (!this.frame.classList.contains('is-fullscreen')) this.toggleFullscreen();
+        if (!this.frame.classList.contains('is-fullscreen')) this.expandAt(e);
       });
       pins.append(card);
     }
     this.surface.prepend(layer);
     this.surface.append(pins);
+  }
+
+  // A relayout (e.g. the session rooms arriving right after a deep link) cancels a glide in
+  // flight; finish it instead of stopping halfway.
+  glideTo(to) {
+    this.glide = { to, until: performance.now() + 500 };
+    super.glideTo(to);
+  }
+
+  layout(force) {
+    const pending = this.glide && performance.now() < this.glide.until ? this.glide.to : null;
+    super.layout(force);
+    if (pending) this.glideTo(pending);
   }
 
   /** Camera that frames rect r (with a margin). */
@@ -296,11 +309,11 @@ export class WallView extends BoardView {
     if (r) this.glideTo(this.frameRect(r));
   }
 
-  /** Glide to one paper and its notes (deep links). */
+  /** Glide to one paper at 1000%, its pin in the middle of the view (deep links, "On the Wall"). */
   focusPaper(uid) {
     const pin = this.wall.pins.get(String(uid));
     if (!pin) return;
-    this.glideTo(this.frameRect(pin.cell, 1.3));
+    this.glideTo({ s: this.clampScale(this.base * 10), cx: pin.x + pin.w / 2, cy: pin.y + pin.h / 2 });
     const card = this.surface.querySelector(`.pc-pin[data-uid="${CSS.escape(String(uid))}"]`);
     card?.classList.add('pc-paper-focus');
     setTimeout(() => card?.classList.remove('pc-paper-focus'), 2600);

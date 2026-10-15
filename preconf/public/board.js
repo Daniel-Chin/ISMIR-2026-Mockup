@@ -101,7 +101,7 @@ export class BoardView {
     this.surface.addEventListener('dblclick', e => {
       if (!this.isPanTarget(e.target)) return;
       // Small embedded boards expand on double-click; once expanded, double-click starts a note.
-      if (this.dblclickExpands && !this.frame.classList.contains('is-fullscreen')) { this.toggleFullscreen(); return; }
+      if (this.dblclickExpands && !this.frame.classList.contains('is-fullscreen')) { this.expandAt(e); return; }
       const r = this.surface.getBoundingClientRect();
       this.compose((e.clientX - r.left) / this.scale - NOTE_W / 2, (e.clientY - r.top) / this.scale - 20);
     });
@@ -412,7 +412,24 @@ export class BoardView {
     this.surface.addEventListener('pointercancel', end);
   }
 
-  toggleFullscreen() {
+  /**
+   * Double-click on an embedded board: expand it around the pointer. The board point under the
+   * pointer stays under it and the zoom stays the same, so it feels like opening up that spot
+   * (near an edge the view stops at the board's edge instead).
+   */
+  expandAt(e) {
+    const r = this.surface.getBoundingClientRect();
+    const at = { cx: (e.clientX - r.left) / this.scale, cy: (e.clientY - r.top) / this.scale, x: e.clientX, y: e.clientY };
+    const s = this.scale;
+    this.toggleFullscreen({ keepView: true });
+    const v = this.scroller.getBoundingClientRect();
+    this.anchor = { cx: at.cx, cy: at.cy, px: at.x - v.left, py: at.y - v.top };
+    this.applyScale(this.clampScale(s));
+    this.anchor = null;
+    this.target = this.scale;
+  }
+
+  toggleFullscreen({ keepView = false } = {}) {
     const on = !this.frame.classList.contains('is-fullscreen');
     this.frame.classList.toggle('is-fullscreen', on);
     this.titleBar.hidden = !on;
@@ -428,7 +445,7 @@ export class BoardView {
     }
     this.layout(true);
     // Expanding or collapsing opens on the default view: all notes in sight.
-    this.fitToNotes();
+    if (!keepView) this.fitToNotes();
   }
 
   // ---------- room events ----------
