@@ -524,10 +524,6 @@ a.canon-egg-link:hover, a.canon-egg-link:focus-visible { text-decoration: underl
 .canon-egg-board li b { color: var(--muted); font-family: "Courier New", ui-monospace, monospace; }
 .canon-egg-board li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; }
 .canon-egg-board li time { font-size: .78em; opacity: .7; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.canon-egg-board li[data-podium] b { font-size: 1.08em; }
-.canon-egg-board li[data-podium="1"] b { color: #d4a017; }
-.canon-egg-board li[data-podium="2"] b { color: #9aa4b1; }
-.canon-egg-board li[data-podium="3"] b { color: #b8733a; }
 .canon-egg-board li.is-me { background: rgba(9, 105, 218, .08); }
 .canon-egg-board li.is-me span { color: var(--pc-jump); }
 /* Your own row when it is below the list: pinned under it, after a gap mark. */

@@ -284,7 +284,6 @@ function canonEggRender(backdrop, view) {
       const when = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
       const row = (e, me) => {
         const li = document.createElement('li');
-        if (e.rank <= 3) li.dataset.podium = String(e.rank);   // gold / silver / bronze
         if (me) li.classList.add('is-me');
         const rank = document.createElement('b'); rank.textContent = '#' + e.rank;
         const name = document.createElement('span'); name.textContent = e.name + (me ? ' (you)' : ''); name.title = e.name;
