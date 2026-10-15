@@ -471,10 +471,21 @@ export class BoardView {
   }
 
   /** Dragging empty board space pans the view once it is zoomed past the viewport. */
-  startPan(e) {
-    if (e.button !== 0 || !this.isPanTarget(e.target)) return;
+  /** `always`: pan even from a non-pan target (a note, for visitors who may not move it). */
+  startPan(e, always = false) {
+    if (e.button !== 0 || (!always && !this.isPanTarget(e.target))) return;
+    // No text selection or native drag: a selection being dragged makes the browser auto-scroll
+    // the board against the pan, and dragging selected text cancels the pan outright.
+    e.preventDefault();
+    window.getSelection?.()?.removeAllRanges();
+    // A zoom or glide still running would keep moving the view under the hand: stop it here.
+    cancelAnimationFrame(this.raf);
+    this.raf = 0;
+    this.anchor = null;
+    this.target = this.scale;
+    this.glide = null;   // the wall would otherwise resume an interrupted glide (wall.js)
+    this.surface.style.willChange = '';
     const sc = this.scroller;
-    if (sc.scrollWidth <= sc.clientWidth && sc.scrollHeight <= sc.clientHeight) return;
     const start = { x: e.clientX, y: e.clientY, left: sc.scrollLeft, top: sc.scrollTop };
     this.surface.setPointerCapture(e.pointerId);
     this.surface.classList.add('is-panning');
@@ -516,10 +527,11 @@ export class BoardView {
       this.scrim = el('div', 'pc-scrim');
       this.scrim.addEventListener('click', () => this.toggleFullscreen());
       document.body.append(this.scrim);
-      document.body.style.overflow = 'hidden';
+      // Lock the page behind (it scrolls on <html>): nothing done on the board may move it.
+      document.documentElement.classList.add('pc-board-expanded');
     } else {
       this.scrim?.remove();
-      document.body.style.overflow = '';
+      document.documentElement.classList.remove('pc-board-expanded');
     }
     this.layout(true);
     // Expanding or collapsing opens on the default view: all notes in sight.
@@ -704,7 +716,8 @@ export class BoardView {
     const note = this.room.notes.get(id);
     const node = this.els.get(id);
     if (!note || !node) return;
-    if (!this.app.user) { this.app.requireLogin('move notes'); return; }
+    // Signed out: notes stay put and nobody is nagged; dragging one just moves the view.
+    if (!this.app.user) { this.startPan(e, true); return; }
     e.preventDefault();
     node.setPointerCapture(e.pointerId);
     // Start from where the note is drawn (it may have been nudged inside the board's edge).

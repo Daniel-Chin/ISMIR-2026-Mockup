@@ -139,6 +139,8 @@ function initials(name) {
 }
 
 function renderAuth() {
+  // Notes look draggable only to people who may move them (styles.css).
+  document.documentElement.classList.toggle('pc-signed-in', !!app.user);
   const slot = $('#auth-slot');
   if (!app.user) {
     const b = el('a', 'theme-toggle pc-signin', 'Sign in');
