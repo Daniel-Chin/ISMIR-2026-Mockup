@@ -177,12 +177,15 @@ function canonEggRenderProgress() {
 function canonEggPaperPool() {
   // Only papers with an author-provided fun fact are eligible.
   return Object.values(window.PC_PROGRAM?.papers || {})
-    .filter((paper) => String(paper?.funFact || '').trim())
+    // "NA", "N/A", "none", "-": placeholders, not facts.
+    .filter((paper) => !/^(n\/?a\.?|none|nil|-+)?$/i.test(String(paper?.funFact || '').trim()))
     .map((paper) => ({ id: paper.uid, title: String(paper.title || paper.uid), fact: String(paper.funFact).trim() }));
 }
 
 function canonEggCloseFunFact() {
   document.querySelector('.canon-egg-funfact-backdrop')?.remove();
+  // Closing the message gives up its sign-in: a later sign-in no longer claims a place.
+  canonEggStore.set(CANON_EGG_PENDING_KEY, null);
   canonEggCompleted = false;
   canonEggProgress = 0;
   canonEggRenderProgress();
@@ -190,7 +193,11 @@ function canonEggCloseFunFact() {
 
 // ---------- result dialog: congratulations / fun fact / leaderboard ----------
 const CANON_EGG_FOUND_KEY = 'pcEggFound';       // this browser has solved it before
-const CANON_EGG_PENDING_KEY = 'pcEggPending';   // solved signed out: claim a rank after sign-in
+// Set (to the time) when "Sign in" is pressed in the message: the rank is claimed on return,
+// within CANON_EGG_PENDING_MS. Solving signed out and signing in some other way never counts.
+const CANON_EGG_PENDING_KEY = 'pcEggPending';
+const CANON_EGG_PENDING_MS = 15 * 60 * 1000;
+const CANON_EGG_FACTS_NOTE = 'From now on, every time you solve it you will get a random paper fun fact.';
 const canonEggStore = {
   get(k) { try { return localStorage.getItem(k); } catch (_) { return null; } },
   set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (_) {} },
@@ -245,13 +252,16 @@ function canonEggRender(backdrop, view) {
   if (view.kind === 'congrats') {
     kicker.textContent = 'Easter egg found';
     title.textContent = 'Congratulations!';
-    copy.append(para(`You are the ${canonEggOrdinal(view.rank)} person to find the hidden easter egg!`));
+    copy.append(para(`You are the ${canonEggOrdinal(view.rank)} person to find the hidden easter egg!`), para(CANON_EGG_FACTS_NOTE));
     links.append(toBoard());
   } else if (view.kind === 'congrats-signin') {
     kicker.textContent = 'Easter egg found';
     title.textContent = 'Congratulations!';
-    copy.append(para('You found the hidden easter egg! Sign in with Slack to find out which finder you are.'));
-    links.append(canonEggLink('Sign in →', () => window.PC_EGG?.login()), toBoard());
+    copy.append(para('You found the hidden easter egg! Sign in with Slack now to claim your place on the leaderboard.'), para(CANON_EGG_FACTS_NOTE));
+    links.append(canonEggLink('Sign in →', () => {
+      canonEggStore.set(CANON_EGG_PENDING_KEY, String(Date.now()));
+      window.PC_EGG?.login();
+    }), toBoard());
   } else if (view.kind === 'fact') {
     const pool = canonEggPaperPool();
     const paper = pool[Math.floor(Math.random() * pool.length)];
@@ -261,39 +271,54 @@ function canonEggRender(backdrop, view) {
     links.append(toBoard());
   } else if (view.kind === 'leaderboard') {
     kicker.textContent = 'Easter egg leaderboard';
-    title.textContent = 'First to find it';
+    title.textContent = view.rank ? 'Congratulations!' : 'First to find it';
     copy.append(para('Loading…'));
     const api = window.PC_EGG;
     if (!api) { copy.replaceChildren(para('The leaderboard is not available here.')); return; }
     api.leaderboard().then((data) => {
       if (!data?.ok) throw new Error('leaderboard');
       copy.replaceChildren();
+      // Just claimed after signing in from the message: say so above the list.
+      if (view.rank) copy.append(para(`You are the ${canonEggOrdinal(view.rank)} person to find the hidden easter egg!`), para(CANON_EGG_FACTS_NOTE));
       if (!data.entries.length) { copy.append(para('Nobody has found it yet.')); return; }
-      const list = document.createElement('ol');
-      list.className = 'canon-egg-board';
       const when = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-      for (const e of data.entries) {
+      const row = (e, me) => {
         const li = document.createElement('li');
-        if (e.me) li.className = 'is-me';
+        if (e.rank <= 3) li.dataset.podium = String(e.rank);   // gold / silver / bronze
+        if (me) li.classList.add('is-me');
         const rank = document.createElement('b'); rank.textContent = '#' + e.rank;
-        const name = document.createElement('span'); name.textContent = e.name + (e.me ? ' (you)' : '');
+        const name = document.createElement('span'); name.textContent = e.name + (me ? ' (you)' : ''); name.title = e.name;
         const at = document.createElement('time'); at.textContent = when.format(new Date(e.at));
         li.append(rank, name, at);
-        list.append(li);
-      }
+        return li;
+      };
+      // The list scrolls inside the dialog however many finders there are.
+      const list = document.createElement('ol');
+      list.className = 'canon-egg-board';
+      for (const e of data.entries) list.append(row(e, e.me));
       copy.append(list);
+      // Further down than the list goes: your own row, pinned under it.
+      if (data.mine && data.mine.rank > data.entries.length) {
+        const own = document.createElement('ol');
+        own.className = 'canon-egg-board canon-egg-board-own';
+        own.append(row(data.mine, true));
+        copy.append(own);
+      }
       const more = [`${data.total} ${data.total === 1 ? 'person has' : 'people have'} found it so far.`];
-      if (data.me && data.me > data.entries.length) more.push(`You are #${data.me}.`);
+      if (data.total > data.entries.length) more.push(`Showing the first ${data.entries.length}.`);
       if (!api.user) more.push('Sign in with Slack and solve it to join.');
       copy.append(para(more.join(' ')));
+      // Your row in view if it is in the list (scrolls the list only, not the page).
+      const mineInList = list.querySelector('.is-me');
+      if (mineInList) list.scrollTop = mineInList.offsetTop - list.clientHeight / 2;
     }).catch(() => { copy.replaceChildren(para('Could not load the leaderboard. Try again in a moment.')); });
   }
 }
 
 /**
  * Solved. Signed in: the server records it; the first time, show the rank. Signed out, first
- * time on this browser: congratulate and offer sign-in (the rank is claimed on return). Every
- * other solve: a random paper fun fact.
+ * time on this browser: congratulate and offer sign-in; only signing in from that message
+ * claims a place. Every other solve: a random paper fun fact.
  */
 async function canonEggShowResult() {
   const api = window.PC_EGG;
@@ -306,21 +331,23 @@ async function canonEggShowResult() {
     canonEggStore.set(CANON_EGG_FOUND_KEY, '1');
   } else if (!canonEggStore.get(CANON_EGG_FOUND_KEY)) {
     canonEggStore.set(CANON_EGG_FOUND_KEY, '1');
-    canonEggStore.set(CANON_EGG_PENDING_KEY, '1');
     view = { kind: 'congrats-signin' };
   }
   canonEggOpenDialog(view);
 }
 
-/** Back from signing in after solving signed out: claim the rank now and show it. */
+/** Back from "Sign in" in the message: claim the place and show the leaderboard with it. */
 async function canonEggClaimPending() {
   const api = window.PC_EGG;
-  if (!api?.user || !canonEggStore.get(CANON_EGG_PENDING_KEY)) return;
+  const pressed = Number(canonEggStore.get(CANON_EGG_PENDING_KEY)) || 0;
+  if (!pressed) return;
+  if (!api?.user) return;   // sign-in still under way (e.g. in the Slack app): keep waiting
   canonEggStore.set(CANON_EGG_PENDING_KEY, null);
+  if (Date.now() - pressed > CANON_EGG_PENDING_MS) return;
   try {
     const r = await api.solve();
-    if (r?.ok && r.first) canonEggOpenDialog({ kind: 'congrats', rank: r.rank });
-  } catch (_) { canonEggStore.set(CANON_EGG_PENDING_KEY, '1'); }
+    if (r?.ok) canonEggOpenDialog({ kind: 'leaderboard', rank: r.first ? r.rank : 0 });
+  } catch (_) { /* offline: the place is not claimed */ }
 }
 
 function canonEggAdvance(key) {

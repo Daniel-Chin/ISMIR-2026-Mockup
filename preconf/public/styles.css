@@ -515,9 +515,26 @@ html .pc-pin .link-row a.link-button { font-size: 11px; padding: 3px 7px; }
 .canon-egg-links:empty { display: none; }
 a.canon-egg-link { font-weight: 900; color: var(--pc-jump); text-decoration: none; cursor: pointer; }
 a.canon-egg-link:hover, a.canon-egg-link:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
-.canon-egg-board { list-style: none; margin: 4px 0 10px; padding: 0; max-height: 46vh; overflow: auto; }
-.canon-egg-board li { display: grid; grid-template-columns: 3.2em minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 5px 2px; border-bottom: 1px dashed var(--pc-border); }
-.canon-egg-board li b { color: var(--gold); font-family: "Courier New", ui-monospace, monospace; }
+.canon-egg-board {
+  position: relative; list-style: none; margin: 4px 0 10px; padding: 0 6px 0 0;
+  max-height: min(320px, 42vh); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+}
+.canon-egg-board li { display: grid; grid-template-columns: 3.4em minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 6px 4px; border-bottom: 1px dashed var(--pc-border); }
+.canon-egg-board li:last-child { border-bottom: 0; }
+.canon-egg-board li b { color: var(--muted); font-family: "Courier New", ui-monospace, monospace; }
 .canon-egg-board li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; }
-.canon-egg-board li time { font-size: .78em; opacity: .7; white-space: nowrap; }
+.canon-egg-board li time { font-size: .78em; opacity: .7; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.canon-egg-board li[data-podium] b { font-size: 1.08em; }
+.canon-egg-board li[data-podium="1"] b { color: #d4a017; }
+.canon-egg-board li[data-podium="2"] b { color: #9aa4b1; }
+.canon-egg-board li[data-podium="3"] b { color: #b8733a; }
+.canon-egg-board li.is-me { background: rgba(9, 105, 218, .08); }
 .canon-egg-board li.is-me span { color: var(--pc-jump); }
+/* Your own row when it is below the list: pinned under it, after a gap mark. */
+.canon-egg-board.canon-egg-board-own { max-height: none; overflow: visible; margin-top: -4px; }
+.canon-egg-board.canon-egg-board-own::before { content: "\22EF"; display: block; text-align: center; opacity: .5; line-height: 1; }
+/* Phones: names need the room; the time is dropped. */
+@media (max-width: 520px) {
+  .canon-egg-board li { grid-template-columns: 3em minmax(0, 1fr); }
+  .canon-egg-board li time { display: none; }
+}
