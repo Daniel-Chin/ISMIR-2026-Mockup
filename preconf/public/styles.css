@@ -279,6 +279,10 @@ html:not([data-theme="light"]) .pc-session-panel-head button.pc-fs-btn:not(.deta
 .pc-note-foot { cursor: grab; display: flex; align-items: center; gap: 6px; padding: 0 8px 7px 10px; font-size: 11px; font-weight: 800; }
 .pc-note-author { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .pc-note-author .mine { color: #6a28d9; }
+.pc-note-to { font-family: "Courier New", ui-monospace, monospace; font-weight: 900; color: #8a5a00; }
+.pc-note-foot.has-tag { flex-wrap: wrap; row-gap: 1px; }
+.pc-note-foot.has-tag .pc-note-author { flex-basis: 100%; }
+.pc-note-foot.has-tag .pc-note-time { margin-right: auto; }
 .pc-note-time { opacity: .65; white-space: nowrap; }
 .pc-note-actions { display: flex; gap: 2px; }
 .pc-icon-btn {
@@ -449,6 +453,9 @@ dialog.pc-composer::backdrop { background: rgba(4, 6, 12, .6); }
 }
 .pc-board-frame.pc-wall-frame.is-fullscreen .pc-fullscreen-title { align-self: stretch; }
 .pc-wall-layer { position: absolute; inset: 0; z-index: 0; }
+/* Above every note (notes use z-index = their stacking order; a dragged note 99999). */
+.pc-wall-layer.pc-wall-pins { z-index: 1000000; pointer-events: none; }
+.pc-wall-pins .pc-pin { pointer-events: auto; }
 .pc-wall-region {
   position: absolute; box-sizing: border-box;
   border: 6px dashed var(--pc-wall-line); background: var(--pc-wall-region);

@@ -46,6 +46,7 @@ export class BoardView {
    *   fitNotes: open zoomed so all notes just fit, centred on them (paper boards)
    *   dblclickExpands: double-click opens the board full screen instead of starting a note
    *   createExtras: () => extra fields for a new note (its place on the Paper Wall)
+   *   noteTag: note => short label of what the note is about (a paper id), shown by its author
    *
    * Subclasses (the Paper Wall, wall.js) override owns / notePos / sendMove / isPanTarget.
    * They run during this constructor, so they may only read `this.opts`.
@@ -506,6 +507,11 @@ export class BoardView {
     const author = node.querySelector('.pc-note-author');
     author.textContent = n.authorName;
     if (this.isMine(n)) author.append(el('span', 'mine', ' (you)'));
+    // "Alice → P1-01": with a tag, name and tag get the foot's first line, time and buttons the second.
+    const tag = this.opts.noteTag?.(n) || '';
+    if (tag) author.append(el('span', 'pc-note-to', ' → ' + tag));
+    author.title = tag ? `${n.authorName} on ${tag}` : n.authorName;
+    node.querySelector('.pc-note-foot').classList.toggle('has-tag', !!tag);
     const time = node.querySelector('.pc-note-time');
     time.dataset.ts = n.created;
     time.textContent = timeAgo(n.created) + (n.updated - n.created > 1000 ? ' · edited' : '');

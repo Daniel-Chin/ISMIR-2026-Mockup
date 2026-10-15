@@ -197,9 +197,11 @@ export class WallRooms {
  */
 export class WallView extends BoardView {
   constructor(mount, o) {
-    super(mount, { ...o, board: null, title: o.title || 'Paper Wall', emptyText: '' });
+    // Embedded, a double-click expands the wall (as on the other boards); expanded, it starts a note.
+    super(mount, { ...o, board: null, title: o.title || 'Paper Wall', emptyText: '', dblclickExpands: true });
     this.frame.classList.add('pc-wall-frame');
     this.frame.style.setProperty('--wall-ratio', String(this.W / this.H));
+    this.titleBar.querySelectorAll('.pc-fullscreen-hint').forEach(n => n.remove());
     this.titleBar.append(el('div', 'pc-fullscreen-hint', 'Comment on a paper, or double-click beside it to leave a note'));
     this.zoomLabel.title = 'Show the whole wall';
     this.zoomLabel.setAttribute('aria-label', 'Show the whole wall');
@@ -249,8 +251,11 @@ export class WallView extends BoardView {
     super.onRoom(ev);
   }
 
+  // Session areas lie under the notes; pins lie above every note (pc-wall-pins in styles.css),
+  // so however notes are moved, no paper is ever covered.
   buildWall() {
     const layer = el('div', 'pc-wall-layer');
+    const pins = el('div', 'pc-wall-layer pc-wall-pins');
     const { program, buildPin, regionHead } = this.opts;
     for (const r of this.wall.regions) {
       const box = el('section', 'pc-wall-region');
@@ -269,10 +274,14 @@ export class WallView extends BoardView {
       card.dataset.uid = pin.uid;
       Object.assign(card.style, { left: pin.x + 'px', top: pin.y + 'px', width: PIN_W + 'px', height: PIN_H + 'px' });
       card.querySelector('[data-comment]')?.addEventListener('click', e => { e.preventDefault(); this.commentOn(pin.uid); });
-      card.addEventListener('dblclick', e => e.stopPropagation());
-      layer.append(card);
+      card.addEventListener('dblclick', e => {
+        e.stopPropagation();
+        if (!this.frame.classList.contains('is-fullscreen')) this.toggleFullscreen();
+      });
+      pins.append(card);
     }
     this.surface.prepend(layer);
+    this.surface.append(pins);
   }
 
   /** Camera that frames rect r (with a margin). */

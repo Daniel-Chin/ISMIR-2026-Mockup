@@ -285,6 +285,8 @@ function sessionCard(s) {
 // ---------- paper wall (alternative view of the hall) ----------
 const papers = { view: 'hall', wall: null, layout: null };
 const wallLayout = () => (papers.layout ||= buildWallLayout(hall.program));
+/** "P1-01" for a note on a paper's board: shown after the author on every paper note. */
+const paperTag = n => (n.board?.startsWith('paper:') ? hall.program.papers[n.board.slice(6)]?.displayId || '#' + n.board.slice(6) : '');
 
 /** Switch the Paper Hall section between the hall (session cards) and the wall. */
 function setPaperView(view, { link = true } = {}) {
@@ -300,7 +302,7 @@ function setPaperView(view, { link = true } = {}) {
       // One live connection per session while the wall is shown; closed again in hall view.
       const rooms = new WallRooms(hall.program);
       rooms.subscribe(ev => { if (ev.type === 'error') handleRoomError(ev); });
-      papers.wall = new WallView($('#paper-wall'), { room: rooms, app, program: hall.program, layout: wallLayout(), buildPin: pinCard, regionHead: wallRegionHead });
+      papers.wall = new WallView($('#paper-wall'), { room: rooms, app, program: hall.program, layout: wallLayout(), buildPin: pinCard, regionHead: wallRegionHead, noteTag: paperTag });
       refreshSessionTimes();
     }
   } else if (papers.wall) {
@@ -498,6 +500,7 @@ function openSession(id, scroll) {
     const board = new BoardView(mount, {
       room, board: 'paper:' + uid, title: `#${uid} ${p.title}`, app, fitNotes: true, dblclickExpands: true,
       emptyText: 'No notes yet: tap + Note to start the discussion',
+      noteTag: paperTag,
       // The same note also appears on the Paper Wall, beside this paper's pin.
       createExtras: () => wallSlotFor(wallLayout(), String(uid), [...room.notes.values()]),
     });
