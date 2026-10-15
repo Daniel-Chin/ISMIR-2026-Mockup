@@ -246,7 +246,7 @@ function canonEggRender(backdrop, view) {
   const copy = backdrop.querySelector('.canon-egg-funfact-copy');
   const links = backdrop.querySelector('.canon-egg-links');
   const para = (text) => { const p = document.createElement('p'); p.textContent = text; return p; };
-  const toBoard = () => canonEggLink('See the leaderboard →', () => canonEggOpenDialog({ kind: 'leaderboard' }));
+  const toBoard = () => canonEggLink('See who found the easter egg →', () => canonEggOpenDialog({ kind: 'leaderboard' }));
   copy.replaceChildren();
   links.replaceChildren();
   if (view.kind === 'congrats') {
@@ -270,11 +270,11 @@ function canonEggRender(backdrop, view) {
     copy.append(para(paper ? paper.fact : 'Authors are still sending them in. Solve it again later!'));
     links.append(toBoard());
   } else if (view.kind === 'leaderboard') {
-    kicker.textContent = 'Easter egg leaderboard';
-    title.textContent = view.rank ? 'Congratulations!' : 'First to find it';
+    kicker.textContent = 'Easter egg finders';
+    title.textContent = view.rank ? 'Congratulations!' : 'Who found the easter egg';
     copy.append(para('Loading…'));
     const api = window.PC_EGG;
-    if (!api) { copy.replaceChildren(para('The leaderboard is not available here.')); return; }
+    if (!api) { copy.replaceChildren(para('The list of finders is not available here.')); return; }
     api.leaderboard().then((data) => {
       if (!data?.ok) throw new Error('leaderboard');
       copy.replaceChildren();
@@ -282,35 +282,36 @@ function canonEggRender(backdrop, view) {
       if (view.rank) copy.append(para(`You are the ${canonEggOrdinal(view.rank)} person to find the hidden easter egg!`), para(CANON_EGG_FACTS_NOTE));
       if (!data.entries.length) { copy.append(para('Nobody has found it yet.')); return; }
       const when = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-      const row = (e, me) => {
+      // Names only, several per line, in the order they found it: no rank numbers, nobody is
+      // singled out. When each one found it shows on hover.
+      const chip = (e, me) => {
         const li = document.createElement('li');
         if (me) li.classList.add('is-me');
-        const rank = document.createElement('b'); rank.textContent = '#' + e.rank;
-        const name = document.createElement('span'); name.textContent = e.name + (me ? ' (you)' : ''); name.title = e.name;
-        const at = document.createElement('time'); at.textContent = when.format(new Date(e.at));
-        li.append(rank, name, at);
+        li.textContent = e.name + (me ? ' (you)' : '');
+        li.title = `${e.name} · ${when.format(new Date(e.at))}`;
         return li;
       };
-      // The list scrolls inside the dialog however many finders there are.
+      // The names scroll inside the dialog however many finders there are.
       const list = document.createElement('ol');
       list.className = 'canon-egg-board';
-      for (const e of data.entries) list.append(row(e, e.me));
-      copy.append(list);
-      // Further down than the list goes: your own row, pinned under it.
+      for (const e of data.entries) list.append(chip(e, e.me));
+      // Further on than the list goes: you, after a gap mark.
       if (data.mine && data.mine.rank > data.entries.length) {
-        const own = document.createElement('ol');
-        own.className = 'canon-egg-board canon-egg-board-own';
-        own.append(row(data.mine, true));
-        copy.append(own);
+        const gap = document.createElement('li');
+        gap.className = 'canon-egg-gap';
+        gap.setAttribute('aria-hidden', 'true');
+        gap.textContent = '\u22EF';
+        list.append(gap, chip(data.mine, true));
       }
+      copy.append(list);
       const more = [`${data.total} ${data.total === 1 ? 'person has' : 'people have'} found it so far.`];
       if (data.total > data.entries.length) more.push(`Showing the first ${data.entries.length}.`);
       if (!api.user) more.push('Sign in with Slack and solve it to join.');
       copy.append(para(more.join(' ')));
-      // Your row in view if it is in the list (scrolls the list only, not the page).
+      // Your name in view (scrolls the list only, not the page).
       const mineInList = list.querySelector('.is-me');
       if (mineInList) list.scrollTop = mineInList.offsetTop - list.clientHeight / 2;
-    }).catch(() => { copy.replaceChildren(para('Could not load the leaderboard. Try again in a moment.')); });
+    }).catch(() => { copy.replaceChildren(para('Could not load the list. Try again in a moment.')); });
   }
 }
 
