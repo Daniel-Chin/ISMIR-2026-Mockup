@@ -179,7 +179,7 @@ function canonEggPaperPool() {
   return Object.values(window.PC_PROGRAM?.papers || {})
     // "NA", "N/A", "none", "-": placeholders, not facts.
     .filter((paper) => !/^(n\/?a\.?|none|nil|-+)?$/i.test(String(paper?.funFact || '').trim()))
-    .map((paper) => ({ id: paper.uid, title: String(paper.title || paper.uid), fact: String(paper.funFact).trim() }));
+    .map((paper) => ({ id: paper.uid, title: String(paper.title || paper.uid), fact: String(paper.funFact).trim(), url: /^https:\/\//.test(paper.posterUrl || '') ? paper.posterUrl : '' }));
 }
 
 function canonEggCloseFunFact() {
@@ -270,7 +270,15 @@ function canonEggRender(backdrop, view) {
     const pool = canonEggPaperPool();
     const paper = pool[Math.floor(Math.random() * pool.length)];
     kicker.textContent = 'Paper fun fact';
-    title.textContent = paper ? paper.title : 'Fun facts are on their way';
+    // The paper's title opens its miniconf page in a new tab.
+    title.textContent = paper && !paper.url ? paper.title : paper ? '' : 'Fun facts are on their way';
+    if (paper?.url) {
+      const a = document.createElement('a');
+      a.className = 'canon-egg-paper-link';
+      a.href = paper.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      a.textContent = paper.title;
+      title.append(a);
+    }
     copy.append(para(paper ? paper.fact : 'Authors are still sending them in. Solve it again later!'));
     if (signedOut) links.append(toSignIn());
     links.append(toBoard());
