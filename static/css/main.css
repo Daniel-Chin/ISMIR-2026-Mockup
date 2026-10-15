@@ -19,13 +19,12 @@ body a:hover {
   border-color: #444444 !important;
 }
 
-/* Test tube before experimental features in the nav (templates/base.html). */
+/* Flask before experimental features in the nav (templates/base.html). */
 .nav-lab-icon {
   width: 1.05em;
   height: 1.05em;
   margin-right: 0.3em;
   vertical-align: -0.15em;
-  color: #e0a100;
 }
 
 .navbar-light .navbar-nav .active > .nav-link {

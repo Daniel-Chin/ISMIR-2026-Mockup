@@ -155,9 +155,9 @@
             {% for href, id in navigation_bar %}
             <li class="nav-item {% if id == active_page %}active{% endif %}">
               {% if href.startswith('http') %}
-              <a class="nav-link" href="{{href}}" target="_blank" rel="noopener noreferrer">{% if id in experimental_features %}<svg class="nav-lab-icon" width="16" height="16" fill="#e0a100" color="#e0a100" aria-hidden="true" focusable="false" viewBox="0 0 16 16"><g transform="rotate(30 8 8)"><path d="M4.5 1.25h7M5.75 1.25v11a2.25 2.25 0 0 0 4.5 0v-11" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.75 7.75h4.5v4.5a2.25 2.25 0 0 1-4.5 0z" fill="currentColor"/></g></svg><span class="sr-only">Experimental: </span>{% endif %}{{id}}</a>
+              <a class="nav-link" href="{{href}}" target="_blank" rel="noopener noreferrer">{% if id in experimental_features %}<img class="nav-lab-icon" src="static/images/experimental.svg" alt=""><span class="sr-only">Experimental: </span>{% endif %}{{id}}</a>
               {% else %}
-              <a class="nav-link" href="{{href}}">{% if id in experimental_features %}<svg class="nav-lab-icon" width="16" height="16" fill="#e0a100" color="#e0a100" aria-hidden="true" focusable="false" viewBox="0 0 16 16"><g transform="rotate(30 8 8)"><path d="M4.5 1.25h7M5.75 1.25v11a2.25 2.25 0 0 0 4.5 0v-11" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.75 7.75h4.5v4.5a2.25 2.25 0 0 1-4.5 0z" fill="currentColor"/></g></svg><span class="sr-only">Experimental: </span>{% endif %}{{id}}</a>
+              <a class="nav-link" href="{{href}}">{% if id in experimental_features %}<img class="nav-lab-icon" src="static/images/experimental.svg" alt=""><span class="sr-only">Experimental: </span>{% endif %}{{id}}</a>
               {% endif %}
             </li>
             {% endfor %}
