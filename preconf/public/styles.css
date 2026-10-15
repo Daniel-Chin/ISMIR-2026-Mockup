@@ -216,7 +216,7 @@ html[data-theme="light"] .pc-btn-primary { background: #102a52; color: #fff; bor
 
 /* ---------- boards ---------- */
 .pc-board-frame { position: relative; border: 2px solid var(--pc-border); box-shadow: var(--pc-shadow); background: var(--pc-board-bg); }
-.pc-board-scroll { position: relative; overflow: auto; scrollbar-width: none; }
+.pc-board-scroll { position: relative; overflow: auto; scrollbar-width: none; touch-action: pan-x pan-y; }   /* pinch: the board's, not the page's */
 .pc-board-scroll::-webkit-scrollbar { display: none; }   /* navigate by dragging the board, like Miro */
 .pc-board-surface { cursor: grab; }
 .pc-board-surface.is-panning { cursor: grabbing; }
@@ -453,12 +453,6 @@ dialog.pc-composer::backdrop { background: rgba(4, 6, 12, .6); }
 
 /* ---------- Paper Wall: every paper pinned on one board (wall.js) ---------- */
 .pc-wall { margin-top: 4px; }
-/* Fullscreen keeps the wall's own shape, so the default view shows all of it. */
-.pc-board-frame.pc-wall-frame.is-fullscreen { align-items: center; }
-.pc-board-frame.pc-wall-frame.is-fullscreen .pc-board-scroll {
-  flex: none; margin: auto 0; width: min(100%, calc((100vh - 150px) * var(--wall-ratio))); aspect-ratio: var(--wall-ratio);
-}
-.pc-board-frame.pc-wall-frame.is-fullscreen .pc-fullscreen-title { align-self: stretch; }
 .pc-wall-layer { position: absolute; inset: 0; z-index: 0; }
 /* Above every note (notes use z-index = their stacking order; a dragged note 99999). */
 .pc-wall-layer.pc-wall-pins { z-index: 1000000; pointer-events: none; }

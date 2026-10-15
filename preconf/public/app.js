@@ -1,6 +1,6 @@
 import { Room } from './room.js';
 import { BoardView, timeAgo } from './board.js';
-import { WallRooms, WallView, buildWallLayout, wallSlotFor } from './wall.js';
+import { WallRooms, WallView, buildWallLayout, screenAspect, wallSlotFor } from './wall.js';
 import { apiFetch, apiUrl, takeTokenFromHash, clearToken } from './api.js';
 
 const COLORS = { sun: '#ffe27a', mint: '#a8f0c6', sky: '#a9dcff', rose: '#ffbfd0', lilac: '#dccbff', sand: '#f3dcae' };
@@ -284,7 +284,31 @@ function sessionCard(s) {
 
 // ---------- paper wall (alternative view of the hall) ----------
 const papers = { view: 'hall', wall: null, layout: null };
-const wallLayout = () => (papers.layout ||= buildWallLayout(hall.program));
+const wallLayout = () => (papers.layout ||= buildWallLayout(hall.program, screenAspect()));
+
+function makeWall(rooms) {
+  papers.wall = new WallView($('#paper-wall'), { room: rooms, app, program: hall.program, layout: wallLayout(), buildPin: pinCard, regionHead: wallRegionHead, noteTag: paperTag });
+  refreshSessionTimes();
+}
+
+// Rotating a tablet or resizing the window can call for another arrangement of the wall (more
+// or fewer sessions per row): rebuild the view, keeping its live connections.
+let wallResizeTimer = 0;
+window.addEventListener('resize', () => {
+  clearTimeout(wallResizeTimer);
+  wallResizeTimer = setTimeout(() => {
+    if (!hall.program) return;
+    const next = buildWallLayout(hall.program, screenAspect());
+    if (next.perRow === papers.layout?.perRow) return;
+    papers.layout = next;
+    if (!papers.wall) return;
+    const expanded = papers.wall.frame.classList.contains('is-fullscreen');
+    const rooms = papers.wall.room;
+    papers.wall.destroy({ keepRooms: true });
+    makeWall(rooms);
+    if (expanded) papers.wall.toggleFullscreen();
+  }, 300);
+});
 /** "P1-01" for a note on a paper's board: shown after the author on every paper note. */
 const paperTag = n => (n.board?.startsWith('paper:') ? hall.program.papers[n.board.slice(6)]?.displayId || '#' + n.board.slice(6) : '');
 
@@ -307,8 +331,7 @@ function setPaperView(view, { link = true } = {}) {
       // the wall, or jumping to a paper on it, shows every note at once.
       const rooms = new WallRooms(hall.program);
       rooms.subscribe(ev => { if (ev.type === 'error') handleRoomError(ev); });
-      papers.wall = new WallView($('#paper-wall'), { room: rooms, app, program: hall.program, layout: wallLayout(), buildPin: pinCard, regionHead: wallRegionHead, noteTag: paperTag });
-      refreshSessionTimes();
+      makeWall(rooms);
     }
   }
   if (link) setLink(view === 'wall' ? '#wall' : '#papers');

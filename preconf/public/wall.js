@@ -19,30 +19,52 @@ const PAPER_ROWS = 2;
 const NOTE_H = 128;                        // footprint used when finding a free spot
 const SLOT_GAP = 20;
 
-/** Where every session area and pin goes. Pure function of program.json. */
-export function buildWallLayout(program) {
+/**
+ * Where every session area and pin goes: sessions in programme order (as in the hall), `perRow`
+ * areas to a row. Note positions on the wall are offsets from their paper's pin, so the areas
+ * can be arranged differently on every screen and notes still follow their papers.
+ */
+function placeWall(program, perRow) {
   const regions = [], pins = new Map();
-  let y = MARGIN, width = 0;
-  for (const day of program.days) {
-    let x = MARGIN, rowH = 0;
-    for (const sid of day.sessions) {
-      const s = program.sessions[sid];
-      if (!s?.papers.length) continue;
-      const cols = Math.ceil(s.papers.length / PAPER_ROWS);
-      const w = REGION_PAD * 2 + cols * CELL_W, h = REGION_PAD * 2 + REGION_HEAD + PAPER_ROWS * CELL_H;
-      regions.push({ id: sid, day: day.day, x, y, w, h });
-      s.papers.forEach((uid, i) => {
-        const cell = { x: x + REGION_PAD + (i % cols) * CELL_W, y: y + REGION_PAD + REGION_HEAD + Math.floor(i / cols) * CELL_H, w: CELL_W, h: CELL_H };
-        pins.set(String(uid), { uid: String(uid), session: sid, x: cell.x + PIN_IN_CELL.x, y: cell.y + PIN_IN_CELL.y, w: PIN_W, h: PIN_H, cell });
-      });
-      x += w + GAP;
-      rowH = Math.max(rowH, h);
-    }
-    if (!rowH) continue;
+  const sessions = program.days.flatMap(day => day.sessions.map(sid => ({ s: program.sessions[sid], day: day.day })))
+    .filter(({ s }) => s?.papers.length);
+  let x = MARGIN, y = MARGIN, rowH = 0, width = 0;
+  sessions.forEach(({ s, day }, n) => {
+    if (n && n % perRow === 0) { y += rowH + GAP; x = MARGIN; rowH = 0; }
+    const cols = Math.ceil(s.papers.length / PAPER_ROWS);
+    const w = REGION_PAD * 2 + cols * CELL_W, h = REGION_PAD * 2 + REGION_HEAD + PAPER_ROWS * CELL_H;
+    regions.push({ id: s.id, day, x, y, w, h });
+    s.papers.forEach((uid, i) => {
+      const cell = { x: x + REGION_PAD + (i % cols) * CELL_W, y: y + REGION_PAD + REGION_HEAD + Math.floor(i / cols) * CELL_H, w: CELL_W, h: CELL_H };
+      pins.set(String(uid), { uid: String(uid), session: s.id, x: cell.x + PIN_IN_CELL.x, y: cell.y + PIN_IN_CELL.y, w: PIN_W, h: PIN_H, cell });
+    });
+    x += w + GAP;
     width = Math.max(width, x - GAP + MARGIN);
-    y += rowH + GAP;
+    rowH = Math.max(rowH, h);
+  });
+  return { W: Math.max(width, 2000), H: Math.max(y + rowH + MARGIN, 1000), regions, pins, perRow };
+}
+
+/**
+ * The wall laid out for a screen of shape `aspect` (width / height of the expanded view): the
+ * number of sessions per row whose wall shape comes closest, so an expanded wall fills tall
+ * phones, tablets and ultra-wide monitors alike.
+ */
+export function buildWallLayout(program, aspect = 2.2) {
+  const count = program.days.reduce((n, d) => n + d.sessions.filter(sid => program.sessions[sid]?.papers.length).length, 0);
+  let best = null;
+  for (let perRow = 1; perRow <= Math.max(1, count); perRow++) {
+    const layout = placeWall(program, perRow);
+    const miss = Math.abs(Math.log(layout.W / layout.H) - Math.log(aspect));
+    if (!best || miss < best.miss - 1e-9) best = { layout, miss };
   }
-  return { W: Math.max(width, 2000), H: Math.max(y - GAP + MARGIN, 1000), regions, pins };
+  return best.layout;
+}
+
+/** Shape (width / height) of the wall's expanded view in this window. */
+export function screenAspect() {
+  // The expanded board: the window minus the site header, margins and the board's title bar.
+  return Math.max(200, window.innerWidth - 28) / Math.max(200, window.innerHeight - 150);
 }
 
 const uidOf = note => (typeof note.board === 'string' && note.board.startsWith('paper:') ? note.board.slice(6) : '');
@@ -237,6 +259,9 @@ export class WallView extends BoardView {
 
   updateEmpty() { this.empty.hidden = true; }
 
+  /** Expanded, the wall fills the window, whatever its shape, and zooms out to show all of itself. */
+  fitScale(width, height, full) { return full ? Math.min(width / this.W, height / this.H) : width / this.W; }
+
   /** The wall's default view: all of it. */
   fitCamera() { return { s: this.minScale, cx: this.W / 2, cy: this.H / 2 }; }
 
@@ -363,9 +388,9 @@ export class WallView extends BoardView {
     this.room.send({ t: 'create', board: 'paper:' + uid, text: result.text, color: result.color, ...spot, ...slot });
   }
 
-  destroy() {
+  destroy({ keepRooms = false } = {}) {
     super.destroy();
-    this.room.close();
+    if (!keepRooms) this.room.close();
   }
 }
 

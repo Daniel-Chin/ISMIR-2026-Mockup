@@ -107,6 +107,15 @@ export class BoardView {
     });
 
     this.scroller.addEventListener('wheel', e => this.onWheel(e), { passive: false });
+    // Two fingers on a board zoom (and pan) the board, never the page around it.
+    this.scroller.addEventListener('touchstart', e => this.onTouch(e), { passive: false });
+    this.scroller.addEventListener('touchmove', e => this.onTouch(e), { passive: false });
+    this.scroller.addEventListener('touchend', e => this.onTouch(e));
+    this.scroller.addEventListener('touchcancel', e => this.onTouch(e));
+    // Safari reports pinches (iPad, Mac trackpad) as gesture events; without these it zooms the page.
+    for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
+      this.scroller.addEventListener(type, e => this.onGesture(e), { passive: false });
+    }
     this.surface.addEventListener('pointerdown', e => this.startPan(e));
     // Any hands-on contact with the board ends the intro tour for good.
     for (const type of ['pointerdown', 'touchstart', 'keydown']) {
@@ -152,7 +161,7 @@ export class BoardView {
     const key = full ? `${width}x${height}` : String(width);
     if (!force && key === this.lastKey) return;
     this.lastKey = key;
-    const fit = full ? Math.max(width / this.W, height / this.H) : width / this.W;
+    const fit = this.fitScale(width, height, full);
     const first = !this.everLaidOut;
     const zoomed = first ? 1 : this.scale / this.base;   // keep the user's zoom across resizes
     const centre = first ? null : this.camera();
@@ -170,6 +179,13 @@ export class BoardView {
     this.setCamera({ s: this.target, cx: centre ? centre.cx : this.W / 2, cy: centre ? centre.cy : this.H / 2 });
     if (this.tourRaf) this.tourSegment(this.camera());   // re-plan the glide for the new viewport
   }
+
+  /**
+   * The smallest zoom. Embedded, the frame has the board's shape: the board fills its width.
+   * Expanded, the frame is the whole window, whatever its shape: the board covers it, so every
+   * spot can take a note (the wall overrides this to show all of itself).
+   */
+  fitScale(width, height, full) { return full ? Math.max(width / this.W, height / this.H) : width / this.W; }
 
   clampScale(v) { return Math.min(Math.max(MAX_SCALE, this.base), Math.max(this.minScale, v)); }
 
@@ -215,6 +231,12 @@ export class BoardView {
 
   applyScale(scale) {
     this.scale = scale;
+    // Zoomed out past the viewport (the expanded wall shows all of itself on any screen shape):
+    // centre the board, with plain board background around it.
+    this.offX = Math.max(0, (this.scroller.clientWidth - this.W * scale) / 2);
+    this.offY = Math.max(0, (this.scroller.clientHeight - this.H * scale) / 2);
+    this.surface.style.left = this.offX + 'px';
+    this.surface.style.top = this.offY + 'px';
     this.surface.style.width = this.W + 'px';
     this.surface.style.height = this.H + 'px';
     this.surface.style.transform = `scale(${scale})`;
@@ -222,8 +244,8 @@ export class BoardView {
     this.sizer.style.height = Math.floor(this.H * scale) + 'px';
     if (this.anchor) {
       const a = this.anchor;
-      this.scroller.scrollLeft = a.cx * scale - a.px;
-      this.scroller.scrollTop = a.cy * scale - a.py;
+      this.scroller.scrollLeft = a.cx * scale + this.offX - a.px;
+      this.scroller.scrollTop = a.cy * scale + this.offY - a.py;
     }
     this.zoomLabel.textContent = Math.round((scale / this.base) * 100) + '%';
   }
@@ -232,7 +254,7 @@ export class BoardView {
   zoomTo(scale, px, py) {
     if (px === undefined) { px = this.scroller.clientWidth / 2; py = this.scroller.clientHeight / 2; }
     this.target = this.clampScale(scale);
-    this.anchor = { cx: (this.scroller.scrollLeft + px) / this.scale, cy: (this.scroller.scrollTop + py) / this.scale, px, py };
+    this.anchor = { cx: (this.scroller.scrollLeft + px - (this.offX || 0)) / this.scale, cy: (this.scroller.scrollTop + py - (this.offY || 0)) / this.scale, px, py };
     if (this.raf) return;
     this.surface.style.willChange = 'transform';
     const step = () => {
@@ -251,7 +273,45 @@ export class BoardView {
     this.raf = requestAnimationFrame(step);
   }
 
+  /** Two-finger pinch on a touch screen: the board point between the fingers stays between them. */
+  onTouch(e) {
+    if (e.touches.length !== 2) {
+      if (this.pinch && e.touches.length < 2) this.pinch = null;
+      return;
+    }
+    e.preventDefault();
+    const [a, b] = e.touches;
+    const r = this.scroller.getBoundingClientRect();
+    const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1;
+    const px = (a.clientX + b.clientX) / 2 - r.left, py = (a.clientY + b.clientY) / 2 - r.top;
+    if (!this.pinch || e.type === 'touchstart') {
+      this.stopTour();
+      cancelAnimationFrame(this.raf);
+      this.raf = 0;
+      this.pinch = { dist, s: this.scale, cx: (this.scroller.scrollLeft + px - (this.offX || 0)) / this.scale, cy: (this.scroller.scrollTop + py - (this.offY || 0)) / this.scale };
+      return;
+    }
+    const s = this.clampScale(this.pinch.s * dist / this.pinch.dist);
+    this.anchor = { cx: this.pinch.cx, cy: this.pinch.cy, px, py };
+    this.applyScale(s);
+    this.anchor = null;
+    this.target = s;
+  }
+
+  /** Safari's pinch (gesturestart/change/end, e.scale relative to the start). */
+  onGesture(e) {
+    e.preventDefault();
+    if (this.pinch) return;   // a touch pinch already handles it (iPad sends both)
+    if (e.type === 'gesturestart') { this.stopTour(); this.gesture = { s: this.target }; return; }
+    if (e.type === 'gestureend') { this.gesture = null; return; }
+    if (!this.gesture) return;
+    const r = this.scroller.getBoundingClientRect();
+    this.zoomTo(this.gesture.s * e.scale, e.clientX - r.left, e.clientY - r.top);
+  }
+
   onWheel(e) {
+    // Safari may also send ctrl+wheel for the pinch it reports as a gesture: zoom once.
+    if (this.gesture && e.ctrlKey) { e.preventDefault(); return; }
     const full = this.frame.classList.contains('is-fullscreen');
     // Embedded boards leave plain scrolling to the page; trackpad pinch (ctrlKey) and Ctrl/⌘
     // + wheel zoom. Fullscreen boards zoom on any wheel, like Miro.
@@ -277,7 +337,7 @@ export class BoardView {
   /** Camera = scale plus the board point at the centre of the viewport. */
   camera() {
     const w = this.scroller.clientWidth, h = this.scroller.clientHeight;
-    return { s: this.scale, cx: (this.scroller.scrollLeft + w / 2) / this.scale, cy: (this.scroller.scrollTop + h / 2) / this.scale };
+    return { s: this.scale, cx: (this.scroller.scrollLeft + w / 2 - (this.offX || 0)) / this.scale, cy: (this.scroller.scrollTop + h / 2 - (this.offY || 0)) / this.scale };
   }
 
   /**
@@ -612,8 +672,8 @@ export class BoardView {
     if (!this.app.requireLogin('post a note')) return;
     if (x === undefined) {
       const s = this.scale;
-      x = (this.scroller.scrollLeft + this.scroller.clientWidth / 2) / s - NOTE_W / 2 + (Math.random() - 0.5) * 120;
-      y = (this.scroller.scrollTop + Math.min(this.scroller.clientHeight, window.innerHeight) / 2) / s - 70 + (Math.random() - 0.5) * 80;
+      x = (this.scroller.scrollLeft + this.scroller.clientWidth / 2 - (this.offX || 0)) / s - NOTE_W / 2 + (Math.random() - 0.5) * 120;
+      y = (this.scroller.scrollTop + Math.min(this.scroller.clientHeight, window.innerHeight) / 2 - (this.offY || 0)) / s - 70 + (Math.random() - 0.5) * 80;
     }
     const result = await this.app.composer.open({ heading: 'New note', where: this.title, max: this.room.limits.textMax });
     if (!result) return;
