@@ -37,7 +37,7 @@ from utils.shared import (
     load_site_config,
     parse_conference_dates,
 )
-from utils.calendar import build_calendar
+from utils.calendar import SESSION_KINDS, build_calendar, event_link
 from utils.session_assignment import parse_file as parse_session_assignment
 
 
@@ -54,6 +54,7 @@ def chain_functions(*functions: Callable) -> Callable:
 
 site_data = {}
 by_uid = {}
+timeline = []  # see _build_timeline
 
 
 def paper_check(row):
@@ -178,6 +179,9 @@ def main(site_data_path: str):
                 include_token=False,
             )
 
+    timeline.clear()
+    timeline.extend(_build_timeline(site_data.get("events", [])))
+
     app.jinja_env.globals["helpdesk_url"] = load_helpdesk_url(site_data_path)
     app.jinja_env.globals["calendar_ics_path"] = calendar_ics_path(site_data_path)
 
@@ -196,6 +200,31 @@ def main(site_data_path: str):
     by_uid["days"] = dict(zip(days, events))
 
     return extra_files
+
+
+def _event_start(event):
+    timezone = pytz.timezone(_conference_timezone_name())
+    naive = datetime.datetime.strptime(  # noqa: DTZ007
+        f"{event['start_date']} {event['start_time']}", "%Y-%m-%d %H:%M"
+    )
+    return timezone.localize(naive)
+
+
+def _build_timeline(events):
+    """Events that have a page, in chronological order (prev/next navigation)."""
+    out = []
+    for event in sorted(events, key=lambda e: (_event_start(e), _as_int(e["uid"]))):
+        url = event_link(event)
+        if not url:
+            continue
+        kind = SESSION_KINDS.get(event["category"])
+        out.append({
+            "uid": str(event["uid"]),
+            "title": str(event["title"]),
+            "url": url,
+            "session_key": f"{kind}-{event['title'].split()[-1]}" if kind else "",
+        })
+    return out
 
 
 # ------------- SERVER CODE -------------------->
@@ -254,7 +283,7 @@ def _session_links():
     """{"poster"|"oral": {session number: {"channel_url", "zoom_url"}}}"""
     links = {"poster": {}, "oral": {}}
     for event in site_data.get("events", []):
-        kind = {"Poster session": "poster", "Oral session": "oral"}.get(event.get("category"))
+        kind = SESSION_KINDS.get(event.get("category"))
         if kind is None:
             continue
         links[kind][str(event["title"]).split()[-1]] = {
@@ -282,6 +311,7 @@ def papers():
     data = _data()
     data["papers"] = site_data["papers"]
     data["session_links"] = _session_links()
+    data["timeline"] = timeline
     return render_template("papers.html", **data)
 
 
@@ -652,6 +682,23 @@ def poster(poster):
     return render_template("poster.html", **data)
 
 
+@app.route("/event_<event>.html")
+def event(event):
+    v = by_uid["events"][event]
+    start = _event_start(v)
+    index = next((i for i, e in enumerate(timeline) if e["uid"] == event), None)
+    data = _data()
+    data["event"] = v
+    data["start_label"] = start.strftime("%a, %b %-d, %H:%M")
+    data["start_utc"] = start.astimezone(pytz.UTC).isoformat()
+    data["timezone_name"] = _conference_timezone_name()
+    data["prev_event"] = timeline[index - 1] if index else None
+    data["next_event"] = (
+        timeline[index + 1] if index is not None and index + 1 < len(timeline) else None
+    )
+    return render_template("event.html", **data)
+
+
 # Disabled: `speakers` data is not loaded into by_uid, so this route is currently
 # unimplemented and breaks static freezing/runtime if linked.
 # @app.route("/speaker_<speaker>.html")
@@ -783,6 +830,9 @@ def generator():
         yield "industry", {"industry": str(industry["uid"])}
     for lbd in site_data["lbds"]:
         yield "lbd", {"lbd": str(lbd["uid"])}
+    for event in timeline:
+        if event["url"].startswith("event_"):
+            yield "event", {"event": event["uid"]}
     for day in site_data["days"]:
         yield "day", {"day": str(day["uid"])}
 

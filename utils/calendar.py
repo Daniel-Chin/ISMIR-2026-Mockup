@@ -4,6 +4,22 @@ from datetime import datetime, timedelta
 
 import pytz
 
+SESSION_KINDS = {"Poster session": "poster", "Oral session": "oral"}
+NO_PAGE_CATEGORIES = {"Registration", "Lunch"}
+
+
+def event_link(event):
+    """Relative URL of the event's page, or "" if it has none."""
+    kind = SESSION_KINDS.get(event["category"])
+    if kind:
+        return f"papers.html?session={event['title'].split()[-1]}&type={kind}"
+    if event["category"] in NO_PAGE_CATEGORIES:
+        return ""
+    if not any(str(event.get(k) or "").strip()
+               for k in ("event_desc", "channel_url", "live_url")):
+        return ""
+    return f"event_{event['uid']}.html"
+
 
 def build_calendar(events, config):
     timezone = pytz.timezone(config["timezone"])
@@ -25,18 +41,7 @@ def build_calendar(events, config):
                 end += timedelta(days=1)
             end = timezone.localize(end)
 
-        category = event["category"]
-        if category in {"Poster session", "Oral session"}:
-            session_type = "poster" if category == "Poster session" else "oral"
-            link = f"papers.html?session={event['title'].split()[-1]}&type={session_type}"
-        else:
-            link = {
-                "LBD": "lbds.html",
-                "Industry": "industry.html?session=Platinum",
-                "Tutorials": "tutorials.html",
-                "Music": "music.html",
-                "Satellite": event.get("web_link", ""),
-            }.get(category, "")
+        link = event_link(event)
 
         description = []
         if link:
@@ -55,7 +60,7 @@ def build_calendar(events, config):
             "location": link,
             "link": link,
             "category": "time",
-            "calendarId": category.replace(" ", "_"),
+            "calendarId": event["category"].replace(" ", "_"),
             "scrollKey": "\n".join(description),
             "raw": {"endTimeTbd": end_time_tbd},
         })
