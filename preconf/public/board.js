@@ -507,10 +507,13 @@ export class BoardView {
     const author = node.querySelector('.pc-note-author');
     author.textContent = n.authorName;
     if (this.isMine(n)) author.append(el('span', 'mine', ' (you)'));
-    // "Alice → P1-01": with a tag, name and tag get the foot's first line, time and buttons the second.
+    // "[P1-01] · 1d ago": with a tag, the name gets the foot's first line; tag, time and
+    // buttons the second.
     const tag = this.opts.noteTag?.(n) || '';
-    if (tag) author.append(el('span', 'pc-note-to', ' → ' + tag));
-    author.title = tag ? `${n.authorName} on ${tag}` : n.authorName;
+    const to = node.querySelector('.pc-note-to');
+    to.textContent = tag ? `[${tag}] · ` : '';
+    to.title = tag ? `Note on ${tag}` : '';
+    to.hidden = !tag;
     node.querySelector('.pc-note-foot').classList.toggle('has-tag', !!tag);
     const time = node.querySelector('.pc-note-time');
     time.dataset.ts = n.created;
@@ -551,7 +554,7 @@ export class BoardView {
     const actions = el('div', 'pc-note-actions');
     const btn = (act, label, title) => { const b = el('button', 'pc-icon-btn', label); b.type = 'button'; b.dataset.act = act; b.title = title; b.setAttribute('aria-label', title); return b; };
     actions.append(btn('edit', '✎', 'Edit your note'), btn('delete', '🗑', 'Delete'));
-    foot.append(el('span', 'pc-note-author'), el('span', 'pc-note-time'), actions);
+    foot.append(el('span', 'pc-note-author'), el('span', 'pc-note-to'), el('span', 'pc-note-time'), actions);
 
     node.append(body, foot);
 

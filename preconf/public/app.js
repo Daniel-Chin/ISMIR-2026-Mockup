@@ -7,7 +7,7 @@ const COLORS = { sun: '#ffe27a', mint: '#a8f0c6', sky: '#a9dcff', rose: '#ffbfd0
 const USER_KEY = 'pcUser';
 const COLS_KEY = 'pcPapersPerRow';
 const COLOR_KEY = 'pcLastColor';
-const VIEW_KEY = 'pcPaperView';   // 'hall' or 'wall'
+const VIEW_KEY = 'pcPaperView';   // 'wall' (default) or 'hall'
 
 const $ = sel => document.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -295,6 +295,7 @@ function setPaperView(view, { link = true } = {}) {
   store.set(VIEW_KEY, view);
   $('#paper-hall').hidden = view !== 'hall';
   $('#paper-wall').hidden = view !== 'wall';
+  $('#paper-view-title').textContent = view === 'wall' ? 'Paper Wall' : 'Paper Hall';
   document.querySelectorAll('#paper-view button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === view)));
   if (view === 'wall') {
     closeSession({ keepHash: true });
@@ -317,7 +318,7 @@ function initPaperView() {
     const b = e.target.closest('button[data-view]');
     if (b) setPaperView(b.dataset.view);
   });
-  setPaperView(location.hash === '#wall' ? 'wall' : store.get(VIEW_KEY, 'hall'), { link: false });
+  setPaperView(location.hash === '#wall' ? 'wall' : store.get(VIEW_KEY, 'wall'), { link: false });
 }
 
 /** A session's title band on the wall: "Mon · PS-01" and its Oral / Poster times. */
@@ -476,7 +477,11 @@ function openSession(id, scroll) {
   for (const n of [1, 2, 3, 4]) {
     const b = el('button', '', String(n));
     b.type = 'button'; b.dataset.n = n;
-    b.addEventListener('click', () => setCols(n));
+    b.addEventListener('click', () => {
+      setCols(n);
+      // New card widths: once the boards have re-laid out, show each one's default view again.
+      requestAnimationFrame(() => requestAnimationFrame(() => { for (const board of hall.open?.boards || []) { board.layout(); board.fitToNotes(); } }));
+    });
     seg.append(b);
   }
   const collapse = el('button', 'pc-btn pc-btn-sm pc-fs-btn', '▲ Collapse');

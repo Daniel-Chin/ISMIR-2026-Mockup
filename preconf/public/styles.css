@@ -240,6 +240,13 @@ html[data-theme="light"] .pc-btn-primary { background: #102a52; color: #fff; bor
   color: var(--muted); font-size: 1.1rem; text-transform: uppercase; letter-spacing: .14em; text-align: center;
 }
 .pc-board-tools { position: absolute; right: 8px; top: 8px; z-index: 5; display: flex; gap: 6px; }
+/* Zoom / Expand show while the pointer is on the board (or a key is in it). Touch screens have
+   no hover, so they always show there; so does an expanded board, which needs Collapse. */
+@media (hover: hover) {
+  .pc-board-frame:not(.is-fullscreen) > .pc-board-tools { opacity: 0; pointer-events: none; transition: opacity .15s ease; }
+  .pc-board-frame:not(.is-fullscreen):hover > .pc-board-tools,
+  .pc-board-frame:not(.is-fullscreen):focus-within > .pc-board-tools { opacity: 1; pointer-events: auto; }
+}
 .pc-board-frame.is-fullscreen { position: fixed; inset: 70px 14px 14px; z-index: 60; display: flex; flex-direction: column; }
 .pc-board-frame.is-fullscreen .pc-board-scroll { flex: 1; height: auto !important; }
 .pc-scrim { position: fixed; inset: 0; z-index: 55; background: rgba(4, 6, 12, .62); }
@@ -279,8 +286,8 @@ html:not([data-theme="light"]) .pc-session-panel-head button.pc-fs-btn:not(.deta
 .pc-note-foot { cursor: grab; display: flex; align-items: center; gap: 6px; padding: 0 8px 7px 10px; font-size: 11px; font-weight: 800; }
 .pc-note-author { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .pc-note-author .mine { color: #6a28d9; }
-.pc-note-to { font-family: "Courier New", ui-monospace, monospace; font-weight: 900; color: #8a5a00; }
-.pc-note-foot.has-tag { flex-wrap: wrap; row-gap: 1px; }
+.pc-note-to { flex: none; white-space: pre; font-family: "Courier New", ui-monospace, monospace; font-weight: 900; color: #8a5a00; }
+.pc-note-foot.has-tag { flex-wrap: wrap; row-gap: 1px; column-gap: 0; }
 .pc-note-foot.has-tag .pc-note-author { flex-basis: 100%; }
 .pc-note-foot.has-tag .pc-note-time { margin-right: auto; }
 .pc-note-time { opacity: .65; white-space: nowrap; }
