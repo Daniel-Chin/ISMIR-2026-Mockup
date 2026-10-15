@@ -546,8 +546,21 @@ export class BoardView {
     this.target = this.scale;
   }
 
+  /**
+   * Expand / Collapse keep what you are looking at: the same spot at the same zoom (expandAt
+   * passes keepView and places the spot under the pointer itself). Collapsing returns the page
+   * to exactly where it was.
+   */
   toggleFullscreen({ keepView = false } = {}) {
     const on = !this.frame.classList.contains('is-fullscreen');
+    const before = keepView ? null : this.camera();
+    const mount = this.frame.parentElement;
+    if (on) {
+      // The expanded board floats above the page; its mount keeps the board's height so nothing
+      // below moves up (which would leave the page somewhere else on collapse).
+      this.pageY = window.scrollY;
+      mount.style.minHeight = this.frame.getBoundingClientRect().height + 'px';
+    }
     this.frame.classList.toggle('is-fullscreen', on);
     this.titleBar.hidden = !on;
     this.fsButton.textContent = on ? '⤡ Collapse' : '⤢ Expand';
@@ -560,10 +573,45 @@ export class BoardView {
     } else {
       this.scrim?.remove();
       document.documentElement.classList.remove('pc-board-expanded');
+      mount.style.minHeight = '';
+      if (this.pageY !== undefined) window.scrollTo({ top: this.pageY, behavior: 'instant' });
     }
     this.layout(true);
-    // Expanding or collapsing opens on the default view: all notes in sight.
-    if (!keepView) this.fitToNotes();
+    if (before) this.setCamera(this.reachable(before));
+  }
+
+  /**
+   * The part of the board that is actually on screen, in board units: an embedded board can be
+   * partly scrolled out of the window. null when none of it is visible.
+   */
+  visibleRect() {
+    const r = this.scroller.getBoundingClientRect();
+    const left = Math.max(r.left, 0), right = Math.min(r.right, window.innerWidth);
+    const top = Math.max(r.top, 0), bottom = Math.min(r.bottom, window.innerHeight);
+    if (right - left < 20 || bottom - top < 20) return null;
+    const s = this.scale, sl = this.scroller.scrollLeft - (this.offX || 0) - r.left, st = this.scroller.scrollTop - (this.offY || 0) - r.top;
+    return {
+      x0: Math.max(0, (sl + left) / s), x1: Math.min(this.W, (sl + right) / s),
+      y0: Math.max(0, (st + top) / s), y1: Math.min(this.H, (st + bottom) / s),
+    };
+  }
+
+  /** Bring a note you just posted fully into view (a short glide, same zoom) if it isn't. */
+  revealNote(id) {
+    const node = this.els.get(id), v = this.visibleRect();
+    if (!node || !v) return;
+    const x = parseFloat(node.style.left) || 0, y = parseFloat(node.style.top) || 0;
+    const w = node._w || NOTE_W, h = node._h || 160, m = 16 / this.scale;
+    const shift = (lo, size, v0, v1) => {
+      if (size + 2 * m > v1 - v0) return lo + size / 2 - (v0 + v1) / 2;   // bigger than the view: centre it
+      if (lo - m < v0) return lo - m - v0;
+      if (lo + size + m > v1) return lo + size + m - v1;
+      return 0;
+    };
+    const dx = shift(x, w, v.x0, v.x1), dy = shift(y, h, v.y0, v.y1);
+    if (!dx && !dy) return;
+    const c = this.camera();
+    this.glideTo({ s: this.scale, cx: c.cx + dx, cy: c.cy + dy });
   }
 
   // ---------- room events ----------
@@ -586,6 +634,8 @@ export class BoardView {
       const node = ev.replaces && this.els.get(ev.replaces);
       if (node) { this.els.delete(ev.replaces); node.dataset.id = n.id; this.els.set(n.id, node); }
       this.upsertNote(n, ev.fresh);
+      // Your own new note (shown before the server confirms it): make sure you can see it.
+      if (ev.fresh && n.pending) this.revealNote(n.id);
     } else if (ev.type === 'remove') {
       const n = ev.note;
       if (!this.owns(n)) return;
@@ -725,9 +775,12 @@ export class BoardView {
     this.stopTour();
     if (!this.app.requireLogin('post a note')) return;
     if (x === undefined) {
-      const s = this.scale;
-      x = (this.scroller.scrollLeft + this.scroller.clientWidth / 2 - (this.offX || 0)) / s - NOTE_W / 2 + (Math.random() - 0.5) * 120;
-      y = (this.scroller.scrollTop + Math.min(this.scroller.clientHeight, window.innerHeight) / 2 - (this.offY || 0)) / s - 70 + (Math.random() - 0.5) * 80;
+      // The middle of the part of the board you can see (not of the whole frame, which may be
+      // partly scrolled off screen), nudged a little so notes posted in a row don't stack.
+      const v = this.visibleRect() || { x0: 0, x1: this.W, y0: 0, y1: this.H };
+      const jx = Math.min(60, (v.x1 - v.x0) / 6), jy = Math.min(40, (v.y1 - v.y0) / 6);
+      x = (v.x0 + v.x1) / 2 - NOTE_W / 2 + (Math.random() - 0.5) * 2 * jx;
+      y = (v.y0 + v.y1) / 2 - 70 + (Math.random() - 0.5) * 2 * jy;
     }
     const result = await this.app.composer.open({ heading: 'New note', where: this.title, max: this.room.limits.textMax });
     if (!result) return;

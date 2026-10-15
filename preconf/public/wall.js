@@ -334,14 +334,6 @@ export class WallView extends BoardView {
     if (pending) this.glideTo(pending);
   }
 
-  // Expand / Collapse keep what you are looking at (same spot, same zoom) instead of jumping
-  // back to the whole wall: on a wall this big, the spot is what matters.
-  toggleFullscreen({ keepView = false } = {}) {
-    const before = keepView ? null : this.camera();
-    super.toggleFullscreen({ keepView: true });
-    if (before) this.setCamera(this.reachable(before));
-  }
-
   /** Shown again after the hall: notes laid out while hidden need measuring. */
   shown() {
     this.renderAll();
