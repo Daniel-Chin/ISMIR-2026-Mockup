@@ -21,7 +21,10 @@
   <div class="btn-group mx-3 mb-3">
     {% if event.channel_url %}
     <a href="{{event.channel_url}}" class="btn btn-outline-primary"
-      target="_blank" rel="noopener noreferrer">{% include
+      target="_blank" rel="noopener noreferrer"
+      {% if event.category == "Tutorials" %}
+      onclick="alert('Entry is conditioned on tutorial registration. Slack will reject unregistered attendees.')"
+      {% endif %}>{% include
       'slack_svg.html' %} Slack Channel</a>
     {% endif %}
     {% if event.zoom_url %}
