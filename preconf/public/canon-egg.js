@@ -247,6 +247,13 @@ function canonEggRender(backdrop, view) {
   const links = backdrop.querySelector('.canon-egg-links');
   const para = (text) => { const p = document.createElement('p'); p.textContent = text; return p; };
   const toBoard = () => canonEggLink('See who found the easter egg →', () => canonEggOpenDialog({ kind: 'leaderboard' }));
+  // Signed out: every message after a solve offers to record the find. Signing in from here (and
+  // only from here) records it once the visitor is back (canonEggClaimPending).
+  const signedOut = !window.PC_EGG?.user;
+  const toSignIn = () => canonEggLink('Sign in to record your find →', () => {
+    canonEggStore.set(CANON_EGG_PENDING_KEY, String(Date.now()));
+    window.PC_EGG?.login();
+  });
   copy.replaceChildren();
   links.replaceChildren();
   if (view.kind === 'congrats') {
@@ -257,22 +264,21 @@ function canonEggRender(backdrop, view) {
   } else if (view.kind === 'congrats-signin') {
     kicker.textContent = 'Easter egg found';
     title.textContent = 'Congratulations!';
-    copy.append(para('You found the hidden easter egg! Sign in with Slack now to claim your place on the leaderboard.'), para(CANON_EGG_FACTS_NOTE));
-    links.append(canonEggLink('Sign in →', () => {
-      canonEggStore.set(CANON_EGG_PENDING_KEY, String(Date.now()));
-      window.PC_EGG?.login();
-    }), toBoard());
+    copy.append(para('You found the hidden easter egg! Sign in with Slack to record that you found it.'), para(CANON_EGG_FACTS_NOTE));
+    links.append(toSignIn(), toBoard());
   } else if (view.kind === 'fact') {
     const pool = canonEggPaperPool();
     const paper = pool[Math.floor(Math.random() * pool.length)];
     kicker.textContent = 'Paper fun fact';
     title.textContent = paper ? paper.title : 'Fun facts are on their way';
     copy.append(para(paper ? paper.fact : 'Authors are still sending them in. Solve it again later!'));
+    if (signedOut) links.append(toSignIn());
     links.append(toBoard());
   } else if (view.kind === 'leaderboard') {
     kicker.textContent = 'Easter egg finders';
     title.textContent = view.rank ? 'Congratulations!' : 'Who found the easter egg';
     copy.append(para('Loading…'));
+    if (signedOut) links.append(toSignIn());
     const api = window.PC_EGG;
     if (!api) { copy.replaceChildren(para('The list of finders is not available here.')); return; }
     api.leaderboard().then((data) => {
@@ -306,7 +312,7 @@ function canonEggRender(backdrop, view) {
       copy.append(list);
       const more = [`${data.total} ${data.total === 1 ? 'person has' : 'people have'} found it so far.`];
       if (data.total > data.entries.length) more.push(`Showing the first ${data.entries.length}.`);
-      if (!api.user) more.push('Sign in with Slack and solve it to join.');
+      if (!api.user) more.push('You are not signed in, so your find is not recorded yet.');
       copy.append(para(more.join(' ')));
       // Your name in view (scrolls the list only, not the page).
       const mineInList = list.querySelector('.is-me');
