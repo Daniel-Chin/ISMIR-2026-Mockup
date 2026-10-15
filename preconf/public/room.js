@@ -58,6 +58,18 @@ export class Room {
 
   setStatus(s) { this.status = s; this.emit({ type: 'status', status: s }); }
 
+  /**
+   * Notes fetched in one request with every other session's (app.js, /api/snapshot) while this
+   * room's connection is still queued behind the others. The connection's own snapshot (hello)
+   * replaces them when it arrives; until then the notes show but nothing can be sent.
+   */
+  seed(notes) {
+    if (this.ready || !Array.isArray(notes)) return;
+    this.notes = new Map(notes.map(n => [n.id, n]));
+    this.ready = true;
+    this.emit({ type: 'reset' });
+  }
+
   receive(msg) {
     switch (msg.t) {
       case 'hello':

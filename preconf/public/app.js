@@ -168,6 +168,19 @@ function renderAuth() {
   slot.replaceChildren(chip, out);
 }
 
+/**
+ * Every live connection's hello says who the server thinks we are. If /api/me hasn't answered
+ * yet (it races the connections at start-up), take that answer: a signed-in visitor never sees
+ * "Sign in" because the check is still on its way.
+ */
+function userFromRoom(room) {
+  if (!room.me || app.user?.id === room.me.id) return;
+  if (app.user) return;   // /api/me already answered with someone: it stays authoritative
+  app.user = { ...room.me };
+  renderAuth();
+  window.dispatchEvent(new Event('pc-egg-ready'));   // the easter egg may be waiting to claim a find
+}
+
 async function refreshUser() {
   try {
     const res = await apiFetch('/api/me', { cache: 'no-store' });
@@ -289,14 +302,34 @@ function sessionCard(s) {
 // same Room, so switching views or opening a session shows its notes at once. Once every
 // session is live, the hall's note counts come from these rooms instead of /api/counts.
 const sessionRooms = new Map();
+// All sessions' notes from one request (see roomSnapshot in the Worker): rooms show them at
+// once while their live connections, which browsers open one at a time, catch up.
+const snapshot = { at: 0, rooms: {} };
+const SNAPSHOT_FRESH_MS = 15_000;
 function sessionRoom(sid) {
   let room = sessionRooms.get(sid);
   if (!room) {
     room = new Room('session:' + sid);
-    room.subscribe(ev => { if (['reset', 'upsert', 'remove'].includes(ev.type)) scheduleBadges(); });
+    room.subscribe(ev => {
+      if (ev.type === 'reset') userFromRoom(room);
+      if (['reset', 'upsert', 'remove'].includes(ev.type)) scheduleBadges();
+    });
     sessionRooms.set(sid, room);
+    if (Date.now() - snapshot.at < SNAPSHOT_FRESH_MS) room.seed(snapshot.rooms[sid]);
   }
   return room;
+}
+
+async function loadSnapshot() {
+  try {
+    const ids = Object.keys(hall.program.sessions);
+    const res = await apiFetch('/api/snapshot?rooms=' + encodeURIComponent(ids.join(',')), { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    snapshot.at = Date.now();
+    snapshot.rooms = data.rooms || {};
+    for (const [sid, room] of sessionRooms) room.seed(snapshot.rooms[sid]);
+  } catch { /* the live connections bring the notes anyway */ }
 }
 const allSessionsLive = () => !!hall.program && Object.keys(hall.program.sessions).every(sid => sessionRooms.get(sid)?.ready);
 
@@ -769,7 +802,10 @@ function initWelcome() {
     $('#welcome').scrollIntoView({ behavior: 'smooth', block: 'start' });
     board.compose();
   });
-  room.subscribe(ev => { if (ev.type === 'error') handleRoomError(ev); });
+  room.subscribe(ev => {
+    if (ev.type === 'reset') userFromRoom(room);
+    if (ev.type === 'error') handleRoomError(ev);
+  });
 }
 
 function applyConference(conf) {
@@ -830,6 +866,7 @@ async function main() {
   // Relative to this module, so it resolves on the Worker and in the GitHub Pages build alike.
   const program = await programReady;
   hall.program = program;
+  const snapshotReady = loadSnapshot();   // in flight while the hall and wall are built
   window.PC_PROGRAM = program; // read by canon-egg.js for paper fun facts
   applyConference(program.conference);
   renderHall();
@@ -839,7 +876,7 @@ async function main() {
   window.addEventListener('resize', () => { if (hall.open) syncAuthorOverflow(hall.open.panel); });
   // Session badges: refresh every 20 s while the page is visible, and at once when it comes
   // back to the foreground (another tab, another app, a phone waking up).
-  refreshCounts();
+  snapshotReady.then(refreshCounts);
   setInterval(() => { if (!document.hidden) refreshCounts(); }, 20_000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshCounts(); });
   window.addEventListener('focus', refreshCounts);

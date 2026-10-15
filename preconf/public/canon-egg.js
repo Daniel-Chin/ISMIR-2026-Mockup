@@ -458,8 +458,10 @@ function initCanonEasterEgg() {
 }
 
 initCanonEasterEgg();
-// app.js announces when it knows who is signed in (window.PC_EGG).
-if (window.PC_EGG) canonEggClaimPending(); else window.addEventListener('pc-egg-ready', canonEggClaimPending, { once: true });
+// app.js sets up window.PC_EGG first and announces 'pc-egg-ready' once the sign-in check is
+// back (this script is deferred, so PC_EGG may already exist with a remembered user): try both.
+if (window.PC_EGG) canonEggClaimPending();
+window.addEventListener('pc-egg-ready', canonEggClaimPending, { once: true });
 
 window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && document.querySelector('.canon-egg-funfact-backdrop')) canonEggCloseFunFact();

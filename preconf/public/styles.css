@@ -221,13 +221,6 @@ html[data-theme="light"] .pc-btn-primary { background: #102a52; color: #fff; bor
 .pc-board-surface { cursor: grab; }
 .pc-board-surface.is-panning { cursor: grabbing; }
 .pc-zoom-btn { min-width: 28px; }
-.pc-zoom-hint {
-  position: absolute; left: 50%; top: 50%; z-index: 6; transform: translate(-50%, -50%);
-  padding: 8px 14px; pointer-events: none; opacity: 0; transition: opacity .25s ease;
-  background: rgba(7, 10, 18, .82); color: #fff6c9; font-size: .8rem; font-weight: 800; letter-spacing: .04em;
-  border-left: 3px solid var(--cyan); border-bottom: 3px solid var(--gold);
-}
-.pc-zoom-hint.is-visible { opacity: 1; }
 .pc-board-surface {
   position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden;
   background-color: var(--pc-board-bg);
@@ -534,8 +527,8 @@ html:not([data-theme="light"]) .canon-egg-board li { background: rgba(255, 255, 
 .canon-egg-board li.canon-egg-gap { border: 0; background: none; padding: 3px 2px; opacity: .55; }
 
 /* ---------- speed ---------- */
-/* Zoomed far out (board.js FAR_SCALE): text would be a few pixels tall, so it is not drawn and
-   shadows are dropped; notes and cards show as their coloured shapes. Keeps zooming smooth. */
+/* Zoomed out below 100% (board.js updateFar): text would be a few pixels tall, so it is not
+   drawn and shadows are dropped; notes and cards show as their coloured shapes. */
 .pc-board-surface.is-far .pc-note > *,
 .pc-board-surface.is-far .pc-pin > :not(.pc-pin-tack) { visibility: hidden; }
 .pc-board-surface.is-far .pc-note,

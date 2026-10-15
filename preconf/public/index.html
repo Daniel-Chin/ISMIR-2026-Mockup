@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>ISMIR 2026 Warm-up Discussion</title>
   <meta name="description" content="Leave a sticky note at the Welcome Reception and discuss ISMIR 2026 papers before the conference." />
-  <script src="/theme.js"></script>
   <!-- Header, hero, section headings and footer come straight from the live overview. -->
   <link rel="stylesheet" href="/vendor/overview.css" />
   <link rel="stylesheet" href="/styles.css" />
+  <!-- After the stylesheets, so they start downloading first; still before the body (no flash). -->
+  <script src="/theme.js"></script>
   <!-- Fetched in parallel with everything else instead of one after another. -->
   <link rel="preload" href="/data/program.json" as="fetch" crossorigin="anonymous" />
   <link rel="modulepreload" href="/app.js" />
@@ -136,9 +137,10 @@
   </dialog>
   <div class="pc-toast-stack" id="toasts" aria-live="polite"></div>
 
-  <script src="/site-config.js"></script>
-  <script src="/vendor/timezone-preference.js"></script>
+  <!-- All deferred: downloaded together, run in this order once the page is parsed. -->
+  <script defer src="/site-config.js"></script>
+  <script defer src="/vendor/timezone-preference.js"></script>
   <script type="module" src="/app.js"></script>
-  <script src="/canon-egg.js"></script>
+  <script defer src="/canon-egg.js"></script>
 </body>
 </html>

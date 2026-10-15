@@ -22,16 +22,8 @@ const FIT_MAX_PERCENT = 200;
 const TOUR_MOVE_MS = 4500;     // intro camera: one glide between shots
 const TOUR_HOLD_MS = 2200;     // ...then rest on the shot
 const ZOOM_EASE = 0.22;        // fraction of the remaining distance covered per frame
-// Below this scale note and card text is a few pixels tall: unreadable, yet the most expensive
-// thing to draw while zooming. It is left out there (styles.css: .is-far), so zooming far out
-// stays smooth however many notes there are.
-const FAR_SCALE = 0.28;
-// While a zoom, glide or pinch is under way the bar is higher: text that would be drawn for the
-// first time at this size mid-animation is filled in once the motion stops (as Miro does).
-const MOVING_FAR_SCALE = 0.5;
 // Notes of up to this many wrapped lines can't be taller than wide: no need to measure them.
 const SHORT_NOTE_LINES = 7, CHARS_PER_LINE = 24;
-const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform);
 
 export const el = (tag, cls, text) => {
   const node = document.createElement(tag);
@@ -100,8 +92,6 @@ export class BoardView {
       tool('+', 'Zoom in', () => this.zoomTo(this.target * 1.4)),
       this.fsButton,
     );
-    this.hint = el('div', 'pc-zoom-hint', `${IS_MAC ? '⌘' : 'Ctrl'} + scroll to zoom`);
-    this.frame.append(this.hint);
     this.surface.append(this.empty);
     this.scroller.append(this.sizer, this.surface);
     this.frame.append(this.titleBar, this.tools, this.scroller);
@@ -265,9 +255,13 @@ export class BoardView {
     this.zoomLabel.textContent = Math.round((scale / this.base) * 100) + '%';
   }
 
-  /** Text left out below FAR_SCALE (MOVING_FAR_SCALE while the view is moving). */
+  /**
+   * Zoomed out below 100% (only paper and Welcome boards go there; the wall's 100% is all of
+   * it), note and card text is left out (styles.css: .is-far): it is a few pixels tall there,
+   * yet the most expensive thing to draw while zooming. At 100% and above all text is drawn.
+   */
   updateFar() {
-    const far = this.scale < (this.moving ? MOVING_FAR_SCALE : FAR_SCALE);
+    const far = this.scale < this.base * 0.999;
     if (far !== this.far) { this.far = far; this.surface.classList.toggle('is-far', far); }
   }
 
@@ -357,25 +351,14 @@ export class BoardView {
   onWheel(e) {
     // Safari may also send ctrl+wheel for the pinch it reports as a gesture: zoom once.
     if (this.gesture && e.ctrlKey) { e.preventDefault(); return; }
-    const full = this.frame.classList.contains('is-fullscreen');
-    // Embedded boards leave plain scrolling to the page; trackpad pinch (ctrlKey) and Ctrl/⌘
-    // + wheel zoom. Fullscreen boards zoom on any wheel, like Miro.
-    if (!full && !e.ctrlKey && !e.metaKey) { this.showHint(); return; }
+    // The wheel over a board zooms it, about the pointer, embedded or expanded alike; it never
+    // scrolls the board (drag empty space to move around) nor the page behind it.
     e.preventDefault();
     this.stopTour();
     const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
     const dy = Math.max(-120, Math.min(120, e.deltaY * unit));
     const r = this.scroller.getBoundingClientRect();
     this.zoomTo(this.target * Math.exp(-dy * 0.0025), e.clientX - r.left, e.clientY - r.top);
-  }
-
-  showHint() {
-    const now = performance.now();
-    if (now - (this.hintAt || 0) < 4000) return;
-    this.hintAt = now;
-    this.hint.classList.add('is-visible');
-    clearTimeout(this.hintTimer);
-    this.hintTimer = setTimeout(() => this.hint.classList.remove('is-visible'), 1400);
   }
 
   // ---------- intro tour ----------
