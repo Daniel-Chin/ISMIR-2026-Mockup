@@ -485,9 +485,12 @@ def sync_captions(youtube: Resource, video_id: str, caption: CaptionPlan) -> Non
 
 def apply_updates(
     youtube: Resource, plans: Sequence[UpdatePlan], csv_path: Path,
-    fields: list[str], rows: list[PaperRow], original: bytes, dry_run: bool = False,
+    fields: list[str], rows: list[PaperRow], original: bytes, videos: Sequence[APIObject],
+    dry_run: bool = False,
 ) -> None:
+    """Applied changes are mirrored into `videos`, so the later playlist pass needs no re-read."""
     papers = {row['uid']: row for row in rows}
+    videos_by_id = {video['id']: video for video in videos}
     for plan in tqdm(plans, desc='Videos', unit='video'):
         body = plan['body']
         parts = [part for part in ('snippet', 'status') if part in body]
@@ -502,6 +505,8 @@ def apply_updates(
                'csv_video_after': plan['url'] if csv_change else None}
         tqdm.write(('DRY RUN ' if dry_run else 'PLANNED ') + json.dumps(log, ensure_ascii=False, sort_keys=True))
         if dry_run:
+            for part in parts:
+                videos_by_id[body['id']][part].update(body[part])
             continue
         if caption is not None:
             # Before the description update, which records the caption in the footer.
@@ -512,6 +517,8 @@ def apply_updates(
                 {k: response.get(p, {}).get(k) for k in body[p]} != body[p] for p in parts
             ) or any('publishAt' in response.get(p, {}) and 'publishAt' not in body[p] for p in parts):
                 raise SafetyError('Update response differs from request; remote state may have changed')
+            for part in parts:
+                videos_by_id[body['id']][part].update(body[part])
             tqdm.write(f"COMPLETED YouTube {plan['classification']} update: {body['id']}")
         if csv_change and url is not None:
             if csv_path.read_bytes() != original:
@@ -527,6 +534,174 @@ def apply_updates(
             atomic_write(csv_path, updated, csv_path.stat().st_mode & 0o777)
             original = updated
             tqdm.write(f"COMPLETED CSV video update: {plan['uid']} -> {plan['url']}")
+
+
+class PlaylistState(TypedDict):
+    id: str
+    title: str
+    description: str
+    privacyStatus: str
+    # (playlistItem ID, video ID) in playlist order.
+    items: list[tuple[str, str]]
+
+
+def playlist_key(description: object) -> str | None:
+    if not isinstance(description, str):
+        raise SafetyError('Playlist description is not a string')
+    if 'ISMIR_PLAYLIST' not in description:
+        return None
+    keys = re.findall(r'(?:^|\n)---\nISMIR_PLAYLIST\nkey: (all|session-[1-9][0-9]*)\Z', description)
+    if description.count('ISMIR_PLAYLIST') != 1 or len(keys) != 1:
+        raise SafetyError('Malformed or ambiguous ISMIR_PLAYLIST block')
+    return keys[0]
+
+
+def enumerate_playlists(youtube: Resource) -> dict[str, PlaylistState]:
+    playlists = dict[str, PlaylistState]()
+    for playlist in pages(youtube.playlists(), part='snippet,status', mine=True, maxResults=50):
+        if playlist['snippet'].get('channelId') != EXPECTED_CHANNEL_ID:
+            raise SafetyError('Playlist belongs to an unexpected channel')
+        key = playlist_key(playlist['snippet'].get('description'))
+        if key is None:
+            continue
+        if key in playlists:
+            raise SafetyError(f'Multiple playlists with key {key}; delete extras by hand')
+        playlist_id = identifier(playlist['id'], 'playlist ID')
+        items = [(identifier(item['id'], 'playlist item ID'),
+                  identifier(item['snippet']['resourceId'].get('videoId'), 'video ID'))
+                 for item in pages(youtube.playlistItems(), part='snippet',
+                                   playlistId=playlist_id, maxResults=50)]
+        playlists[key] = {'id': playlist_id, 'title': playlist['snippet']['title'],
+                          'description': playlist['snippet']['description'],
+                          'privacyStatus': playlist['status']['privacyStatus'], 'items': items}
+    return playlists
+
+
+def desired_playlists(
+    videos: Sequence[APIObject], papers: Mapping[str, PaperRow],
+) -> dict[str, tuple[str, str, list[str]]]:
+    """Key -> (title, description, video IDs in order). Only decorated, current videos are listed."""
+    current = dict[str, str]()
+    for video in videos:
+        claim = metadata(video['snippet']['description'])
+        if claim is None:
+            continue
+        paper = papers[claim['paper_id']]
+        if paper['raw_video'] and claim['google_drive_id'] == drive_id(paper['raw_video'], allow_url=True):
+            current[claim['paper_id']] = video['id']
+    sessions, _ = parse_file('./sitedata/')
+    config = load_site_config('./sitedata/')
+    conf_name = config['name']
+    link = f"Paper, Poster, and more: \n{config['miniconf_url']}"
+
+    def entry(key: str, label: str, scope: str, uids: Sequence[str]) -> tuple[str, str, list[str]]:
+        title = legalize_title(f'{conf_name} Presentation Videos - {label}')
+        human = legalize(f'Presentation videos of {scope} at {conf_name}.\n\n{link}', multiline=True)
+        return title, f'{human}\n\n---\nISMIR_PLAYLIST\nkey: {key}', [current[u] for u in uids if u in current]
+
+    # Session.name is internal; only the index is shown.
+    result = {f'session-{s.index}': entry(f'session-{s.index}', f'Paper Session {s.index}',
+                                          f'Paper Session {s.index}', s.papers) for s in sessions}
+    result['all'] = entry('all', 'All Papers', 'all papers',
+                          [uid for s in sessions for uid in s.papers])
+    return result
+
+
+def longest_increasing(ranks: Sequence[int]) -> set[int]:
+    """Ranks forming a longest increasing subsequence; these items need not move."""
+    length = [1] * len(ranks)
+    prev = [-1] * len(ranks)
+    for i in range(len(ranks)):
+        for j in range(i):
+            if ranks[j] < ranks[i] and length[j] + 1 > length[i]:
+                length[i], prev[i] = length[j] + 1, j
+    i = max(range(len(ranks)), key=length.__getitem__, default=-1)
+    result = set[int]()
+    while i != -1:
+        result.add(ranks[i])
+        i = prev[i]
+    return result
+
+
+def sync_playlists(
+    youtube: Resource, playlists: dict[str, PlaylistState], videos: Sequence[APIObject],
+    papers: Mapping[str, PaperRow], label: str, dry_run: bool = False,
+) -> None:
+    """Mutates `playlists` to mirror remote state, so a later pass needs no re-read.
+    Items whose video is not ours and decorated are unmanaged and left in place."""
+    managed = {v['id'] for v in videos if metadata(v['snippet']['description']) is not None}
+    prefix = 'DRY RUN ' if dry_run else 'PLANNED '
+
+    def log(message: str) -> None:
+        tqdm.write(f'{prefix}{label} playlist {message}')
+
+    for key, (title, description, wanted) in desired_playlists(videos, papers).items():
+        snippet = {'title': title, 'description': description}
+        state = playlists.get(key)
+        if state is None:
+            if not wanted:
+                continue
+            log(f'create {key}: {title}')
+            playlist_id = f'DRY-{key}'
+            if not dry_run:
+                response = execute(youtube.playlists().insert(
+                    part='snippet,status', body={'snippet': snippet, 'status': {'privacyStatus': 'public'}}))
+                playlist_id = identifier(response.get('id'), 'playlist ID')
+                if playlist_key(response.get('snippet', {}).get('description')) != key:
+                    raise SafetyError('Playlist insert response differs from request')
+                tqdm.write(f'COMPLETED playlist create: {key} {playlist_id}')
+            state = playlists[key] = {'id': playlist_id, 'title': title, 'description': description,
+                                      'privacyStatus': 'public', 'items': []}
+        elif (state['title'], state['description'], state['privacyStatus']) != (title, description, 'public'):
+            log(f'update {key}: {title}')
+            if not dry_run:
+                response = execute(youtube.playlists().update(part='snippet,status', body={
+                    'id': state['id'], 'snippet': snippet, 'status': {'privacyStatus': 'public'}}))
+                if response.get('id') != state['id']:
+                    raise SafetyError('Playlist update response differs from request')
+                tqdm.write(f'COMPLETED playlist update: {key}')
+            state.update(title=title, description=description, privacyStatus='public')
+
+        items = state['items']
+        seen = set[str]()
+        for item in list(items):
+            item_id, video_id = item
+            if video_id in managed and (video_id not in wanted or video_id in seen):
+                log(f'remove {key}: {video_id}')
+                if not dry_run:
+                    execute(youtube.playlistItems().delete(id=item_id))
+                    tqdm.write(f'COMPLETED playlist remove: {key} {video_id}')
+                items.remove(item)
+            seen.add(video_id)
+
+        rank = {video_id: i for i, video_id in enumerate(wanted)}
+        stable = longest_increasing([rank[v] for _, v in items if v in rank])
+        # Placing each item right after its predecessor, in order, yields the wanted order.
+        for i, video_id in enumerate(wanted):
+            if i in stable:
+                continue
+            existing = [item for item in items if item[1] == video_id]
+            for item in existing:
+                items.remove(item)
+            ids = [v for _, v in items]
+            position = (ids.index(wanted[i - 1]) + 1 if i
+                        else next((j for j, v in enumerate(ids) if v in managed), 0))
+            item_snippet = {'playlistId': state['id'], 'position': position,
+                            'resourceId': {'kind': 'youtube#video', 'videoId': video_id}}
+            log(f"{'move' if existing else 'insert'} {key}: {video_id} -> {position}")
+            item_id = existing[0][0] if existing else f'DRY-{key}-{video_id}'
+            if not dry_run:
+                if existing:
+                    request = youtube.playlistItems().update(
+                        part='snippet', body={'id': item_id, 'snippet': item_snippet})
+                else:
+                    request = youtube.playlistItems().insert(part='snippet', body={'snippet': item_snippet})
+                response = execute(request)
+                item_id = identifier(response.get('id'), 'playlist item ID')
+                if response.get('snippet', {}).get('position') != position:
+                    raise SafetyError('Playlist item response differs from request')
+                tqdm.write(f'COMPLETED playlist {"move" if existing else "insert"}: {key} {video_id}')
+            items.insert(position, (item_id, video_id))
 
 
 def authenticate() -> Resource:
@@ -558,6 +733,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                             help='No auth or API calls; pretend YouTube is empty and print the plan')
         parser.add_argument('--first-video', action='store_true',
                             help='Apply only the first planned update, for testing')
+        parser.add_argument('--no-playlists', action='store_true', help='Skip both playlist syncs')
         args = parser.parse_args(argv)
         dry_run = args.dry_run or args.drier_run
         fields, rows, papers, original, captions = validate_local(args.input, args.videos, args.captions)
@@ -565,11 +741,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             print('DRIER RUN: no auth or API calls; pretending YouTube has no uploads.')
             youtube = cast('Resource', None)
             videos = list[APIObject]()
+            playlists = dict[str, PlaylistState]()
         else:
             if not re.fullmatch(r'UC[A-Za-z0-9_-]{22}', EXPECTED_CHANNEL_ID):
                 raise SafetyError('Set EXPECTED_CHANNEL_ID to the verified channel ID')
             youtube = authenticate()
             videos = enumerate_videos(youtube)
+            # All reads happen up front; both playlist passes share them.
+            playlists = {} if args.no_playlists else enumerate_playlists(youtube)
         managed = sum(metadata(v['snippet']['description']) is not None for v in videos)
         fresh = sum(metadata(v['snippet']['description']) is None
                     and fresh_paper_id(v, papers) is not None for v in videos)
@@ -580,7 +759,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.first_video:
             plans = plans[:1]
             print(f'FIRST VIDEO: limiting to {len(plans)} update.')
-        apply_updates(youtube, plans, args.input, fields, rows, original, dry_run)
+        # Before decoration: drop outdated videos early and fill in already-decorated ones.
+        if not args.no_playlists:
+            sync_playlists(youtube, playlists, videos, papers, 'pre-decoration', dry_run)
+        apply_updates(youtube, plans, args.input, fields, rows, original, videos, dry_run)
+        if not args.no_playlists:
+            sync_playlists(youtube, playlists, videos, papers, 'post-decoration', dry_run)
         if dry_run:
             print('DRY RUN: coverage below is the unchanged CSV.')
         summarize_coverage(rows)
