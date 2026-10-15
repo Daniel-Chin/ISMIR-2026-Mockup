@@ -49,8 +49,11 @@
     <h4 class="text-muted text-center">
       Presented {{paper.content.paper_presentation}}
     </h4>
-    {% if paper.content.award_nominee in ['TRUE', 'Yes'] %}
-    <h4 class="text-muted text-center">Award Nominee</h4>
+    {% if paper.content.award_session %}
+    <h4 class="text-muted text-center">
+      {% if paper.award_url %}<a href="{{paper.award_url}}" class="text-muted"
+        style="text-decoration: underline;">{% endif %}Award Nominee Session {{paper.content.award_session}}{% if paper.award_url %}</a>{% endif %}
+    </h4>
     {% endif %}
 
   </div>

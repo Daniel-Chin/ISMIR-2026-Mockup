@@ -35,6 +35,7 @@ from utils.shared import (
     calendar_ics_path,
     load_helpdesk_url,
     load_site_config,
+    parse_award_nominee,
     parse_conference_dates,
 )
 from utils.calendar import SESSION_KINDS, build_calendar, event_link
@@ -52,9 +53,12 @@ def chain_functions(*functions: Callable) -> Callable:
     return closure
 
 
+AWARD_NOMINEE_CATEGORY = "Award nominee"
+
 site_data = {}
 by_uid = {}
 timeline = []  # see _build_timeline
+award_event_uids = {}  # award session number -> uid of its "Award nominee" event
 
 
 def paper_check(row):
@@ -181,6 +185,12 @@ def main(site_data_path: str):
 
     timeline.clear()
     timeline.extend(_build_timeline(site_data.get("events", [])))
+    award_event_uids.clear()
+    for event in site_data.get("events", []):
+        # "★ Award Nominees\nOral Session - 2"; skips "★ Test of Time Award Talks"
+        session = event["title"].split()[-1]
+        if event["category"] == AWARD_NOMINEE_CATEGORY and session.isdigit():
+            award_event_uids[int(session)] = str(event["uid"])
 
     app.jinja_env.globals["helpdesk_url"] = load_helpdesk_url(site_data_path)
     app.jinja_env.globals["calendar_ics_path"] = calendar_ics_path(site_data_path)
@@ -240,7 +250,7 @@ markdown_renderer = MarkdownIt("commonmark", {"html": True})
 @app.template_filter("markdown")
 def markdown_filter(value):
     text = "" if value is None else str(value)
-    return Markup(markdown_renderer.render(text))
+    return Markup(f'<div class="markdown">{markdown_renderer.render(text)}</div>')
 
 # MAIN PAGES
 
@@ -277,6 +287,21 @@ def _paper_zoom_url(paper_row):
             continue
         return str(event.get("zoom_url", ""))
     return ""
+
+
+def _award_papers(award_session):
+    """Papers of an award session, by position in it."""
+    papers = []
+    for row in site_data["papers"]:
+        award = parse_award_nominee(row["AwardNominee"])
+        if award and award[0] == award_session:
+            papers.append((award[1], row))
+    return [
+        {"id": row["uid"], "title": row["title"],
+         "session": row["session"], "position": row["position"],
+         "authors": remove_affiliation(row["authors_and_affil"])}
+        for _, row in sorted(papers, key=lambda p: p[0])
+    ]
 
 
 def _session_links():
@@ -491,6 +516,7 @@ def format_paper(v):
         "authors_and_affil",
     ]
     list_fields = {k: extract_list_field(v, k) for k in list_keys}
+    award = parse_award_nominee(v["AwardNominee"])
 
     process = lambda s: s.replace("\n ", "\n")
 
@@ -516,7 +542,7 @@ def format_paper(v):
                 "summary_of_updates_post_review", ""
             ),
             "paper_presentation": v["paper_presentation"],
-            "award_nominee": v["AwardNominee"],
+            "award_session": award[0] if award else None,
             "authors": remove_affiliation(v["authors_and_affil"]),
             "authors_and_affil": list_fields["authors_and_affil"],
             "keywords": list(
@@ -524,7 +550,7 @@ def format_paper(v):
                     list_fields["primary_subject"]
                     + list_fields["secondary_subject"]
                     + (["TISMIR"] if v["is_tismir"] in {"TRUE", "Yes"} else [])
-                    + (["Awards Nominee"] if v["AwardNominee"] in {"TRUE", "Yes"} else [])
+                    + (["Awards Nominee"] if award else [])
                     + (["Open Review"] if v["publish_reviews"] in {"TRUE", "Yes"} else [])
                 )
             ),
@@ -678,6 +704,8 @@ def poster(poster):
     data = _data()
     paper_data = format_paper(v)
     paper_data["zoom_url"] = _paper_zoom_url(v)
+    award_event_uid = award_event_uids.get(paper_data["content"]["award_session"])
+    paper_data["award_url"] = f"event_{award_event_uid}.html" if award_event_uid else ""
     data["paper"] = paper_data
     return render_template("poster.html", **data)
 
@@ -689,6 +717,10 @@ def event(event):
     index = next((i for i, e in enumerate(timeline) if e["uid"] == event), None)
     data = _data()
     data["event"] = v
+    award_session = next(
+        (s for s, uid in award_event_uids.items() if uid == event), None
+    )
+    data["award_papers"] = _award_papers(award_session) if award_session else []
     data["start_label"] = start.strftime("%a, %b %-d, %H:%M")
     data["start_utc"] = start.astimezone(pytz.UTC).isoformat()
     data["timezone_name"] = _conference_timezone_name()

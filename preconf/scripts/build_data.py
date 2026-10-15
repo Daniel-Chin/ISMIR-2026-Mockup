@@ -112,6 +112,12 @@ def truthy(value):
     return str(value).strip().lower() in {"yes", "true", "1", "y"}
 
 
+def flag_set(src, value):
+    if src == "AwardNominee":  # "No" or "A{session}-{position}"
+        return bool(re.fullmatch(r"A\d+-\d+", value.strip()))
+    return truthy(value)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sitedata", type=Path, default=DEFAULT_SITEDATA)
@@ -164,7 +170,7 @@ def main():
                 continue
             uids.append(uid)
             paper = {out: row.get(src, "").strip() for src, out in PUBLIC_FIELDS.items()}
-            paper["flags"] = [out for src, out in FLAG_FIELDS.items() if truthy(row.get(src, ""))]
+            paper["flags"] = [out for src, out in FLAG_FIELDS.items() if flag_set(src, row.get(src, ""))]
             paper["session"] = name
             paper["posterUrl"] = f"{miniconf}/poster_{uid}.html" if miniconf else ""
             # Overview card fields: "P1-01" ids, name-only authors, presenter mode, material links.

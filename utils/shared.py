@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import date, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
@@ -17,6 +18,17 @@ def load_site_config(site_data_path: str) -> dict:
     if not isinstance(config, dict) or not config:
         raise ValueError(f"Site configuration must be a nonempty mapping: {config_path}")
     return config
+
+
+def parse_award_nominee(value: str) -> tuple[int, int] | None:
+    """papers.csv AwardNominee: 'A{session}-{position}' -> (session, position); 'No' -> None."""
+    value = value.strip()
+    if value == "No":
+        return None
+    match = re.fullmatch(r"A(\d+)-(\d+)", value)
+    if not match:
+        raise ValueError(f"Invalid AwardNominee: {value!r}")
+    return int(match.group(1)), int(match.group(2))
 
 
 def calendar_ics_path(site_data_path: str) -> str:

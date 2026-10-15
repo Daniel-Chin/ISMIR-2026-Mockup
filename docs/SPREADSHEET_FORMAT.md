@@ -55,7 +55,8 @@ review1, review2, review3, review4, meta_review, fun_facts
 | `oral_session_presenter` | Speaker name |
 | `primary_subject`, `secondary_subject` | `Theme -> subtopic`, `;`-separated → page keywords |
 | `long_presentation` | Unused |
-| `is_tismir`, `SpecialTrack`, `StudentAuthor`, `AwardNominee`, `publish_reviews` | `TRUE`/`FALSE` flags |
+| `is_tismir`, `SpecialTrack`, `StudentAuthor`, `publish_reviews` | `TRUE`/`FALSE` flags |
+| `AwardNominee` | `No` or `A{X}-{Y}` where X is award session id and Y is the position in session, both counting from 1 |
 | `summary_of_updates_post_review` | free-text summary of author changes after peer review (stored in data; not displayed on pages yet) |
 | `raw_pdf_path`, `raw_video`, `raw_captions`, `raw_poster_pdf`, `raw_thumbnail`, `raw_slides_pdf` | Google Drive `open?id=` links |
 | `video` | YouTube embed URL, or a repo-local `static/...` path |

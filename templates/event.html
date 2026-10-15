@@ -43,7 +43,25 @@
     </div>
   </div>
 </div>
+{% endif %}
 
+{% if award_papers %}
+<div class="pp-card m-3">
+  <div class="card-body">
+    <ol class="card-text paper-text mb-0">
+      {% for paper in award_papers %}
+      <li class="mb-2">
+        P{{paper.session}}-{{paper.position}}: <a href="poster_{{paper.id}}.html"
+          style="text-decoration: underline;">{{paper.title}}</a><br>
+        <span class="text-muted">{{paper.authors | join(", ")}}</span>
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+</div>
+{% endif %}
+
+{% if event.event_desc or award_papers %}
 <div class="d-flex justify-content-center my-3">{% include 'event_nav.html' %}</div>
 {% endif %}
 

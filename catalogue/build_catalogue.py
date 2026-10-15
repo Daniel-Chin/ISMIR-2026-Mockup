@@ -26,7 +26,11 @@ import pytz
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from catalogue.schema import validate_catalogue  # noqa: E402
 from utils.session_assignment import parse_file  # noqa: E402
-from utils.shared import load_conference_timezone_name, load_site_config  # noqa: E402
+from utils.shared import (  # noqa: E402
+    load_conference_timezone_name,
+    load_site_config,
+    parse_award_nominee,
+)
 
 PRIVATE_COLUMNS = (
     "author_emails",
@@ -188,7 +192,7 @@ def build_papers(rows, base_url, assignments):
                 "miniconf_url": "{}/poster_{}.html".format(base_url, uid),
                 "pdf_url": convert_drive_link(row.get("pdf_path")),
                 "special_track": is_true(row.get("SpecialTrack")),
-                "award_nominee": is_true(row.get("AwardNominee")),
+                "award_nominee": parse_award_nominee(row.get("AwardNominee") or "No") is not None,
                 "is_tismir": is_true(row.get("is_tismir")),
             }
         )

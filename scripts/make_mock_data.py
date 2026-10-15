@@ -160,7 +160,7 @@ def make_papers():
                 "is_tismir": "FALSE",
                 "SpecialTrack": "FALSE",
                 "StudentAuthor": "TRUE" if i % 2 else "FALSE",
-                "AwardNominee": "TRUE" if i == 1 else "FALSE",
+                "AwardNominee": "A1-1" if i == 1 else "No",
                 "publish_reviews": "FALSE",
                 "summary_of_updates_post_review": "",
                 "pdf_name": paper_file,
