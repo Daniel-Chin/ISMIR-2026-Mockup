@@ -1,11 +1,13 @@
 import { Room } from './room.js';
 import { BoardView, timeAgo } from './board.js';
+import { WallRooms, WallView, buildWallLayout, wallSlotFor } from './wall.js';
 import { apiFetch, apiUrl, takeTokenFromHash, clearToken } from './api.js';
 
 const COLORS = { sun: '#ffe27a', mint: '#a8f0c6', sky: '#a9dcff', rose: '#ffbfd0', lilac: '#dccbff', sand: '#f3dcae' };
 const USER_KEY = 'pcUser';
 const COLS_KEY = 'pcPapersPerRow';
 const COLOR_KEY = 'pcLastColor';
+const VIEW_KEY = 'pcPaperView';   // 'hall' or 'wall'
 
 const $ = sel => document.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -91,6 +93,7 @@ const composer = {
 const app = {
   user: store.get(USER_KEY, null),
   composer,
+  toast,
   // Sign-in pages live on the Worker; `return` brings the visitor back to this exact page.
   loginUrl() { return apiUrl('/auth/slack/start?return=' + encodeURIComponent(location.href)); },
   slackApp: null,   // {team, app} from /api/me when the Slack-app sign-in is set up
@@ -279,6 +282,86 @@ function sessionCard(s) {
   return card;
 }
 
+// ---------- paper wall (alternative view of the hall) ----------
+const papers = { view: 'hall', wall: null, layout: null };
+const wallLayout = () => (papers.layout ||= buildWallLayout(hall.program));
+
+/** Switch the Paper Hall section between the hall (session cards) and the wall. */
+function setPaperView(view, { link = true } = {}) {
+  view = view === 'wall' ? 'wall' : 'hall';
+  papers.view = view;
+  store.set(VIEW_KEY, view);
+  $('#paper-hall').hidden = view !== 'hall';
+  $('#paper-wall').hidden = view !== 'wall';
+  document.querySelectorAll('#paper-view button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === view)));
+  if (view === 'wall') {
+    closeSession({ keepHash: true });
+    if (!papers.wall) {
+      // One live connection per session while the wall is shown; closed again in hall view.
+      const rooms = new WallRooms(hall.program);
+      rooms.subscribe(ev => { if (ev.type === 'error') handleRoomError(ev); });
+      papers.wall = new WallView($('#paper-wall'), { room: rooms, app, program: hall.program, layout: wallLayout(), buildPin: pinCard, regionHead: wallRegionHead });
+      refreshSessionTimes();
+    }
+  } else if (papers.wall) {
+    papers.wall.destroy();
+    papers.wall = null;
+  }
+  if (link) setLink(view === 'wall' ? '#wall' : '#papers');
+}
+
+function initPaperView() {
+  $('#paper-view').addEventListener('click', e => {
+    const b = e.target.closest('button[data-view]');
+    if (b) setPaperView(b.dataset.view);
+  });
+  setPaperView(location.hash === '#wall' ? 'wall' : store.get(VIEW_KEY, 'hall'), { link: false });
+}
+
+/** A session's title band on the wall: "Mon · PS-01" and its Oral / Poster times. */
+function wallRegionHead(s, region) {
+  // A div, not a <button>: overview.css restyles every bare button.
+  const head = el('div', '');
+  head.setAttribute('role', 'button');
+  head.tabIndex = 0;
+  head.append(el('span', 'pc-wall-region-name', `${region.day} · ${s.id}`), timeBlock(s, 'pc-wall-region-time'));
+  return head;
+}
+
+/** A paper pinned to the wall: title, links, a Comment button; authors and time at the foot. */
+function pinCard(p) {
+  const card = el('article', '');
+  card.append(el('span', 'pc-pin-tack'));
+  const top = el('div', 'pc-pin-top');
+  const comment = el('a', 'link-button pc-add-note pc-pin-comment', '+ Comment');
+  comment.href = '#'; comment.setAttribute('role', 'button'); comment.dataset.comment = '';
+  top.append(el('span', 'pc-pin-id', p.displayId || '#' + p.uid), comment);
+  const title = el('h4', 'pc-pin-title');
+  const titleLink = linkButton(p.posterUrl, p.title);
+  if (titleLink) { titleLink.className = ''; title.append(titleLink); } else title.textContent = p.title;
+  title.title = p.title;
+  const foot = el('div', 'pc-pin-foot');
+  const authors = el('span', 'pc-pin-authors', p.authors);
+  authors.title = p.authors;
+  foot.append(authors, presentTime(p));
+  card.append(top, title, paperLinks(p), foot);
+  return card;
+}
+
+/** When the paper is presented: its session's poster slot, in the zone chosen in the hero. */
+function presentTime(p) {
+  const s = hall.program.sessions[p.session];
+  const box = el('span', 'pc-pin-time');
+  if (!s) return box;
+  const i = Math.max(0, s.slots.findIndex(slot => slot.kind === 'poster'));
+  box.dataset.sessionTime = s.id;
+  const line = el('span', 'pc-time-line');
+  line.dataset.slot = i;
+  line.append(el('span', 'pc-time-main'), el('span', 'pc-time-venue'));
+  box.append(line);
+  return box;
+}
+
 function closeSession({ keepHash = false } = {}) {
   if (!hall.open) return;
   for (const b of hall.open.boards) b.destroy();
@@ -293,6 +376,7 @@ function closeSession({ keepHash = false } = {}) {
  * Shareable addresses (the URL always shows where you are, so it can be copied as is):
  *   lounge.html#welcome                    Welcome Reception
  *   lounge.html#papers                     Paper Hall
+ *   lounge.html#wall                       Paper Hall, as the Paper Wall
  *   lounge.html#session=PS-03              a poster session, opened
  *   lounge.html#session=PS-03&paper=3      one paper's board in it (paper = papers.csv uid)
  *   lounge.html#paper=3                    same; the session is looked up (miniconf links use this)
@@ -310,6 +394,17 @@ function paperLink(uid) {
 function route() {
   const params = new URLSearchParams(location.hash.slice(1));
   const paper = params.get('paper'), session = params.get('session');
+  if (location.hash === '#wall') {
+    if (papers.view !== 'wall') setPaperView('wall', { link: false });
+    document.getElementById('papers')?.scrollIntoView();
+    return;
+  }
+  // On the wall, a paper or session link flies there instead of opening the hall.
+  if (papers.view === 'wall' && ((paper && hall.program.papers[paper]) || (session && hall.program.sessions[session]))) {
+    document.getElementById('papers')?.scrollIntoView();
+    if (paper && hall.program.papers[paper]) papers.wall.focusPaper(paper); else papers.wall.focusSession(session);
+    return;
+  }
   if (paper && hall.program.papers[paper]) return openPaper(paper);
   if (session && hall.program.sessions[session]) {
     if (hall.open?.id !== session) openSession(session, true);
@@ -400,7 +495,12 @@ function openSession(id, scroll) {
     const cardEl = paperCard(p);
     grid.append(cardEl);
     const mount = cardEl.querySelector('.pc-paper-board');
-    const board = new BoardView(mount, { room, board: 'paper:' + uid, title: `#${uid} ${p.title}`, app, fitNotes: true, dblclickExpands: true, emptyText: 'No notes yet: tap + Note to start the discussion' });
+    const board = new BoardView(mount, {
+      room, board: 'paper:' + uid, title: `#${uid} ${p.title}`, app, fitNotes: true, dblclickExpands: true,
+      emptyText: 'No notes yet: tap + Note to start the discussion',
+      // The same note also appears on the Paper Wall, beside this paper's pin.
+      createExtras: () => wallSlotFor(wallLayout(), String(uid), [...room.notes.values()]),
+    });
     boards.push(board);
     cardEl.querySelector('[data-add]').addEventListener('click', e => { e.preventDefault(); board.compose(); });
     counters.set('paper:' + uid, cardEl.querySelector('[data-count]'));
@@ -477,14 +577,7 @@ function paperCard(p) {
   const controls = el('div', 'paper-card-controls');
   const modeRow = el('div', 'presenter-mode-row');
   modeRow.append(el('div', 'presenter-mode-line', PRESENTER_LABELS[p.presenterMode] || 'Presentation mode TBA'));
-  // Paper / Poster / Video open the miniconf paper page in a new tab, at that section
-  // (poster.js there opens the section named by the #fragment).
-  const links = el('div', 'link-row');
-  const has = new Set(p.materials || []);
-  const section = id => (has.has(id) && p.posterUrl ? `${p.posterUrl}#${id}` : '');
-  for (const a of [linkButton(p.channelUrl, 'Slack'), linkButton(section('paper'), 'Paper'), linkButton(section('poster'), 'Poster'), linkButton(section('video'), 'Video')]) {
-    if (a) links.append(a);
-  }
+  const links = paperLinks(p);
   controls.append(modeRow);
   if (links.childElementCount) controls.append(links);
 
@@ -498,6 +591,20 @@ function paperCard(p) {
   boardHead.append(add);
   card.append(status, copy, controls, boardHead, el('div', 'pc-paper-board'));
   return card;
+}
+
+/**
+ * Slack / Paper / Poster / Video. Paper, Poster and Video open the miniconf paper page in a new
+ * tab, at that section (poster.js there opens the section named by the #fragment).
+ */
+function paperLinks(p) {
+  const links = el('div', 'link-row');
+  const has = new Set(p.materials || []);
+  const section = id => (has.has(id) && p.posterUrl ? `${p.posterUrl}#${id}` : '');
+  for (const a of [linkButton(p.channelUrl, 'Slack'), linkButton(section('paper'), 'Paper'), linkButton(section('poster'), 'Poster'), linkButton(section('video'), 'Video')]) {
+    if (a) links.append(a);
+  }
+  return links;
 }
 
 /** Show "more" only where the author list is actually clamped (as the overview does). */
@@ -598,6 +705,7 @@ async function main() {
   window.PC_PROGRAM = program; // read by canon-egg.js for paper fun facts
   applyConference(program.conference);
   renderHall();
+  initPaperView();
   refreshSessionTimes();
   window.addEventListener('ismir-timezone-change', refreshSessionTimes);
   window.addEventListener('resize', () => { if (hall.open) syncAuthorOverflow(hall.open.panel); });

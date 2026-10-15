@@ -32,7 +32,7 @@ PAGE = "lounge.html"
 ASSET_DIR = "lounge"
 DEFAULT_API_ORIGIN = "https://lounge.liweilin.org"   # custom domain; *.workers.dev is blocked on some networks
 # Files the page loads; everything else in public/ (local probes, etc.) stays out of the build.
-ASSETS = ["app.js", "board.js", "room.js", "api.js", "canon-egg.js", "theme.js", "styles.css"]
+ASSETS = ["app.js", "board.js", "wall.js", "room.js", "api.js", "canon-egg.js", "theme.js", "styles.css"]
 ASSET_DIRS = ["vendor", "data"]
 
 

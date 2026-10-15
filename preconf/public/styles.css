@@ -439,3 +439,51 @@ dialog.pc-composer::backdrop { background: rgba(4, 6, 12, .6); }
 @media (prefers-reduced-motion: reduce) {
   .pc-note, .pc-note.fresh, .pc-note.remote-drag { animation: none !important; transition: none !important; }
 }
+
+/* ---------- Paper Wall: every paper pinned on one board (wall.js) ---------- */
+.pc-wall { margin-top: 4px; }
+/* Fullscreen keeps the wall's own shape, so the default view shows all of it. */
+.pc-board-frame.pc-wall-frame.is-fullscreen { align-items: center; }
+.pc-board-frame.pc-wall-frame.is-fullscreen .pc-board-scroll {
+  flex: none; margin: auto 0; width: min(100%, calc((100vh - 150px) * var(--wall-ratio))); aspect-ratio: var(--wall-ratio);
+}
+.pc-board-frame.pc-wall-frame.is-fullscreen .pc-fullscreen-title { align-self: stretch; }
+.pc-wall-layer { position: absolute; inset: 0; z-index: 0; }
+.pc-wall-region {
+  position: absolute; box-sizing: border-box;
+  border: 6px dashed var(--pc-wall-line); background: var(--pc-wall-region);
+}
+.pc-wall-region-head {
+  display: block; padding: 34px 50px 0; cursor: zoom-in; color: var(--pc-title); outline-offset: -10px;
+}
+.pc-wall-region-name { display: block; font-size: 120px; font-weight: 900; line-height: 1; letter-spacing: -.02em; }
+.pc-wall-region-time { display: flex; gap: 60px; margin-top: 22px; font-size: 44px; font-weight: 700; color: var(--muted); }
+.pc-wall-region-time .pc-time-venue { display: none; }
+.pc-wall-region-time .pc-time-sep { margin: 0 .3em; }
+:root { --pc-wall-line: rgba(78, 230, 255, .2); --pc-wall-region: rgba(78, 230, 255, .035); }
+html[data-theme="light"] { --pc-wall-line: rgba(16, 42, 82, .16); --pc-wall-region: rgba(16, 42, 82, .025); }
+
+/* A pinned paper: a printed card with a tack. Fixed: it pans the wall instead of moving. */
+.pc-pin {
+  position: absolute; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px;
+  padding: 18px 16px 12px; background: #fbf8f1; color: #17181a;
+  border: 2px solid var(--pc-note-border); box-shadow: var(--pc-note-shadow); cursor: grab;
+}
+.pc-pin-tack {
+  position: absolute; top: -13px; left: 50%; width: 24px; height: 24px; margin-left: -12px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ff9a8a 0 18%, #e2362b 45%, #9d1a14 100%);
+  box-shadow: 2px 4px 3px rgba(0, 0, 0, .35);
+}
+.pc-pin-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pc-pin-id { font-family: "Courier New", ui-monospace, monospace; font-size: 12px; font-weight: 900; color: #8a5a00; letter-spacing: .05em; }
+html .pc-pin a.link-button.pc-pin-comment { font-size: 11px; padding: 3px 8px; }
+.pc-pin-title { margin: 0; font-size: 18px; line-height: 1.25; font-weight: 800; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.pc-pin-title a { color: #10233d; text-decoration: none; }
+.pc-pin-title a:hover, .pc-pin-title a:focus-visible { color: #0969da; text-decoration: underline; text-underline-offset: 3px; }
+.pc-pin .link-row { display: flex; flex-wrap: wrap; gap: 5px; margin: 0; }
+html .pc-pin .link-row a.link-button { font-size: 11px; padding: 3px 7px; }
+.pc-pin-foot { margin-top: auto; display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; font-size: 11px; line-height: 1.3; }
+.pc-pin-authors { min-width: 0; color: #3d4757; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.pc-pin-time { flex: none; text-align: right; font-weight: 800; color: #1c2433; white-space: nowrap; }
+.pc-pin-time .pc-time-venue { display: none; }
+.pc-pin.pc-paper-focus { outline: 6px solid var(--gold); outline-offset: 6px; }

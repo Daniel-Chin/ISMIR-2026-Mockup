@@ -70,6 +70,7 @@ export class Room {
         break;
       }
       case 'drag': this.emit({ type: 'drag', id: msg.id, x: msg.x, y: msg.y }); break;
+      case 'wdrag': this.emit({ type: 'wdrag', id: msg.id, wx: msg.wx, wy: msg.wy }); break;
       case 'batch': for (const item of msg.items || []) this.receive(item); break;
       case 'error': this.emit({ type: 'error', code: msg.code, message: msg.message, id: msg.id }); break;
       default: break;

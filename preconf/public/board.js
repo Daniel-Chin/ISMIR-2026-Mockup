@@ -1,7 +1,7 @@
 // A scalable corkboard bound to one board id inside a Room.
 // All user text goes through textContent; nothing from the server is parsed as HTML.
 
-const NOTE_W = 230;            // default width; short notes keep it
+export const NOTE_W = 230;     // default width; short notes keep it
 const NOTE_W_MAX = 680;        // widest a long note may grow (600 chars fit well below this)
 const NOTE_RATIO_MIN = 0.5;    // a long note's height / width lands in [0.5, 1)
 // Width only changes the height in whole wrapped lines, so the fitted ratio can undershoot its
@@ -15,7 +15,7 @@ function idFraction(id) {
   return (h >>> 0) / 4294967296;
 }
 const DRAG_SEND_MS = 70;
-const MAX_SCALE = 3;           // absolute: notes at 3x their logical size
+export const MAX_SCALE = 3;    // absolute: notes at 3x their logical size
 // The fitted "all notes" view zooms in no closer than 200%: a lone note should not blow up
 // to fill the screen. (100% = the base board fills the view; see BOARD_EXPAND on the server.)
 const FIT_MAX_PERCENT = 200;
@@ -24,7 +24,7 @@ const TOUR_HOLD_MS = 2200;     // ...then rest on the shot
 const ZOOM_EASE = 0.22;        // fraction of the remaining distance covered per frame
 const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform);
 
-const el = (tag, cls, text) => {
+export const el = (tag, cls, text) => {
   const node = document.createElement(tag);
   if (cls) node.className = cls;
   if (text !== undefined) node.textContent = text;
@@ -42,11 +42,16 @@ export function timeAgo(ts) {
 export class BoardView {
   /**
    * @param {HTMLElement} mount
-   * @param {object} o { room, board, title, app, emptyText, tour, fitNotes, dblclickExpands }
+   * @param {object} o { room, board, title, app, emptyText, tour, fitNotes, dblclickExpands, createExtras }
    *   fitNotes: open zoomed so all notes just fit, centred on them (paper boards)
    *   dblclickExpands: double-click opens the board full screen instead of starting a note
+   *   createExtras: () => extra fields for a new note (its place on the Paper Wall)
+   *
+   * Subclasses (the Paper Wall, wall.js) override owns / notePos / sendMove / isPanTarget.
+   * They run during this constructor, so they may only read `this.opts`.
    */
   constructor(mount, o) {
+    this.opts = o;
     Object.assign(this, { room: o.room, board: o.board, title: o.title, app: o.app });
     this.tourEnabled = !!o.tour && !matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.fitNotes = !!o.fitNotes;
@@ -93,7 +98,7 @@ export class BoardView {
     mount.append(this.frame);
 
     this.surface.addEventListener('dblclick', e => {
-      if (e.target !== this.surface && e.target !== this.empty) return;
+      if (!this.isPanTarget(e.target)) return;
       // Small embedded boards expand on double-click; once expanded, double-click starts a note.
       if (this.dblclickExpands && !this.frame.classList.contains('is-fullscreen')) { this.toggleFullscreen(); return; }
       const r = this.surface.getBoundingClientRect();
@@ -121,6 +126,16 @@ export class BoardView {
 
   get W() { return this.room.limits.boardW; }
   get H() { return this.room.limits.boardH; }
+
+  // ---------- hooks (overridden by the Paper Wall) ----------
+  /** Does this view show note `n`? */
+  owns(n) { return n.board === this.board; }
+  /** Where note `n` sits on this surface. */
+  notePos(n) { return { x: n.x, y: n.y }; }
+  /** Send a drag preview (final=false) or the drop (final=true); returns false when offline. */
+  sendMove(final, id, x, y) { return final ? this.room.send({ t: 'move', id, x, y }) : this.room.raw({ t: 'drag', id, x, y }); }
+  /** Can a press on `target` pan the board (and a double-click start a note)? */
+  isPanTarget(target) { return target === this.surface || target === this.empty; }
 
   // Width is read from the border box (scrollbar-independent) and only a real size change
   // re-fits. The viewport height depends only on that width, never on the zoom, so a scrollbar
@@ -157,11 +172,14 @@ export class BoardView {
   clampScale(v) { return Math.min(Math.max(MAX_SCALE, this.base), Math.max(this.minScale, v)); }
 
   /** The middle zoom button: glide back to the default view (all notes in view). */
-  resetView() {
+  resetView() { this.glideTo(this.fitCamera()); }
+
+  /** Glide the camera to `to` ({s, cx, cy}). */
+  glideTo(to) {
     this.stopTour();
     cancelAnimationFrame(this.raf);
     this.raf = 0;
-    const from = this.camera(), to = this.fitCamera();
+    const from = this.camera();
     const t0 = performance.now(), ms = 450;
     const ease = t => 1 - (1 - t) ** 3;
     const step = now => {
@@ -282,7 +300,7 @@ export class BoardView {
   nextShot() {
     // "Overview" = the board's default view (all notes just in view, at most 200%; see fitCamera).
     const overview = this.fitCamera();
-    const notes = [...this.room.notes.values()].filter(n => n.board === this.board && this.els.has(n.id));
+    const notes = [...this.room.notes.values()].filter(n => this.owns(n) && this.els.has(n.id));
     if (!notes.length) {
       // Empty wall: drift between random spots and the default view.
       this.shotIndex = (this.shotIndex || 0) + 1;
@@ -297,7 +315,7 @@ export class BoardView {
       this.lastShown = null;
       return overview;
     }
-    const centre = n => { const node = this.els.get(n.id); return { x: n.x + node.offsetWidth / 2, y: n.y + node.offsetHeight / 2 }; };
+    const centre = n => { const node = this.els.get(n.id), p = this.notePos(n); return { x: p.x + node.offsetWidth / 2, y: p.y + node.offsetHeight / 2 }; };
     let n;
     const from = this.lastShown && this.room.notes.get(this.lastShown);
     if (!from || !this.els.has(from.id)) {
@@ -321,7 +339,8 @@ export class BoardView {
     const vw = this.scroller.clientWidth, vh = this.scroller.clientHeight;
     const preferred = Math.max(this.base * 1.8, vw / (NOTE_W * 3.4));
     const fits = Math.min((vw * 0.82) / w, (vh * 0.82) / h);   // whole note plus a margin
-    return { s: this.clampScale(Math.min(preferred, fits)), cx: n.x + w / 2, cy: n.y + h / 2 };
+    const p = this.notePos(n);
+    return { s: this.clampScale(Math.min(preferred, fits)), cx: p.x + w / 2, cy: p.y + h / 2 };
   }
 
   tourSegment(from) {
@@ -374,7 +393,7 @@ export class BoardView {
 
   /** Dragging empty board space pans the view once it is zoomed past the viewport. */
   startPan(e) {
-    if (e.button !== 0 || (e.target !== this.surface && e.target !== this.empty)) return;
+    if (e.button !== 0 || !this.isPanTarget(e.target)) return;
     const sc = this.scroller;
     if (sc.scrollWidth <= sc.clientWidth && sc.scrollHeight <= sc.clientHeight) return;
     const start = { x: e.clientX, y: e.clientY, left: sc.scrollLeft, top: sc.scrollTop };
@@ -427,11 +446,11 @@ export class BoardView {
     }
     if (ev.type === 'upsert') {
       const n = ev.note;
-      if (n.board !== this.board) return;
+      if (!this.owns(n)) return;
       this.upsertNote(n, ev.fresh);
     } else if (ev.type === 'remove') {
       const n = ev.note;
-      if (n.board !== this.board) return;
+      if (!this.owns(n)) return;
       this.els.get(n.id)?.remove();
       this.els.delete(n.id);
       this.updateEmpty();
@@ -454,7 +473,7 @@ export class BoardView {
   renderAll() {
     for (const node of this.els.values()) node.remove();
     this.els.clear();
-    const notes = [...this.room.notes.values()].filter(n => n.board === this.board).sort((a, b) => a.z - b.z);
+    const notes = [...this.room.notes.values()].filter(n => this.owns(n)).sort((a, b) => a.z - b.z);
     for (const n of notes) this.upsertNote(n, false);
     this.updateEmpty();
   }
@@ -480,8 +499,9 @@ export class BoardView {
     if (this.dragging?.id !== n.id) {
       node.classList.remove('remote-drag');
       // A widened note is kept inside the board instead of being clipped at its edge.
-      node.style.left = Math.min(n.x, Math.max(0, this.W - node.offsetWidth)) + 'px';
-      node.style.top = Math.min(n.y, Math.max(0, this.H - node.offsetHeight)) + 'px';
+      const p = this.notePos(n);
+      node.style.left = Math.min(Math.max(0, p.x), Math.max(0, this.W - node.offsetWidth)) + 'px';
+      node.style.top = Math.min(Math.max(0, p.y), Math.max(0, this.H - node.offsetHeight)) + 'px';
     }
     const author = node.querySelector('.pc-note-author');
     author.textContent = n.authorName;
@@ -555,7 +575,7 @@ export class BoardView {
     if (!result) return;
     x = Math.min(Math.max(0, x), this.W - NOTE_W);
     y = Math.min(Math.max(0, y), this.H - 160);
-    this.room.send({ t: 'create', board: this.board, text: result.text, color: result.color, x, y });
+    this.room.send({ t: 'create', board: this.board, text: result.text, color: result.color, x, y, ...(this.opts.createExtras?.() || {}) });
   }
 
   async editNote(note) {
@@ -583,7 +603,9 @@ export class BoardView {
     if (!this.app.user) { this.app.requireLogin('move notes'); return; }
     e.preventDefault();
     node.setPointerCapture(e.pointerId);
-    const d = { id, node, startX: e.clientX, startY: e.clientY, x0: note.x, y0: note.y, x: note.x, y: note.y, lastSent: 0, moved: false };
+    // Start from where the note is drawn (it may have been nudged inside the board's edge).
+    const x0 = parseFloat(node.style.left) || 0, y0 = parseFloat(node.style.top) || 0;
+    const d = { id, node, startX: e.clientX, startY: e.clientY, x0, y0, x: x0, y: y0, lastSent: 0, moved: false };
     this.dragging = d;
     node.classList.add('dragging');
     node.style.zIndex = '99999';
@@ -595,7 +617,7 @@ export class BoardView {
       node.style.left = d.x + 'px';
       node.style.top = d.y + 'px';
       const now = performance.now();
-      if (d.moved && now - d.lastSent > DRAG_SEND_MS) { d.lastSent = now; this.room.raw({ t: 'drag', id, x: d.x, y: d.y }); }
+      if (d.moved && now - d.lastSent > DRAG_SEND_MS) { d.lastSent = now; this.sendMove(false, id, d.x, d.y); }
     };
     const end = () => {
       node.removeEventListener('pointermove', move);
@@ -603,7 +625,7 @@ export class BoardView {
       node.removeEventListener('pointercancel', end);
       node.classList.remove('dragging');
       this.dragging = null;
-      if (d.moved && this.room.send({ t: 'move', id, x: d.x, y: d.y })) return; // server echo sets final z/pos
+      if (d.moved && this.sendMove(true, id, d.x, d.y)) return; // server echo sets final z/pos
       const cur = this.room.notes.get(id);
       if (cur) this.upsertNote(cur, false);
     };
