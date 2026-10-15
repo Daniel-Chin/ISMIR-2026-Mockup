@@ -284,6 +284,36 @@ function sessionCard(s) {
   return card;
 }
 
+// ---------- live session rooms, shared by the wall and the hall ----------
+// One connection per session for the whole page: the wall and an opened hall session use the
+// same Room, so switching views or opening a session shows its notes at once. Once every
+// session is live, the hall's note counts come from these rooms instead of /api/counts.
+const sessionRooms = new Map();
+function sessionRoom(sid) {
+  let room = sessionRooms.get(sid);
+  if (!room) {
+    room = new Room('session:' + sid);
+    room.subscribe(ev => { if (['reset', 'upsert', 'remove'].includes(ev.type)) scheduleBadges(); });
+    sessionRooms.set(sid, room);
+  }
+  return room;
+}
+const allSessionsLive = () => !!hall.program && Object.keys(hall.program.sessions).every(sid => sessionRooms.get(sid)?.ready);
+
+let badgeFrame = 0;
+function scheduleBadges() {
+  badgeFrame ||= requestAnimationFrame(() => {
+    badgeFrame = 0;
+    if (!hall.program) return;
+    for (const [sid, room] of sessionRooms) {
+      if (!room.ready) continue;
+      for (const uid of hall.program.sessions[sid]?.papers || []) hall.counts['paper:' + uid] = room.countFor('paper:' + uid);
+      const badge = document.querySelector(`[data-session-count="${CSS.escape(sid)}"]`);
+      if (badge) badge.textContent = `${sessionNoteCount(hall.program.sessions[sid])} notes`;
+    }
+  });
+}
+
 // ---------- paper wall (alternative view of the hall) ----------
 const papers = { view: 'hall', wall: null, layout: null };
 const wallLayout = () => (papers.layout ||= buildWallLayout(hall.program, screenAspect()));
@@ -331,7 +361,7 @@ function setPaperView(view, { link = true } = {}) {
     else {
       // One live connection per session. Kept (idle) while the hall is shown, so going back to
       // the wall, or jumping to a paper on it, shows every note at once.
-      const rooms = new WallRooms(hall.program);
+      const rooms = new WallRooms(hall.program, sessionRoom);
       rooms.subscribe(ev => { if (ev.type === 'error') handleRoomError(ev); });
       makeWall(rooms);
     }
@@ -422,7 +452,7 @@ function presentTime(p) {
 function closeSession({ keepHash = false } = {}) {
   if (!hall.open) return;
   for (const b of hall.open.boards) b.destroy();
-  hall.open.room.close();
+  hall.open.unsubscribe();   // the room itself stays: it is shared (sessionRoom)
   hall.open.panel.remove();
   document.querySelectorAll('.pc-session-card[aria-expanded="true"]').forEach(c => c.setAttribute('aria-expanded', 'false'));
   hall.open = null;
@@ -507,7 +537,7 @@ function openSession(id, scroll) {
   card?.setAttribute('aria-expanded', 'true');
   const slot = card.closest('.pc-day-row').querySelector('.pc-session-slot');
 
-  const room = new Room('session:' + id);
+  const room = sessionRoom(id);
   const panel = el('section', 'pc-session-panel');
   panel.setAttribute('aria-label', `Session ${id}`);
   const head = el('div', 'pc-session-panel-head');
@@ -582,13 +612,13 @@ function openSession(id, scroll) {
     const badge = document.querySelector(`[data-session-count="${CSS.escape(id)}"]`);
     if (badge) badge.textContent = `${total} notes`;
   };
-  room.subscribe(ev => {
-    if (ev.type === 'error') {
-      handleRoomError(ev);
-    }
+  const unsubscribe = room.subscribe(ev => {
+    // With the wall open its rooms report errors already; avoid showing each one twice.
+    if (ev.type === 'error' && !papers.wall) handleRoomError(ev);
     if (['reset', 'upsert', 'remove'].includes(ev.type)) updateCounts();
   });
-  hall.open = { id, room, panel, boards };
+  if (room.ready) updateCounts();
+  hall.open = { id, room, panel, boards, unsubscribe };
   if (scroll) requestAnimationFrame(() => panel.scrollIntoView({ behavior: 'smooth', block: 'start' }));
 }
 
@@ -713,6 +743,8 @@ function handleRoomError(ev) {
 }
 
 async function refreshCounts() {
+  // Every session live (the wall is open): the counts are already here and kept current.
+  if (allSessionsLive()) { scheduleBadges(); return; }
   try {
     const res = await apiFetch('/api/counts?rooms=' + encodeURIComponent(Object.keys(hall.program.sessions).join(',')), { cache: 'no-store' });
     if (!res.ok) return;
@@ -781,7 +813,10 @@ async function main() {
     params.delete('login_error');
     history.replaceState(null, '', location.pathname + (params.toString() ? '?' + params : '') + location.hash);
   }
-  await refreshUser();
+  // The paper data and the sign-in check travel in parallel. Nothing waits for the check: the
+  // page shows the remembered name meanwhile, and the server checks every write anyway.
+  const programReady = fetch(new URL('./data/program.json', import.meta.url)).then(r => r.json());
+  const userReady = refreshUser();
   // The Canon easter egg (canon-egg.js, a classic script) records solves through these.
   window.PC_EGG = {
     get user() { return app.user; },
@@ -789,11 +824,11 @@ async function main() {
     solve: () => apiFetch('/api/egg/solve', { method: 'POST' }).then(r => r.json()),
     leaderboard: () => apiFetch('/api/egg/leaderboard', { cache: 'no-store' }).then(r => r.json()),
   };
-  window.dispatchEvent(new Event('pc-egg-ready'));
+  userReady.then(() => window.dispatchEvent(new Event('pc-egg-ready')));
   initWelcome();
 
   // Relative to this module, so it resolves on the Worker and in the GitHub Pages build alike.
-  const program = await fetch(new URL('./data/program.json', import.meta.url)).then(r => r.json());
+  const program = await programReady;
   hall.program = program;
   window.PC_PROGRAM = program; // read by canon-egg.js for paper fun facts
   applyConference(program.conference);

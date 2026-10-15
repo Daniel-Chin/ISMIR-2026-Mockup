@@ -9,6 +9,13 @@
   <!-- Header, hero, section headings and footer come straight from the live overview. -->
   <link rel="stylesheet" href="/vendor/overview.css" />
   <link rel="stylesheet" href="/styles.css" />
+  <!-- Fetched in parallel with everything else instead of one after another. -->
+  <link rel="preload" href="/data/program.json" as="fetch" crossorigin="anonymous" />
+  <link rel="modulepreload" href="/app.js" />
+  <link rel="modulepreload" href="/board.js" />
+  <link rel="modulepreload" href="/wall.js" />
+  <link rel="modulepreload" href="/room.js" />
+  <link rel="modulepreload" href="/api.js" />
 </head>
 <body>
   <header class="site-header">

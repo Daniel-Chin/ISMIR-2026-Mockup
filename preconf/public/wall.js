@@ -156,10 +156,11 @@ export function freeBoardSpot(notes, W, H) {
 
 /**
  * Every session room at once, presented to BoardView as one room: a merged note map, events
- * passed through, and each message routed to the room that owns the note.
+ * passed through, and each message routed to the room that owns the note. `roomFor(sid)` hands
+ * out the session's Room (app.js shares them with the hall, so each session has one connection).
  */
 export class WallRooms {
-  constructor(program) {
+  constructor(program, roomFor = sid => new Room('session:' + sid)) {
     this.program = program;
     this.notes = new Map();
     this.owner = new Map();
@@ -168,12 +169,17 @@ export class WallRooms {
     this.paperLimits = { boardW: 4000, boardH: 2480 };
     this.listeners = new Set();
     this.rooms = new Map();
+    this.unsubs = [];
+    this.resetFrame = 0;
     for (const sid of Object.keys(program.sessions)) {
-      const room = new Room('session:' + sid);
+      const room = roomFor(sid);
       this.rooms.set(sid, room);
-      room.subscribe(ev => this.onRoom(room, ev));
+      this.unsubs.push(room.subscribe(ev => this.onRoom(room, ev)));
+      if (room.ready) this.onRoom(room, { type: 'reset' });   // already live (opened by the hall)
     }
   }
+
+  get ready() { return [...this.rooms.values()].some(r => r.ready); }
 
   subscribe(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
   emit(ev) { for (const fn of this.listeners) { try { fn(ev); } catch (e) { console.error(e); } } }
@@ -185,7 +191,11 @@ export class WallRooms {
       if (room.me) this.me = room.me;
       if (room.limits?.textMax) this.limits.textMax = room.limits.textMax;
       if (room.limits?.boardW) this.paperLimits = { boardW: room.limits.boardW, boardH: room.limits.boardH };
+      // Fourteen rooms answer within moments of each other: redraw once per frame, not per room.
+      this.resetFrame ||= requestAnimationFrame(() => { this.resetFrame = 0; this.emit({ type: 'reset' }); });
+      return;
     } else if (ev.type === 'upsert') {
+      if (ev.replaces) { this.notes.delete(ev.replaces); this.owner.delete(ev.replaces); }
       this.notes.set(ev.note.id, ev.note); this.owner.set(ev.note.id, room);
     } else if (ev.type === 'remove') {
       this.notes.delete(ev.note.id); this.owner.delete(ev.note.id);
@@ -207,8 +217,10 @@ export class WallRooms {
     return false;
   }
 
+  /** Stop listening. The rooms stay open: they belong to app.js and serve the hall too. */
   close() {
-    for (const room of this.rooms.values()) room.close();
+    cancelAnimationFrame(this.resetFrame);
+    for (const off of this.unsubs) off();
     this.listeners.clear();
   }
 }

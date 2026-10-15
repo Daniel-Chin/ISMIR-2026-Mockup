@@ -532,3 +532,15 @@ a.canon-egg-link:hover, a.canon-egg-link:focus-visible { text-decoration: underl
 html:not([data-theme="light"]) .canon-egg-board li { background: rgba(255, 255, 255, .06); }
 .canon-egg-board li.is-me { color: var(--pc-jump); border-color: currentColor; }
 .canon-egg-board li.canon-egg-gap { border: 0; background: none; padding: 3px 2px; opacity: .55; }
+
+/* ---------- speed ---------- */
+/* Zoomed far out (board.js FAR_SCALE): text would be a few pixels tall, so it is not drawn and
+   shadows are dropped; notes and cards show as their coloured shapes. Keeps zooming smooth. */
+.pc-board-surface.is-far .pc-note > *,
+.pc-board-surface.is-far .pc-pin > :not(.pc-pin-tack) { visibility: hidden; }
+.pc-board-surface.is-far .pc-note,
+.pc-board-surface.is-far .pc-pin { box-shadow: none; }
+/* Each note and card lays out on its own: a change inside one never re-lays out the others. */
+.pc-note, .pc-pin { contain: layout style; }
+/* Posted, waiting for the server's confirmation (a fraction of a second). */
+.pc-note.is-pending { opacity: .72; }

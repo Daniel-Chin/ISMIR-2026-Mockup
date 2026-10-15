@@ -22,6 +22,15 @@ const FIT_MAX_PERCENT = 200;
 const TOUR_MOVE_MS = 4500;     // intro camera: one glide between shots
 const TOUR_HOLD_MS = 2200;     // ...then rest on the shot
 const ZOOM_EASE = 0.22;        // fraction of the remaining distance covered per frame
+// Below this scale note and card text is a few pixels tall: unreadable, yet the most expensive
+// thing to draw while zooming. It is left out there (styles.css: .is-far), so zooming far out
+// stays smooth however many notes there are.
+const FAR_SCALE = 0.28;
+// While a zoom, glide or pinch is under way the bar is higher: text that would be drawn for the
+// first time at this size mid-animation is filled in once the motion stops (as Miro does).
+const MOVING_FAR_SCALE = 0.5;
+// Notes of up to this many wrapped lines can't be taller than wide: no need to measure them.
+const SHORT_NOTE_LINES = 7, CHARS_PER_LINE = 24;
 const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform);
 
 export const el = (tag, cls, text) => {
@@ -132,6 +141,9 @@ export class BoardView {
     document.addEventListener('keydown', this.onKey);
     this.renderAll();
     this.layout(true);
+    // The room may already be live (the hall reuses the wall's connections): no 'reset' will
+    // come, so open on the default view now.
+    if (this.room.ready && this.fitNotes) { this.fitted = true; this.fitToNotes(); }
   }
 
   get W() { return this.room.limits.boardW; }
@@ -174,6 +186,7 @@ export class BoardView {
     cancelAnimationFrame(this.raf);
     this.raf = 0;
     this.anchor = null;
+    this.setMoving(false);
     this.target = this.clampScale(this.base * zoomed);
     // Open on the centre of the board; on later resizes keep looking at the same spot.
     this.setCamera({ s: this.target, cx: centre ? centre.cx : this.W / 2, cy: centre ? centre.cy : this.H / 2 });
@@ -207,6 +220,7 @@ export class BoardView {
     const zooming = Math.abs(Math.log(to.s / from.s)) > 0.05;
     const pivot = (a, b) => (a * from.s - b * to.s) / (from.s - to.s);
     const px = zooming ? pivot(from.cx, to.cx) : 0, py = zooming ? pivot(from.cy, to.cy) : 0;
+    this.setMoving(true);
     const step = now => {
       // rAF's timestamp is the frame's start, which can be a moment before t0: never run backwards.
       const k = ease(Math.min(1, Math.max(0, (now - t0) / ms)));
@@ -214,7 +228,7 @@ export class BoardView {
       this.setCamera(zooming
         ? { s, cx: px - (px - from.cx) * from.s / s, cy: py - (py - from.cy) * from.s / s }
         : { s, cx: from.cx + (to.cx - from.cx) * k, cy: from.cy + (to.cy - from.cy) * k });
-      if (k < 1) this.raf = requestAnimationFrame(step); else this.raf = 0;
+      if (k < 1) this.raf = requestAnimationFrame(step); else { this.raf = 0; this.setMoving(false); }
     };
     this.raf = requestAnimationFrame(step);
   }
@@ -240,6 +254,7 @@ export class BoardView {
     this.surface.style.width = this.W + 'px';
     this.surface.style.height = this.H + 'px';
     this.surface.style.transform = `scale(${scale})`;
+    this.updateFar();
     this.sizer.style.width = Math.floor(this.W * scale) + 'px';
     this.sizer.style.height = Math.floor(this.H * scale) + 'px';
     if (this.anchor) {
@@ -250,21 +265,37 @@ export class BoardView {
     this.zoomLabel.textContent = Math.round((scale / this.base) * 100) + '%';
   }
 
+  /** Text left out below FAR_SCALE (MOVING_FAR_SCALE while the view is moving). */
+  updateFar() {
+    const far = this.scale < (this.moving ? MOVING_FAR_SCALE : FAR_SCALE);
+    if (far !== this.far) { this.far = far; this.surface.classList.toggle('is-far', far); }
+  }
+
+  /**
+   * A zoom/glide/pinch starts or stops. While moving, the board is one compositor layer that is
+   * only scaled; when it stops, the layer is dropped so text re-renders crisply at its new size.
+   */
+  setMoving(on) {
+    if (this.moving === on) return;
+    this.moving = on;
+    this.surface.style.willChange = on ? 'transform' : '';
+    this.updateFar();
+  }
+
   /** Smoothly zoom to `scale`, keeping the content under viewport point (px, py) fixed. */
   zoomTo(scale, px, py) {
     if (px === undefined) { px = this.scroller.clientWidth / 2; py = this.scroller.clientHeight / 2; }
     this.target = this.clampScale(scale);
     this.anchor = { cx: (this.scroller.scrollLeft + px - (this.offX || 0)) / this.scale, cy: (this.scroller.scrollTop + py - (this.offY || 0)) / this.scale, px, py };
     if (this.raf) return;
-    this.surface.style.willChange = 'transform';
+    this.setMoving(true);
     const step = () => {
       const diff = this.target - this.scale;
       if (Math.abs(diff) < this.target * 0.002) {
         this.applyScale(this.target);
         this.raf = 0;
         this.anchor = null;
-        // Drop the compositor layer once settled so text re-rasterises crisply at the new size.
-        this.surface.style.willChange = '';
+        this.setMoving(false);
         return;
       }
       this.applyScale(this.scale + diff * ZOOM_EASE);
@@ -276,7 +307,13 @@ export class BoardView {
   /** Two-finger pinch on a touch screen: the board point between the fingers stays between them. */
   onTouch(e) {
     if (e.touches.length !== 2) {
-      if (this.pinch && e.touches.length < 2) this.pinch = null;
+      if (this.pinch && e.touches.length < 2) {
+        cancelAnimationFrame(this.pinch.raf);
+        const last = this.pinch.next;
+        if (last) { this.anchor = { cx: this.pinch.cx, cy: this.pinch.cy, px: last.px, py: last.py }; this.applyScale(last.s); this.anchor = null; this.target = last.s; }
+        this.pinch = null;
+        this.setMoving(false);   // settle: text re-renders crisply
+      }
       return;
     }
     e.preventDefault();
@@ -291,11 +328,19 @@ export class BoardView {
       this.pinch = { dist, s: this.scale, cx: (this.scroller.scrollLeft + px - (this.offX || 0)) / this.scale, cy: (this.scroller.scrollTop + py - (this.offY || 0)) / this.scale };
       return;
     }
-    const s = this.clampScale(this.pinch.s * dist / this.pinch.dist);
-    this.anchor = { cx: this.pinch.cx, cy: this.pinch.cy, px, py };
-    this.applyScale(s);
-    this.anchor = null;
-    this.target = s;
+    // Touch events can outpace the screen: keep the latest and draw once per frame.
+    this.pinch.next = { s: this.clampScale(this.pinch.s * dist / this.pinch.dist), px, py };
+    if (this.pinch.raf) return;
+    this.setMoving(true);
+    this.pinch.raf = requestAnimationFrame(() => {
+      const p = this.pinch;
+      if (!p) return;
+      p.raf = 0;
+      this.anchor = { cx: p.cx, cy: p.cy, px: p.next.px, py: p.next.py };
+      this.applyScale(p.next.s);
+      this.anchor = null;
+      this.target = p.next.s;
+    });
   }
 
   /** Safari's pinch (gesturestart/change/end, e.scale relative to the start). */
@@ -484,7 +529,7 @@ export class BoardView {
     this.anchor = null;
     this.target = this.scale;
     this.glide = null;   // the wall would otherwise resume an interrupted glide (wall.js)
-    this.surface.style.willChange = '';
+    this.setMoving(false);
     const sc = this.scroller;
     const start = { x: e.clientX, y: e.clientY, left: sc.scrollLeft, top: sc.scrollTop };
     this.surface.setPointerCapture(e.pointerId);
@@ -555,6 +600,8 @@ export class BoardView {
     if (ev.type === 'upsert') {
       const n = ev.note;
       if (!this.owns(n)) return;
+      const node = ev.replaces && this.els.get(ev.replaces);
+      if (node) { this.els.delete(ev.replaces); node.dataset.id = n.id; this.els.set(n.id, node); }
       this.upsertNote(n, ev.fresh);
     } else if (ev.type === 'remove') {
       const n = ev.note;
@@ -578,11 +625,15 @@ export class BoardView {
     }
   }
 
+  /** Bring the board in line with the room: update notes in place, add new ones, drop gone ones. */
   renderAll() {
-    for (const node of this.els.values()) node.remove();
-    this.els.clear();
-    const notes = [...this.room.notes.values()].filter(n => this.owns(n)).sort((a, b) => a.z - b.z);
-    for (const n of notes) this.upsertNote(n, false);
+    const keep = new Set();
+    for (const n of this.room.notes.values()) {
+      if (!this.owns(n)) continue;
+      keep.add(n.id);
+      this.upsertNote(n, false);
+    }
+    for (const [id, node] of this.els) if (!keep.has(id)) { node.remove(); this.els.delete(id); }
     this.updateEmpty();
   }
 
@@ -606,11 +657,14 @@ export class BoardView {
     this.fitNote(node, n);
     if (this.dragging?.id !== n.id) {
       node.classList.remove('remote-drag');
-      // A widened note is kept inside the board instead of being clipped at its edge.
+      // A widened note is kept inside the board instead of being clipped at its edge. Its size
+      // comes from fitNote (no layout read per note: hundreds arrive at once on the wall).
       const p = this.notePos(n);
-      node.style.left = Math.min(Math.max(0, p.x), Math.max(0, this.W - node.offsetWidth)) + 'px';
-      node.style.top = Math.min(Math.max(0, p.y), Math.max(0, this.H - node.offsetHeight)) + 'px';
+      node.style.left = Math.min(Math.max(0, p.x), Math.max(0, this.W - (node._w || NOTE_W))) + 'px';
+      node.style.top = Math.min(Math.max(0, p.y), Math.max(0, this.H - (node._h || 160))) + 'px';
     }
+    // Posted, not yet confirmed by the server: shown, but not editable or movable yet.
+    node.classList.toggle('is-pending', !!n.pending);
     const author = node.querySelector('.pc-note-author');
     author.textContent = n.authorName;
     if (this.isMine(n)) author.append(el('span', 'mine', ' (you)'));
@@ -626,8 +680,8 @@ export class BoardView {
     time.dataset.ts = n.created;
     time.textContent = timeAgo(n.created) + (n.updated - n.created > 1000 ? ' · edited' : '');
     node.title = n.movedBy ? `Last moved by ${n.movedBy}` : '';
-    node.querySelector('[data-act=edit]').hidden = !this.isMine(n);
-    node.querySelector('[data-act=delete]').hidden = !this.canDelete(n);
+    node.querySelector('[data-act=edit]').hidden = !!n.pending || !this.isMine(n);
+    node.querySelector('[data-act=delete]').hidden = !!n.pending || !this.canDelete(n);
     this.updateEmpty();
   }
 
@@ -639,8 +693,12 @@ export class BoardView {
   fitNote(node, n) {
     if (node._fitText === n.text) return;
     node.style.width = NOTE_W + 'px';
+    // Most notes are short: count wrapped lines instead of asking the browser for a layout.
+    const lines = String(n.text).split('\n').reduce((sum, line) => sum + Math.max(1, Math.ceil([...line].length / CHARS_PER_LINE)), 0);
+    if (lines <= SHORT_NOTE_LINES) { node._fitText = n.text; node._w = NOTE_W; node._h = 56 + lines * 19; return; }
     if (!node.offsetHeight) return;              // not laid out yet; retried on the next upsert
     node._fitText = n.text;
+    node._w = NOTE_W; node._h = node.offsetHeight;
     if (node.offsetHeight <= NOTE_W) return;
     const lowest = NOTE_RATIO_MIN + NOTE_RATIO_SLACK;
     const ratio = lowest + (1 - lowest) * idFraction(n.id);
@@ -651,6 +709,7 @@ export class BoardView {
       if (node.offsetHeight / mid > ratio) lo = mid; else hi = mid;
     }
     node.style.width = Math.ceil(hi) + 'px';
+    node._w = Math.ceil(hi); node._h = node.offsetHeight;
   }
 
   buildNote(n) {
@@ -667,12 +726,12 @@ export class BoardView {
 
     actions.addEventListener('click', e => {
       const act = e.target.closest('button')?.dataset.act;
-      const note = this.room.notes.get(n.id);
+      const note = this.room.notes.get(node.dataset.id);
       if (!act || !note) return;
       if (act === 'edit') this.editNote(note);
       else if (act === 'delete') this.deleteNote(note);
     });
-    for (const target of [body, foot]) target.addEventListener('pointerdown', e => this.startDrag(e, n.id));
+    for (const target of [body, foot]) target.addEventListener('pointerdown', e => this.startDrag(e, node.dataset.id));
     node.addEventListener('dblclick', e => e.stopPropagation());
     return node;
   }
@@ -717,7 +776,8 @@ export class BoardView {
     const node = this.els.get(id);
     if (!note || !node) return;
     // Signed out: notes stay put and nobody is nagged; dragging one just moves the view.
-    if (!this.app.user) { this.startPan(e, true); return; }
+    // A post not yet confirmed can't move either (the server doesn't know it yet).
+    if (!this.app.user || note.pending) { this.startPan(e, true); return; }
     e.preventDefault();
     node.setPointerCapture(e.pointerId);
     // Start from where the note is drawn (it may have been nudged inside the board's edge).
