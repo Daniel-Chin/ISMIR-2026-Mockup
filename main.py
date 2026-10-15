@@ -32,13 +32,15 @@ from markupsafe import Markup
 
 from utils.zoom_redirect import build_zoom_redirect_url
 from utils.shared import (
+    SESSION_KINDS,
     calendar_ics_path,
+    event_link,
     load_helpdesk_url,
     load_site_config,
     parse_award_nominee,
     parse_conference_dates,
 )
-from utils.calendar import SESSION_KINDS, build_calendar, event_link
+from utils.calendar import build_calendar
 from utils.session_assignment import parse_file as parse_session_assignment
 
 

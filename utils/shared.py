@@ -31,6 +31,23 @@ def parse_award_nominee(value: str) -> tuple[int, int] | None:
     return int(match.group(1)), int(match.group(2))
 
 
+SESSION_KINDS = {"Poster session": "poster", "Oral session": "oral"}
+NO_PAGE_CATEGORIES = {"Registration", "Lunch"}
+
+
+def event_link(event: dict) -> str:
+    """Relative URL of the event's page, or "" if it has none."""
+    kind = SESSION_KINDS.get(event["category"])
+    if kind:
+        return f"papers.html?session={event['title'].split()[-1]}&type={kind}"
+    if event["category"] in NO_PAGE_CATEGORIES:
+        return ""
+    if not any(str(event.get(k) or "").strip()
+               for k in ("event_desc", "channel_url", "live_url")):
+        return ""
+    return f"event_{event['uid']}.html"
+
+
 def calendar_ics_path(site_data_path: str) -> str:
     """Relative to the repo root, e.g. static/calendar/ISMIR_2026.ics"""
     name = str(load_site_config(site_data_path)["name"])

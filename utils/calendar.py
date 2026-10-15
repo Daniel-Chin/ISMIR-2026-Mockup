@@ -4,21 +4,7 @@ from datetime import datetime, timedelta
 
 import pytz
 
-SESSION_KINDS = {"Poster session": "poster", "Oral session": "oral"}
-NO_PAGE_CATEGORIES = {"Registration", "Lunch"}
-
-
-def event_link(event):
-    """Relative URL of the event's page, or "" if it has none."""
-    kind = SESSION_KINDS.get(event["category"])
-    if kind:
-        return f"papers.html?session={event['title'].split()[-1]}&type={kind}"
-    if event["category"] in NO_PAGE_CATEGORIES:
-        return ""
-    if not any(str(event.get(k) or "").strip()
-               for k in ("event_desc", "channel_url", "live_url")):
-        return ""
-    return f"event_{event['uid']}.html"
+from utils.shared import event_link
 
 
 def build_calendar(events, config):

@@ -20,7 +20,7 @@ ASSETS = ('index.html', 'history.html', 'app.js', 'history.js', 'styles.css',
           'timezone-preference.js', 'cursor-avatars.js', 'theme-toggle.js', 'public-connection.js', 'prompt-config.js', 'llm-prompts.json',
           'site-integration.js')
 EVENT_FIELDS = ('id', 'type', 'title', 'topic', 'summary', 'organiser', 'startsAt', 'endsAt', 'day',
-                'dayNumber', 'track', 'category', 'spotlight', 'sessionNumber', 'posterSessionNumber', 'paperRange', 'endTimeTBD')
+                'dayNumber', 'track', 'category', 'spotlight', 'sessionNumber', 'posterSessionNumber', 'paperRange', 'endTimeTBD', 'detailUrl')
 PAPER_FIELDS = ('id', 'displayId', 'sourcePaperId', 'detailUrl', 'title', 'authors', 'primaryAuthor', 'abstract', 'subjects', 'isTismir', 'longPresentation',
                 'presenterMode', 'funFact', 'sessionId', 'sessionNumber', 'posterSessionNumber', 'sessionPaperNumber')
 CONF_FIELDS = ('name', 'location', 'theme', 'timeZone', 'startsOn', 'endsOn', 'pageTitle', 'subtitle')
