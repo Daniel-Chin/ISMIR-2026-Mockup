@@ -35,6 +35,11 @@ SESSION_KINDS = {"Poster session": "poster", "Oral session": "oral"}
 NO_PAGE_CATEGORIES = {"Registration", "Lunch"}
 
 
+def event_slug(title: str) -> str:
+    """URL-safe event name, stable across uid changes, e.g. "★ Award Nominees\nOral Session - 2" -> "award-nominees-oral-session-2" """
+    return re.sub(r"[\W_]+", "-", title).strip("-").lower()
+
+
 def event_link(event: dict) -> str:
     """Relative URL of the event's page, or "" if it has none."""
     kind = SESSION_KINDS.get(event["category"])
@@ -45,7 +50,7 @@ def event_link(event: dict) -> str:
     if not any(str(event.get(k) or "").strip()
                for k in ("event_desc", "channel_url", "live_url")):
         return ""
-    return f"event_{event['uid']}.html"
+    return f"event_{event_slug(str(event['title']))}.html"
 
 
 def calendar_ics_path(site_data_path: str) -> str:

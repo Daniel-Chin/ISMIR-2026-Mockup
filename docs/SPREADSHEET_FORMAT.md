@@ -90,7 +90,7 @@ slack_channel, channel_url, live_url, thumbnail_link, event_desc
 | `category` | fixed vocabulary: `Tutorials`, `Opening`, `All Meeting` (keynotes), `Poster session` (also orals), `LBD`, `Industry`, `Music`, `Meetup`, `VMeetup`, `WiMIR Meetup`, `Awards`, `Social`, `Lunch`, `Registration`, `Satellite`, `Performance`. Drives day-page section, calendar color, and calendar click-through link |
 | private — stripped before publish |
 | ⚙️ `channel_url`, `live_url` | Slack link / Zoom-YouTube stream link |
-| `event_desc` | markdown description shown on the event's page `event_<uid>.html`. Every category except `Poster session`, `Oral session`, `Registration`, and `Lunch` gets an event page |
+| `event_desc` | markdown description shown on the event's page `event_<slugified title>.html`. Every category except `Poster session`, `Oral session`, `Registration`, and `Lunch` gets an event page |
 
 ## Tab `lbds` — late-breaking demos
 

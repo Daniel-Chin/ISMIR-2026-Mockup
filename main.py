@@ -707,16 +707,22 @@ def poster(poster):
     paper_data = format_paper(v)
     paper_data["zoom_url"] = _paper_zoom_url(v)
     award_event_uid = award_event_uids.get(paper_data["content"]["award_session"])
-    paper_data["award_url"] = f"event_{award_event_uid}.html" if award_event_uid else ""
+    paper_data["award_url"] = (
+        event_link(by_uid["events"][award_event_uid]) if award_event_uid else ""
+    )
     data["paper"] = paper_data
     return render_template("poster.html", **data)
 
 
-@app.route("/event_<event>.html")
-def event(event):
+@app.route("/event_<slug>.html")
+def event(slug):
+    url = f"event_{slug}.html"
+    index = next((i for i, e in enumerate(timeline) if e["url"] == url), None)
+    if index is None:
+        abort(404)
+    event = timeline[index]["uid"]
     v = by_uid["events"][event]
     start = _event_start(v)
-    index = next((i for i, e in enumerate(timeline) if e["uid"] == event), None)
     data = _data()
     data["event"] = v
     award_session = next(
@@ -727,9 +733,7 @@ def event(event):
     data["start_utc"] = start.astimezone(pytz.UTC).isoformat()
     data["timezone_name"] = _conference_timezone_name()
     data["prev_event"] = timeline[index - 1] if index else None
-    data["next_event"] = (
-        timeline[index + 1] if index is not None and index + 1 < len(timeline) else None
-    )
+    data["next_event"] = timeline[index + 1] if index + 1 < len(timeline) else None
     return render_template("event.html", **data)
 
 
@@ -866,7 +870,7 @@ def generator():
         yield "lbd", {"lbd": str(lbd["uid"])}
     for event in timeline:
         if event["url"].startswith("event_"):
-            yield "event", {"event": event["uid"]}
+            yield "event", {"slug": event["url"][len("event_"):-len(".html")]}
     for day in site_data["days"]:
         yield "day", {"day": str(day["uid"])}
 
