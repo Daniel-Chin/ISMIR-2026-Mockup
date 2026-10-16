@@ -54,6 +54,23 @@ function dropLinkFromUrl() {
 }
 
 export const clearToken = () => { writeToken(''); dropLinkFromUrl(); };
+
+/**
+ * Whether this browser holds a session for this page. The miniconf copy goes only by the shared
+ * token (signing out on either site drops it); a cookie the Worker may still send on its own
+ * connections must not sign the page back in. The Worker-hosted page uses the cookie itself.
+ */
+export const hasSession = () => !API || !!readToken();
+
+/**
+ * The session is shared with the Live Overview (same origin, same key; its egg-account.js).
+ * Signing in or out there, or in another tab, calls `onChange` here.
+ */
+export function onSessionChange(onChange) {
+  window.addEventListener('storage', e => {
+    if (e.key === TOKEN_KEY && (e.oldValue || '') !== (e.newValue || '')) onChange();
+  });
+}
 export const apiUrl = path => API + path;
 
 export function apiFetch(path, opts = {}) {

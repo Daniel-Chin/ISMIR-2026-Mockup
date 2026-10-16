@@ -123,6 +123,13 @@
     window.dispatchEvent(new Event('pc-egg-ready'));   // canon-egg.js may be waiting to record a find
   }
 
+  // Signed in or out on the Warm-up Discussion, or in another tab: follow at once.
+  window.addEventListener('storage', (e) => {
+    if (e.key !== TOKEN_KEY || (e.oldValue || '') === (e.newValue || '')) return;
+    if (!e.newValue) { user = null; render(); return; }
+    refresh();
+  });
+
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render);
   else render();
   refresh();

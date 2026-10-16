@@ -32,7 +32,8 @@
     });
     if (conf.name) document.title = `${conf.name} ${document.title}`;
     // The page stands alone (no miniconf wrapper), so its own nav links back to the configured miniconf.
-    const links = { miniconf: programSite + '/', official: conf.officialSiteUrl };
+    // The Warm-up Discussion is the miniconf's other add-on, at {prefix}/lounge.html (preconf/).
+    const links = { miniconf: programSite + '/', warmup: programSite + '/lounge.html', official: conf.officialSiteUrl };
     root.querySelectorAll('[data-site-link]').forEach((node) => {
       const href = links[node.dataset.siteLink];
       if (href) node.setAttribute('href', href);

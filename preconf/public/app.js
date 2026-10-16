@@ -1,7 +1,7 @@
 import { Room } from './room.js';
 import { BoardView, timeAgo } from './board.js';
 import { WallRooms, WallView, buildWallLayout, screenAspect, wallSlotFor } from './wall.js';
-import { apiFetch, apiUrl, takeTokenFromHash, clearToken } from './api.js';
+import { apiFetch, apiUrl, takeTokenFromHash, clearToken, onSessionChange, hasSession } from './api.js';
 
 const COLORS = { sun: '#ffe27a', mint: '#a8f0c6', sky: '#a9dcff', rose: '#ffbfd0', lilac: '#dccbff', sand: '#f3dcae' };
 const USER_KEY = 'pcUser';
@@ -176,6 +176,7 @@ function renderAuth() {
 function userFromRoom(room) {
   if (!room.me || app.user?.id === room.me.id) return;
   if (app.user) return;   // /api/me already answered with someone: it stays authoritative
+  if (!hasSession()) return;   // signed out (here or on the Live Overview)
   app.user = { ...room.me };
   renderAuth();
   window.dispatchEvent(new Event('pc-egg-ready'));   // the easter egg may be waiting to claim a find
@@ -812,7 +813,9 @@ function initWelcome() {
 function applyConference(conf) {
   const text = { name: conf.name, date: conf.date };
   document.querySelectorAll('[data-conf]').forEach(n => { if (text[n.dataset.conf]) n.textContent = text[n.dataset.conf]; });
-  const links = { miniconf: conf.miniconfUrl ? conf.miniconfUrl.replace(/\/+$/, '') + '/' : '', official: conf.officialSiteUrl };
+  // The Live Overview is the miniconf's other add-on, at {prefix}/live.html (live_overview/).
+  const prefix = conf.miniconfUrl ? conf.miniconfUrl.replace(/\/+$/, '') : '';
+  const links = { miniconf: prefix ? prefix + '/' : '', live: prefix ? prefix + '/live.html' : '', official: conf.officialSiteUrl };
   document.querySelectorAll('[data-site-link]').forEach(a => { if (/^https:\/\//.test(links[a.dataset.siteLink] || '')) a.href = links[a.dataset.siteLink]; });
   const help = $('#helpdesk-link');
   if (/^https:\/\//.test(conf.helpdeskUrl || '')) help.href = conf.helpdeskUrl; else help.remove();
@@ -831,6 +834,9 @@ async function main() {
     if (next) location.replace(next); else location.reload();
   });
   window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
+  // Signed in or out on the Live Overview, or in another tab: so here too. Reload, so that every
+  // live connection reopens with (or without) the session.
+  onSessionChange(() => location.reload());
   renderAuth();
   const params = new URLSearchParams(location.search);
   if (params.get('login_error')) {
