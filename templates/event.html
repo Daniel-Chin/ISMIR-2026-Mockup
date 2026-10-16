@@ -1,0 +1,91 @@
+{% set page_title = event.title %}
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- Title -->
+<div class="pp-card m-3">
+  <div class="card-header">
+    <h2 class="card-title main-title text-center" style="white-space: pre-line;">{{event.title}}</h2>
+    <h3 class="card-subtitle mb-2 text-muted text-center">
+      {{start_label}} – {{event.end_time}} ({{timezone_name}})
+    </h3>
+    <h4 id="event-countdown" class="text-muted text-center"
+      data-start="{{start_utc}}"></h4>
+  </div>
+</div>
+
+<div style="display: flex; justify-content: center;" class="btn-toolbar mt-4"
+  role="toolbar">
+  <div class="mb-3">{% include 'event_nav.html' %}</div>
+  <div class="btn-group mx-3 mb-3">
+    {% if event.channel_url %}
+    <a href="{{event.channel_url}}" class="btn btn-outline-primary"
+      target="_blank" rel="noopener noreferrer"
+      {% if event.category == "Tutorials" %}
+      onclick="alert('Entry is conditioned on tutorial registration. Slack will reject unregistered attendees.')"
+      {% endif %}>{% include
+      'slack_svg.html' %} Slack Channel</a>
+    {% endif %}
+    {% if event.zoom_url %}
+    <a href="{{event.zoom_url}}" class="btn btn-outline-primary"
+      target="_blank" rel="noopener noreferrer">Zoom</a>
+    {% endif %}
+    {% if event.web_link %}
+    <a href="{{event.web_link}}" class="btn btn-outline-primary"
+      target="_blank" rel="noopener noreferrer">Website</a>
+    {% endif %}
+  </div>
+</div>
+
+{% if event.event_desc %}
+<div class="pp-card m-3">
+  <div class="card-body">
+    <div class="card-text paper-text">
+      {{event.event_desc | markdown | safe}}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if award_papers %}
+<div class="pp-card m-3">
+  <div class="card-body">
+    <ol class="card-text paper-text mb-0">
+      {% for paper in award_papers %}
+      <li class="mb-2">
+        P{{paper.session}}-{{paper.position}}: <a href="poster_{{paper.id}}.html"
+          style="text-decoration: underline;">{{paper.title}}</a><br>
+        <span class="text-muted">{{paper.authors | join(", ")}}</span>
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+</div>
+{% endif %}
+
+{% if event.event_desc or award_papers %}
+<div class="d-flex justify-content-center my-3">{% include 'event_nav.html' %}</div>
+{% endif %}
+
+<script>
+  (function () {
+    const el = document.getElementById('event-countdown');
+    const start = new Date(el.dataset.start);
+    const update = () => {
+      let mins = Math.ceil((start - new Date()) / 60000);
+      if (mins <= 0) {
+        el.textContent = 'Started';
+        return;
+      }
+      const days = Math.floor(mins / 1440);
+      const hours = Math.floor(mins % 1440 / 60);
+      mins %= 60;
+      el.textContent = 'T-' + (days ? days + 'd ' : '')
+        + (days || hours ? hours + 'h ' : '') + mins + 'm';
+    };
+    update();
+    setInterval(update, 30000);
+  })();
+</script>
+{% endblock %}

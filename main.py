@@ -32,9 +32,12 @@ from markupsafe import Markup
 
 from utils.zoom_redirect import build_zoom_redirect_url
 from utils.shared import (
+    SESSION_KINDS,
     calendar_ics_path,
+    event_link,
     load_helpdesk_url,
     load_site_config,
+    parse_award_nominee,
     parse_conference_dates,
 )
 from utils.calendar import build_calendar
@@ -52,8 +55,12 @@ def chain_functions(*functions: Callable) -> Callable:
     return closure
 
 
+AWARD_NOMINEE_CATEGORY = "Award nominee"
+
 site_data = {}
 by_uid = {}
+timeline = []  # see _build_timeline
+award_event_uids = {}  # award session number -> uid of its "Award nominee" event
 
 
 def paper_check(row):
@@ -178,6 +185,15 @@ def main(site_data_path: str):
                 include_token=False,
             )
 
+    timeline.clear()
+    timeline.extend(_build_timeline(site_data.get("events", [])))
+    award_event_uids.clear()
+    for event in site_data.get("events", []):
+        # "★ Award Nominees\nOral Session - 2"; skips "★ Test of Time Award Talks"
+        session = event["title"].split()[-1]
+        if event["category"] == AWARD_NOMINEE_CATEGORY and session.isdigit():
+            award_event_uids[int(session)] = str(event["uid"])
+
     app.jinja_env.globals["helpdesk_url"] = load_helpdesk_url(site_data_path)
     app.jinja_env.globals["calendar_ics_path"] = calendar_ics_path(site_data_path)
 
@@ -198,6 +214,31 @@ def main(site_data_path: str):
     return extra_files
 
 
+def _event_start(event):
+    timezone = pytz.timezone(_conference_timezone_name())
+    naive = datetime.datetime.strptime(  # noqa: DTZ007
+        f"{event['start_date']} {event['start_time']}", "%Y-%m-%d %H:%M"
+    )
+    return timezone.localize(naive)
+
+
+def _build_timeline(events):
+    """Events that have a page, in chronological order (prev/next navigation)."""
+    out = []
+    for event in sorted(events, key=lambda e: (_event_start(e), _as_int(e["uid"]))):
+        url = event_link(event)
+        if not url:
+            continue
+        kind = SESSION_KINDS.get(event["category"])
+        out.append({
+            "uid": str(event["uid"]),
+            "title": str(event["title"]),
+            "url": url,
+            "session_key": f"{kind}-{event['title'].split()[-1]}" if kind else "",
+        })
+    return out
+
+
 # ------------- SERVER CODE -------------------->
 
 app = Flask(__name__)
@@ -211,7 +252,7 @@ markdown_renderer = MarkdownIt("commonmark", {"html": True})
 @app.template_filter("markdown")
 def markdown_filter(value):
     text = "" if value is None else str(value)
-    return Markup(markdown_renderer.render(text))
+    return Markup(f'<div class="markdown">{markdown_renderer.render(text)}</div>')
 
 # MAIN PAGES
 
@@ -250,11 +291,26 @@ def _paper_zoom_url(paper_row):
     return ""
 
 
+def _award_papers(award_session):
+    """Papers of an award session, by position in it."""
+    papers = []
+    for row in site_data["papers"]:
+        award = parse_award_nominee(row["AwardNominee"])
+        if award and award[0] == award_session:
+            papers.append((award[1], row))
+    return [
+        {"id": row["uid"], "title": row["title"],
+         "session": row["session"], "position": row["position"],
+         "authors": remove_affiliation(row["authors_and_affil"])}
+        for _, row in sorted(papers, key=lambda p: p[0])
+    ]
+
+
 def _session_links():
     """{"poster"|"oral": {session number: {"channel_url", "zoom_url"}}}"""
     links = {"poster": {}, "oral": {}}
     for event in site_data.get("events", []):
-        kind = {"Poster session": "poster", "Oral session": "oral"}.get(event.get("category"))
+        kind = SESSION_KINDS.get(event.get("category"))
         if kind is None:
             continue
         links[kind][str(event["title"]).split()[-1]] = {
@@ -282,6 +338,7 @@ def papers():
     data = _data()
     data["papers"] = site_data["papers"]
     data["session_links"] = _session_links()
+    data["timeline"] = timeline
     return render_template("papers.html", **data)
 
 
@@ -461,6 +518,7 @@ def format_paper(v):
         "authors_and_affil",
     ]
     list_fields = {k: extract_list_field(v, k) for k in list_keys}
+    award = parse_award_nominee(v["AwardNominee"])
 
     process = lambda s: s.replace("\n ", "\n")
 
@@ -486,7 +544,7 @@ def format_paper(v):
                 "summary_of_updates_post_review", ""
             ),
             "paper_presentation": v["paper_presentation"],
-            "award_nominee": v["AwardNominee"],
+            "award_session": award[0] if award else None,
             "authors": remove_affiliation(v["authors_and_affil"]),
             "authors_and_affil": list_fields["authors_and_affil"],
             "keywords": list(
@@ -494,7 +552,7 @@ def format_paper(v):
                     list_fields["primary_subject"]
                     + list_fields["secondary_subject"]
                     + (["TISMIR"] if v["is_tismir"] in {"TRUE", "Yes"} else [])
-                    + (["Awards Nominee"] if v["AwardNominee"] in {"TRUE", "Yes"} else [])
+                    + (["Awards Nominee"] if award else [])
                     + (["Open Review"] if v["publish_reviews"] in {"TRUE", "Yes"} else [])
                 )
             ),
@@ -648,8 +706,35 @@ def poster(poster):
     data = _data()
     paper_data = format_paper(v)
     paper_data["zoom_url"] = _paper_zoom_url(v)
+    award_event_uid = award_event_uids.get(paper_data["content"]["award_session"])
+    paper_data["award_url"] = (
+        event_link(by_uid["events"][award_event_uid]) if award_event_uid else ""
+    )
     data["paper"] = paper_data
     return render_template("poster.html", **data)
+
+
+@app.route("/event_<slug>.html")
+def event(slug):
+    url = f"event_{slug}.html"
+    index = next((i for i, e in enumerate(timeline) if e["url"] == url), None)
+    if index is None:
+        abort(404)
+    event = timeline[index]["uid"]
+    v = by_uid["events"][event]
+    start = _event_start(v)
+    data = _data()
+    data["event"] = v
+    award_session = next(
+        (s for s, uid in award_event_uids.items() if uid == event), None
+    )
+    data["award_papers"] = _award_papers(award_session) if award_session else []
+    data["start_label"] = start.strftime("%a, %b %-d, %H:%M")
+    data["start_utc"] = start.astimezone(pytz.UTC).isoformat()
+    data["timezone_name"] = _conference_timezone_name()
+    data["prev_event"] = timeline[index - 1] if index else None
+    data["next_event"] = timeline[index + 1] if index + 1 < len(timeline) else None
+    return render_template("event.html", **data)
 
 
 # Disabled: `speakers` data is not loaded into by_uid, so this route is currently
@@ -783,6 +868,9 @@ def generator():
         yield "industry", {"industry": str(industry["uid"])}
     for lbd in site_data["lbds"]:
         yield "lbd", {"lbd": str(lbd["uid"])}
+    for event in timeline:
+        if event["url"].startswith("event_"):
+            yield "event", {"slug": event["url"][len("event_"):-len(".html")]}
     for day in site_data["days"]:
         yield "day", {"day": str(day["uid"])}
 

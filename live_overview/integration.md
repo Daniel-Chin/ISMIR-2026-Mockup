@@ -42,7 +42,10 @@ Data refresh (`git pull`, `uv run python pull_from_google_sheet.py`) is the call
 ## Zoom
 - The page never shows or links a real Zoom URL.
 - An event's Zoom button always links to `{prefix}/zoom.html?event_uid={uid}` (built in `overview-source/site-integration.js`). Papers never get Zoom links.
-- The static snapshot contains no links at all. Raw `live_url`s go only to the backend push.
+- The static snapshot contains no Zoom, Slack or other `links`. Raw `live_url`s go only to the backend push.
+
+## Event pages
+- Event titles link to the event's miniconf page (`detailUrl`, e.g. `{prefix}/event_opening-session.html`; oral/poster sessions go to `papers.html?session=…`). `update_schedule.py` takes it from `event_link` in `./utils/shared.py`, the same rule the miniconf calendar uses; events without a page (Registration, Lunch, …) get no link.
 
 ## Files and scripts
 - Live Overview owns all of `./live_overview`, including its uv env (`pyproject.toml`).

@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 
 import pytz
 
+from utils.shared import event_link
+
 
 def build_calendar(events, config):
     timezone = pytz.timezone(config["timezone"])
@@ -25,18 +27,7 @@ def build_calendar(events, config):
                 end += timedelta(days=1)
             end = timezone.localize(end)
 
-        category = event["category"]
-        if category in {"Poster session", "Oral session"}:
-            session_type = "poster" if category == "Poster session" else "oral"
-            link = f"papers.html?session={event['title'].split()[-1]}&type={session_type}"
-        else:
-            link = {
-                "LBD": "lbds.html",
-                "Industry": "industry.html?session=Platinum",
-                "Tutorials": "tutorials.html",
-                "Music": "music.html",
-                "Satellite": event.get("web_link", ""),
-            }.get(category, "")
+        link = event_link(event)
 
         description = []
         if link:
@@ -55,7 +46,7 @@ def build_calendar(events, config):
             "location": link,
             "link": link,
             "category": "time",
-            "calendarId": category.replace(" ", "_"),
+            "calendarId": event["category"].replace(" ", "_"),
             "scrollKey": "\n".join(description),
             "raw": {"endTimeTbd": end_time_tbd},
         })

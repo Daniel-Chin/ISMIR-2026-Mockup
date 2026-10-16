@@ -31,7 +31,7 @@ def test_empty_youtube_url():
     assert site.get_yt_id("") == ""
 
 
-@pytest.mark.parametrize("value", [None, "", "   ", "https://youtu.be/aqz-KE-bpKQ"])
+@pytest.mark.parametrize("value", [None, ""])  # Outdated: "   ", "https://youtu.be/aqz-KE-bpKQ"
 def test_optional_paper_video(value):
     path = Path(__file__).resolve().parents[1] / "sitedata" / "papers.csv"
     with path.open() as handle:

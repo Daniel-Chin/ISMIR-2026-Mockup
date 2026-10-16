@@ -488,7 +488,7 @@ def apply_updates(
     fields: list[str], rows: list[PaperRow], original: bytes, videos: Sequence[APIObject],
     dry_run: bool = False,
 ) -> None:
-    """Applied changes are mirrored into `videos`, so the later playlist pass needs no re-read."""
+    """Applied changes are mirrored into `videos`, so the playlist sync needs no re-read."""
     papers = {row['uid']: row for row in rows}
     videos_by_id = {video['id']: video for video in videos}
     for plan in tqdm(plans, desc='Videos', unit='video'):
@@ -625,15 +625,14 @@ def longest_increasing(ranks: Sequence[int]) -> set[int]:
 
 def sync_playlists(
     youtube: Resource, playlists: dict[str, PlaylistState], videos: Sequence[APIObject],
-    papers: Mapping[str, PaperRow], label: str, dry_run: bool = False,
+    papers: Mapping[str, PaperRow], dry_run: bool = False,
 ) -> None:
-    """Mutates `playlists` to mirror remote state, so a later pass needs no re-read.
-    Items whose video is not ours and decorated are unmanaged and left in place."""
+    """Items whose video is not ours and decorated are unmanaged and left in place."""
     managed = {v['id'] for v in videos if metadata(v['snippet']['description']) is not None}
     prefix = 'DRY RUN ' if dry_run else 'PLANNED '
 
     def log(message: str) -> None:
-        tqdm.write(f'{prefix}{label} playlist {message}')
+        tqdm.write(f'{prefix}playlist {message}')
 
     for key, (title, description, wanted) in desired_playlists(videos, papers).items():
         snippet = {'title': title, 'description': description}
@@ -733,7 +732,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                             help='No auth or API calls; pretend YouTube is empty and print the plan')
         parser.add_argument('--first-video', action='store_true',
                             help='Apply only the first planned update, for testing')
-        parser.add_argument('--no-playlists', action='store_true', help='Skip both playlist syncs')
+        parser.add_argument('--no-playlists', action='store_true', help='Skip playlist sync')
         args = parser.parse_args(argv)
         dry_run = args.dry_run or args.drier_run
         fields, rows, papers, original, captions = validate_local(args.input, args.videos, args.captions)
@@ -747,7 +746,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                 raise SafetyError('Set EXPECTED_CHANNEL_ID to the verified channel ID')
             youtube = authenticate()
             videos = enumerate_videos(youtube)
-            # All reads happen up front; both playlist passes share them.
             playlists = {} if args.no_playlists else enumerate_playlists(youtube)
         managed = sum(metadata(v['snippet']['description']) is not None for v in videos)
         fresh = sum(metadata(v['snippet']['description']) is None
@@ -759,12 +757,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.first_video:
             plans = plans[:1]
             print(f'FIRST VIDEO: limiting to {len(plans)} update.')
-        # Before decoration: drop outdated videos early and fill in already-decorated ones.
-        if not args.no_playlists:
-            sync_playlists(youtube, playlists, videos, papers, 'pre-decoration', dry_run)
         apply_updates(youtube, plans, args.input, fields, rows, original, videos, dry_run)
         if not args.no_playlists:
-            sync_playlists(youtube, playlists, videos, papers, 'post-decoration', dry_run)
+            sync_playlists(youtube, playlists, videos, papers, dry_run)
         if dry_run:
             print('DRY RUN: coverage below is the unchanged CSV.')
         summarize_coverage(rows)

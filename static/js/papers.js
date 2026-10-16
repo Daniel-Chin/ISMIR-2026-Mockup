@@ -149,6 +149,7 @@ const alertedMissingLinks = new Set();
 const updateSessionButtons = (session) => {
     const type = getUrlParameter("type") === "oral" ? "oral" : "poster";
     d3.select('#session_type').text(type);
+    d3.select('#session_zoom').text(`Zoom for ${type[0].toUpperCase() + type.slice(1)} Session`);
     const links = sessionLinks[type][session] || {};
     for (const [id, key] of [['#session_slack', 'channel_url'], ['#session_zoom', 'zoom_url']]) {
         const url = links[key];
@@ -158,6 +159,12 @@ const updateSessionButtons = (session) => {
             alertedMissingLinks.add(message);
             alert(message);
         }
+    }
+    const i = timeline.findIndex(e => e.session_key === `${type}-${session}`);
+    for (const [cls, neighbor] of [['.timeline_prev', timeline[i - 1]], ['.timeline_next', timeline[i + 1]]]) {
+        const show = i >= 0 && neighbor;
+        d3.selectAll(cls).attr('href', show ? neighbor.url : null).classed('d-none', !show);
+        d3.selectAll(cls + ' span').text(show ? neighbor.title : '');
     }
 }
 

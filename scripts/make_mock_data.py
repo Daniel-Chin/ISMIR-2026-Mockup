@@ -160,7 +160,7 @@ def make_papers():
                 "is_tismir": "FALSE",
                 "SpecialTrack": "FALSE",
                 "StudentAuthor": "TRUE" if i % 2 else "FALSE",
-                "AwardNominee": "TRUE" if i == 1 else "FALSE",
+                "AwardNominee": "A1-1" if i == 1 else "No",
                 "publish_reviews": "FALSE",
                 "summary_of_updates_post_review": "",
                 "pdf_name": paper_file,
@@ -189,7 +189,7 @@ def make_events():
     header = (
         "uid,title,day,start_date,start_time,end_time,category,description,"
         "organiser,organiser_emails,organiser_affiliation,organiser_bio,image,"
-        "web_link,slack_channel,channel_url,live_url,thumbnail_link"
+        "web_link,slack_channel,channel_url,live_url,thumbnail_link,event_desc"
     ).split(",")
     program = [
         ("Opening Session", "18:00", "18:10", "Opening", "Welcome to the mock run."),

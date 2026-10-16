@@ -7,6 +7,8 @@ from urllib.parse import urlsplit
 import csv_helpers as helper
 from build_public_site import build
 ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT.parent))
+from utils.shared import event_link  # noqa: E402  (same event pages as the miniconf calendar)
 
 def read(path):
     with path.open(encoding='utf-8-sig',newline='') as f:
@@ -81,6 +83,8 @@ def convert(folder,conf,warnings=None):
         live=row.get('live_url','').strip()
         if live:links['zoom' if re.search(r'(^|\.)(zoom\.us|zoom\.com|zoomgov\.com)$',urlsplit(live).hostname or '') else 'youtube']=live
         event={'id':'event-'+uid,'sourceEventId':uid,'title':title,'type':typ,'category':category,'track':'poster' if typ=='poster' else 'main','startsAt':start.isoformat(),'endsAt':end.isoformat(),'links':links,'day':start.strftime('%A'),'dayNumber':helper.parse_int(row.get('day')),'topic':helper.topic_from_event(typ,category),'summary':helper.clean_text(row.get('description')),'organiser':helper.clean_text(row.get('organiser'))}
+        page=event_link(row)
+        if page:event['detailUrl']=f"{conf['miniconf_url']}/{page}"
         if tbd:event['endTimeTBD']=True
         if 'zoom' in links:event['zoomKind']='meeting' if typ=='poster' else 'webinar'
         match=re.fullmatch(r'(Poster|Oral)\s+Session\s*-?\s*(\d+)',title,re.I)

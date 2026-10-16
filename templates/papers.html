@@ -18,6 +18,7 @@
   data-other>
 <script>
   const sessionLinks = {{ session_links | tojson }};
+  const timeline = {{ timeline | tojson }};
   const devBuild = {{ dev_build | default(false) | tojson }};
 </script>
 {% endblock %}
@@ -48,7 +49,7 @@
 <!-- Session -->
 <div class="row d-none session_notice">
   <div
-    class="alert alert-warning alert-dismissible fade show col-12"
+    class="alert border alert-dismissible fade show col-12"
     role="alert">
     Showing papers for <span id="session_type"></span> session
     <span id="session_name" style="font-weight: bold;"></span>:
@@ -59,6 +60,8 @@
       <a id="session_zoom" class="btn btn-outline-primary" target="_blank"
         rel="noopener noreferrer">Zoom</a>
     </span>
+    {% set nav_class = 'btn-group-sm ml-2' %}
+    {% include 'event_nav.html' %}
     <button
       type="button"
       class="close remove_session"
@@ -170,6 +173,8 @@
 
 <!-- Cards -->
 <div class="cards row papers-cards"></div>
+{% set nav_class = '' %}
+<div class="d-flex justify-content-center my-3">{% include 'event_nav.html' %}</div>
 <script src="static/js/little_helpers.js"></script>
 <script src="static/js/persistor.js"></script>
 <script src="static/js/papers.js"></script>

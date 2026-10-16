@@ -345,6 +345,12 @@ tr.fc-list-item {
   color: #030303;
 }
 
+/* Rendered by the `markdown` template filter (main.py); site-wide link styles drop the underline. */
+.markdown a,
+.markdown a:hover {
+  text-decoration: underline;
+}
+
 #absShow.collapsed::after {
   content: "+ Show More";
 }

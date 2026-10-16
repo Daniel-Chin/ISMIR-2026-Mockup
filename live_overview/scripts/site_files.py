@@ -15,7 +15,7 @@ SHARED_FILES = {'site-chrome.js', 'timezone-preference.js', 'canon-egg.js'}
 
 # The offline fallback (schedule-snapshot.json) keeps schedule metadata only: no links, no live data.
 EVENT_FIELDS = ('id', 'type', 'title', 'topic', 'summary', 'organiser', 'startsAt', 'endsAt', 'day',
-                'dayNumber', 'track', 'category', 'spotlight', 'sessionNumber', 'posterSessionNumber', 'paperRange', 'endTimeTBD')
+                'dayNumber', 'track', 'category', 'spotlight', 'sessionNumber', 'posterSessionNumber', 'paperRange', 'endTimeTBD', 'detailUrl')
 PAPER_FIELDS = ('id', 'displayId', 'sourcePaperId', 'detailUrl', 'title', 'authors', 'primaryAuthor', 'abstract', 'subjects', 'isTismir', 'longPresentation',
                 'presenterMode', 'funFact', 'sessionId', 'sessionNumber', 'posterSessionNumber', 'sessionPaperNumber')
 CONF_FIELDS = ('name', 'location', 'theme', 'timeZone', 'startsOn', 'endsOn', 'pageTitle', 'subtitle')

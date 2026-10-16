@@ -1,0 +1,12 @@
+{# Prev/next in the event timeline; links are filled by the includer;
+   nav_class sizes the group. #}
+<div class="btn-group {{ nav_class | default('') }}">
+  <a class="timeline_prev btn btn-outline-secondary
+    {{ '' if prev_event else 'd-none' }}"
+    href="{{prev_event.url if prev_event else ''}}">&larr;
+    <span>{{prev_event.title if prev_event else ''}}</span></a>
+  <a class="timeline_next btn btn-outline-secondary
+    {{ '' if next_event else 'd-none' }}"
+    href="{{next_event.url if next_event else ''}}">
+    <span>{{next_event.title if next_event else ''}}</span> &rarr;</a>
+</div>
