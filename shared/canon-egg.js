@@ -1,11 +1,16 @@
-// Canon-in-D piano easter egg, ported from live_overview/overview-source/app.js so the Lounge
-// hero plays exactly like the live overview's. Differences: the paper pool comes from
-// program.json, there is no debug mode, and solving it here counts: the first time a signed-in
+// Canon-in-D piano easter egg, shared by the Warm-up Discussion (lounge.html) and the Live
+// Overview (live.html; its build copies this file). Solving it counts: the first time a signed-in
 // attendee solves it they learn which finder they are; every later solve shows a random paper
-// fun fact. Both link to the finders' leaderboard (window.PC_EGG, set up by app.js).
+// fun fact. Both link to the list of finders.
+//
+// The page provides:
+//   window.PC_EGG        sign-in and the finders' list ({user, login, solve, leaderboard}): app.js
+//                        in the lounge, egg-account.js in the live overview. Without it the egg
+//                        shows fun facts only.
+//   window.PC_EGG_POOL   optional () => [{id, title, fact, url}]: papers with a fun fact
+//                        (default: window.PC_PROGRAM, the lounge's program.json)
 (function () {
 'use strict';
-const debugMode = false;
 
 // v8.84 hidden Canon-in-D piano easter egg. Deliberately no visible hint.
 const CANON_EGG_SEQUENCE = ['D', 'A', 'B', 'F', 'G', 'D', 'G', 'A'];
@@ -175,6 +180,7 @@ function canonEggRenderProgress() {
 }
 
 function canonEggPaperPool() {
+  if (typeof window.PC_EGG_POOL === 'function') return window.PC_EGG_POOL();
   // Only papers with an author-provided fun fact are eligible.
   return Object.values(window.PC_PROGRAM?.papers || {})
     // "NA", "N/A", "none", "-": placeholders, not facts.
@@ -280,8 +286,10 @@ function canonEggRender(backdrop, view) {
       title.append(a);
     }
     copy.append(para(paper ? paper.fact : 'Authors are still sending them in. Solve it again later!'));
-    if (signedOut) links.append(toSignIn());
-    links.append(toBoard());
+    if (window.PC_EGG) {   // no sign-in or finders' list on a page without them
+      if (signedOut) links.append(toSignIn());
+      links.append(toBoard());
+    }
   } else if (view.kind === 'leaderboard') {
     kicker.textContent = 'Easter egg finders';
     title.textContent = view.rank ? 'Congratulations!' : 'Who found the easter egg';
@@ -343,7 +351,7 @@ async function canonEggShowResult() {
       if (r?.ok && r.first) view = { kind: 'congrats', rank: r.rank };
     } catch (_) { /* offline: fall back to a fun fact */ }
     canonEggStore.set(CANON_EGG_FOUND_KEY, '1');
-  } else if (!canonEggStore.get(CANON_EGG_FOUND_KEY)) {
+  } else if (api && !canonEggStore.get(CANON_EGG_FOUND_KEY)) {
     canonEggStore.set(CANON_EGG_FOUND_KEY, '1');
     view = { kind: 'congrats-signin' };
   }
@@ -398,7 +406,7 @@ function canonEggKeyboardChord(event) {
 }
 
 function canonEggKeyDown(event) {
-  if (debugMode || event.isComposing || event.repeat || event.ctrlKey || event.metaKey || event.altKey || canonEggEditableTarget(event.target)) return;
+  if (event.isComposing || event.repeat || event.ctrlKey || event.metaKey || event.altKey || canonEggEditableTarget(event.target)) return;
   const key = canonEggKeyboardChord(event);
   if (!key) return;
   canonEggHeldKeys.add(key);
@@ -415,7 +423,7 @@ function canonEggKeyUp(event) {
 }
 
 function canonEggPointerDown(event) {
-  if (debugMode || canonEggCompleted) return;
+  if (canonEggCompleted) return;
   const root = event.target.closest?.('[data-canon-root]');
   if (!root || !canonEggPianoOverlay?.contains(root)) return;
   const key = root.dataset.canonRoot || '';
@@ -440,7 +448,6 @@ function canonEggPointerUp(event) {
 }
 
 function initCanonEasterEgg() {
-  if (debugMode) return;
   canonEggCreatePianoOverlay();
   canonEggBinaryGroups = [...document.querySelectorAll('.llm-prompt-card .binary-puzzle .bit-group')].slice(0, CANON_EGG_SEQUENCE.length);
   canonEggRenderProgress();

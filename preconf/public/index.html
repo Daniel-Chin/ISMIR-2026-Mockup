@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/vendor/overview.css" />
   <link rel="stylesheet" href="/styles.css" />
   <!-- After the stylesheets, so they start downloading first; still before the body (no flash). -->
-  <script src="/theme.js"></script>
+  <script src="/vendor/site-chrome.js"></script>
   <!-- Fetched in parallel with everything else instead of one after another. -->
   <link rel="preload" href="/data/program.json" as="fetch" crossorigin="anonymous" />
   <link rel="modulepreload" href="/app.js" />
@@ -141,6 +141,6 @@
   <script defer src="/site-config.js"></script>
   <script defer src="/vendor/timezone-preference.js"></script>
   <script type="module" src="/app.js"></script>
-  <script defer src="/canon-egg.js"></script>
+  <script defer src="/vendor/canon-egg.js"></script>
 </body>
 </html>

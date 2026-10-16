@@ -86,3 +86,9 @@ zoom_shared_webinar_end_hhmm: '23:59'
 miniconf_url: 'https://daniel-chin.github.io/ISMIR2026-Kit'
 official_site_url: 'https://ismir2026.ismir.net/'
 helpdesk_url: 'https://ismir2026-mockup.slack.com/archives/C0BLUL9V77Y'
+# The two Cloudflare Workers behind the miniconf's add-ons (each folder's integration.md). Use
+# their custom domains: *.workers.dev is blocked on some networks (e.g. mainland China).
+live_overview_api: 'https://live-api.liweilin.org'   # Live Overview: schedule and live counts
+warmup_api: 'https://lounge.liweilin.org'            # Warm-up Discussion: notes, Slack sign-in, easter egg
+venue_city: 'Abu Dhabi'                               # "Abu Dhabi 10:00-10:30" next to times shown in the visitor's zone
+slack_app_name: 'ISMIR2026 Lounge'                    # the Warm-up Discussion's Slack app, as attendees see it in Slack

@@ -1,122 +1,15 @@
 'use strict';
-// Shared with the backend-hosted page: debug-clock and non-publicStatic code paths only run there.
-const publicStatic = window.ISMIR_PUBLIC_CONFIG?.staticHosting === true;
-
-const ISMIR_BUILD_VERSION = '1.0.0-ui.6';
-window.ISMIR_BUILD_VERSION = ISMIR_BUILD_VERSION;
+// The history page: every event that has ended, newest first. Data comes from the live
+// overview's backend through public-connection.js; overview-common.js has the shared helpers.
 
 const root = document.getElementById('history-events-root');
-const lastUpdated = document.getElementById('last-updated');
 const connection = document.getElementById('connection-status');
 const copyHistoryPromptButton = document.getElementById('copy-history-prompt');
 const historyCopyStatus = document.getElementById('history-copy-status');
 let latestState = null;
-let conferenceTimeZone = window.ISMIRSite.timeZone;
-let reconnectTimer = null;
-let lastClockAuthoritySignature = '';
-let clockAuthorityPollBusy = false;
-let latestClockRevisionSeen = -1;
-function displayTimeZone() {
-  return window.ISMIRTimeZone?.getTimeZone?.() || (() => {
-    try { return Intl.DateTimeFormat().resolvedOptions().timeZone || conferenceTimeZone; }
-    catch (_) { return conferenceTimeZone; }
-  })();
-}
 const expandedHistoryPaperEventIds = new Set();
 
-const pageParams = new URLSearchParams(location.search);
-if (!publicStatic && pageParams.has('debug')) {
-  if (pageParams.get('debug') === '0' || pageParams.get('debug') === 'false') localStorage.removeItem('ismir-live-debug');
-  else localStorage.setItem('ismir-live-debug', '1');
-}
-const debugMode = !publicStatic && localStorage.getItem('ismir-live-debug') === '1';
-
-function clockRevision(state) {
-  const revision = Number(state?.debugClock?.revision || 0);
-  return Number.isFinite(revision) ? Math.max(0, Math.floor(revision)) : 0;
-}
-
-function clockAuthoritySignature(state) {
-  const clock = state?.debugClock || {};
-  return JSON.stringify({
-    revision: clockRevision(state),
-    enabled: Boolean(clock.enabled),
-    baseFakeIso: String(clock.baseFakeIso || ''),
-    baseRealIso: String(clock.baseRealIso || ''),
-    speed: Number.isFinite(Number(clock.speed)) ? Number(clock.speed) : 1,
-  });
-}
-
-function debugTimeMs(state) {
-  const clock = state?.debugClock || {};
-  if (clock.enabled) {
-    const baseFake = Date.parse(clock.baseFakeIso || '');
-    const baseReal = Date.parse(clock.baseRealIso || '');
-    const speed = Number.isFinite(Number(clock.speed)) ? Number(clock.speed) : 1;
-    if (Number.isFinite(baseFake) && Number.isFinite(baseReal)) {
-      return baseFake + (Date.now() - baseReal) * Math.max(0, Math.min(100, speed));
-    }
-  }
-  const t = Date.parse(state?.serverNow || '');
-  return Number.isFinite(t) ? t : Date.now();
-}
-function isDebugEventVisible(event, state) {
-  if (!event?.debugOnly) return true;
-  if (!debugMode) return false;
-  const now = debugTimeMs(state);
-  const start = Date.parse(event.debugStartsAt || event.startsAt || 0);
-  const end = Date.parse(event.debugEndsAt || event.endsAt || 0);
-  if (Number.isFinite(start) && now < start) return false;
-  if (Number.isFinite(end) && now > end) return false;
-  return true;
-}
-function eventStatusAt(event, now) {
-  const start = Date.parse(event?.startsAt || 0);
-  const end = Date.parse(event?.endsAt || 0);
-  if (!Number.isFinite(start) || !Number.isFinite(end)) return event?.status || 'upcoming';
-  if (now < start) return 'upcoming';
-  if (now < end) return 'live';
-  return 'history';
-}
-
-function stateForDisplay(state) {
-  if (!state) return state;
-  const now = debugTimeMs(state);
-  return {
-    ...state,
-    events: (state.events || [])
-      .filter(e => isDebugEventVisible(e, state))
-      .map((event) => {
-        const status = eventStatusAt(event, now);
-        if (status === event?.status && !(event?.papers || []).some((paper) => paper?.status !== status)) return event;
-        return { ...event, status, papers: (event?.papers || []).map((paper) => ({ ...paper, status })) };
-      }),
-  };
-}
-
-function esc(s) { return String(s ?? '').replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])); }
 function fmtTime(iso) { return iso ? new Intl.DateTimeFormat('en', { weekday: 'short', hour: '2-digit', minute: '2-digit', timeZone: displayTimeZone() }).format(new Date(iso)) : '—'; }
-function relativeTime(iso) {
-  if (!iso) return '—';
-  const now = latestState ? debugTimeMs(latestState) : Date.now();
-  const diff = Math.round((now - new Date(iso).getTime()) / 1000);
-  if (Math.abs(diff) < 10) return 'just now';
-  if (diff < 60) return `${diff}s ago`;
-  if (diff < 3600) return `${Math.round(diff / 60)}m ago`;
-  return fmtTime(iso);
-}
-function detailUrlFromPaper(p) {
-  if (p?.detailUrl) return p.detailUrl;
-  const info = p?.links?.info || '';
-  if (info) return info;
-  // MiniConf pages are keyed by the papers.csv uid, not by our paper/oral display ids.
-  const uid = String(p?.sourcePaperId || '').trim() || (String(p?.id || '').match(/(?:^|-)paper-(\d+)$/) || [])[1] || '';
-  return uid ? `${window.ISMIRSite.programSite}/poster_${encodeURIComponent(uid)}.html` : '';
-}
-function eventInfoUrl(e) {
-  const links = e?.links || {};
-  return e?.detailUrl || links.info || links.detail || '';
-}
 function eventTitleHtml(e) {
   const url = eventInfoUrl(e);
   const title = esc(e?.title || 'Untitled event');
@@ -181,26 +74,6 @@ function renderHistoryPaperPanel(e) {
     </ol>
   </div>`;
 }
-function setConnection(online, label) {
-  if (!connection) return;
-  connection.textContent = label || (online ? 'Realtime connected' : 'Offline');
-  connection.className = `connection ${online ? 'online' : 'offline'}`;
-}
-function groupTutorialEvents(events) {
-  const groups = new Map(), result = [];
-  for (const event of events) {
-    if (event.type !== 'tutorial') { result.push(event); continue; }
-    const key = JSON.stringify([event.startsAt, event.endsAt]);
-    let group = groups.get(key);
-    if (!group) {
-      group = { ...event, id: `tutorials-${event.id}`, type: 'tutorial-group', title: 'Tutorials', links: {}, papers: [], tutorials: [] };
-      groups.set(key, group); result.push(group);
-    }
-    group.tutorials.push(event);
-  }
-  return result;
-}
-
 function renderHistoryTutorials(group) {
   return `<article class="timeline-item upcoming-completed-card history-completed-card tutorial-group-card" data-event-type="tutorial-group">
     <div class="timeline-time upcoming-card-time history-ended-time">${group.endTimeTBD ? 'End time TBD' : 'Ended ' + esc(fmtEndedTime(group.endsAt))}</div>
@@ -213,15 +86,9 @@ function renderHistoryTutorials(group) {
 
 function render(rawState) {
   if (!rawState) return;
-  const incomingRevision = clockRevision(rawState);
-  if (latestClockRevisionSeen >= 0 && incomingRevision < latestClockRevisionSeen) return;
-  latestClockRevisionSeen = Math.max(latestClockRevisionSeen, incomingRevision);
-  const state = stateForDisplay(rawState);
+  const state = stateAtConferenceTime(rawState);
   latestState = state;
-  conferenceTimeZone = state.conference?.timeZone || conferenceTimeZone;
-  window.ISMIRTimeZone?.setReferenceDate?.(debugTimeMs(state));
-  lastClockAuthoritySignature = clockAuthoritySignature(state);
-  if (lastUpdated) lastUpdated.textContent = `Last updated ${relativeTime(state.updatedAt)}`;
+  window.ISMIRTimeZone?.setReferenceDate?.(conferenceNow(state));
   const history = (state.events || []).filter(e => e.status === 'history').sort((a, b) => new Date(b.endsAt) - new Date(a.endsAt));
   root.innerHTML = history.length ? groupTutorialEvents(history).map(e => {
     if (e.tutorials) return renderHistoryTutorials(e);
@@ -273,7 +140,7 @@ function compactHistoryEventForPrompt(e) {
 }
 
 async function buildHistoryPrompt(state) {
-  const display = stateForDisplay(state || latestState || { events: [] });
+  const display = stateAtConferenceTime(state || latestState || { events: [] });
   const history = (display.events || [])
     .filter((e) => e.status === 'history')
     .sort((a, b) => new Date(b.endsAt) - new Date(a.endsAt))
@@ -289,104 +156,12 @@ async function buildHistoryPrompt(state) {
   return window.ISMIRPrompts.build('history', snapshot);
 }
 
-async function copyHistoryPrompt() {
-  let prompt;
-  if (copyHistoryPromptButton) copyHistoryPromptButton.disabled = true;
-  if (historyCopyStatus) historyCopyStatus.textContent = 'Loading prompt…';
-  try { prompt = await buildHistoryPrompt(latestState); }
-  catch (err) {
-    if (historyCopyStatus) historyCopyStatus.textContent = 'Could not load llm-prompts.json. Check the file and try again.';
-    return;
-  } finally { if (copyHistoryPromptButton) copyHistoryPromptButton.disabled = false; }
-  try {
-    await navigator.clipboard.writeText(prompt);
-    if (historyCopyStatus) historyCopyStatus.textContent = 'Copied';
-  } catch (err) {
-    const ta = document.createElement('textarea');
-    ta.value = prompt;
-    ta.setAttribute('readonly', '');
-    ta.style.position = 'fixed';
-    ta.style.left = '-9999px';
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    if (historyCopyStatus) historyCopyStatus.textContent = 'Copied';
-  }
-  window.setTimeout(() => { if (historyCopyStatus) historyCopyStatus.textContent = ''; }, 1800);
-}
 
-async function fetchStateAtClockRevision(minRevision) {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const stateRes = await fetch(`/api/state?_clock=${encodeURIComponent(String(minRevision))}&_=${Date.now()}`, { cache: 'no-store', credentials: 'same-origin' });
-    const stateData = await stateRes.json();
-    if (stateRes.ok && stateData?.ok && stateData.state && clockRevision(stateData.state) >= minRevision) return stateData.state;
-    if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 180));
-  }
-  return null;
-}
-
-async function refreshClockAuthorityFallback() {
-  if (publicStatic || clockAuthorityPollBusy || !latestState) return;
-  clockAuthorityPollBusy = true;
-  try {
-    const clockRes = await fetch(`/api/debug-clock?_=${Date.now()}`, { cache: 'no-store', credentials: 'same-origin' });
-    const clockData = await clockRes.json();
-    if (!clockRes.ok || !clockData?.ok || !clockData.debugClock) return;
-    const clockEnvelope = { debugClock: clockData.debugClock };
-    const incomingRevision = clockRevision(clockEnvelope);
-    if (incomingRevision < latestClockRevisionSeen) return;
-    const incomingSignature = clockAuthoritySignature(clockEnvelope);
-    if (incomingSignature === lastClockAuthoritySignature) return;
-
-    latestClockRevisionSeen = Math.max(latestClockRevisionSeen, incomingRevision);
-    const authoritativeState = await fetchStateAtClockRevision(incomingRevision);
-    if (authoritativeState) {
-      render(authoritativeState);
-      return;
-    }
-
-    const mergedState = {
-      ...latestState,
-      debugClock: clockData.debugClock,
-      serverNow: clockData.debugClock.serverNow || latestState.serverNow,
-    };
-    render(mergedState);
-    lastClockAuthoritySignature = '';
-  } catch (_) {
-    // WebSocket is primary; this is only a missed-clock-update fallback.
-  } finally {
-    clockAuthorityPollBusy = false;
-  }
-}
-
-async function fetchInitial() {
-  if (publicStatic) {
-    window.ISMIRPublic.start({ ...window.ISMIR_PUBLIC_CONFIG, onStatus: setConnection,
-      onState: state => { latestClockRevisionSeen = -1; render(window.ISMIRSite?.localizeState(state) || state); } });
-    return;
-  }
-  const res = await fetch('/api/state', { cache: 'no-store' });
-  const data = await res.json();
-  if (data.ok) render(data.state);
-}
-function connectWS() {
-  if (publicStatic) return;
-  clearTimeout(reconnectTimer);
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const ws = new WebSocket(`${proto}//${location.host}/ws/public`);
-  ws.onopen = () => setConnection(true, 'Realtime connected');
-  ws.onmessage = (event) => { const msg = JSON.parse(event.data); if (msg.type === 'state') render(msg.state); };
-  ws.onclose = () => { setConnection(false, 'Reconnecting…'); reconnectTimer = setTimeout(connectWS, 1500); };
-  ws.onerror = () => setConnection(false, 'Connection issue');
-}
 window.addEventListener('ismir-timezone-change', () => { if (latestState) render(latestState); });
-fetchInitial().catch(() => setConnection(false, 'Initial load failed'));
-connectWS();
-setInterval(refreshClockAuthorityFallback, 2000);
-window.addEventListener('focus', refreshClockAuthorityFallback);
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) refreshClockAuthorityFallback();
+window.ISMIRPublic.start({
+  ...window.ISMIR_PUBLIC_CONFIG,
+  onStatus: (online, label) => setConnectionStatus(connection, online, label),
+  onState: state => render(window.ISMIRSite?.localizeState(state) || state),
 });
 if (root) {
   root.addEventListener('click', (event) => {
@@ -409,4 +184,4 @@ if (root) {
     if (card) card.classList.toggle('is-paper-expanded', opening);
   });
 }
-if (copyHistoryPromptButton) copyHistoryPromptButton.addEventListener('click', copyHistoryPrompt);
+if (copyHistoryPromptButton) copyHistoryPromptButton.addEventListener('click', () => copyPrompt(copyHistoryPromptButton, historyCopyStatus, () => buildHistoryPrompt(latestState)));

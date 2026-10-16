@@ -22,14 +22,11 @@ from urllib.parse import urlsplit
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from build_public_site import ASSETS, PUBLIC_RELEASE, snapshot  # noqa: E402
+from site_files import ASSETS, asset_source, content_version, snapshot  # noqa: E402
 import update_schedule  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 REPO = ROOT.parent
-# Custom domain of the same Worker: *.workers.dev is blocked on some networks (e.g. mainland China).
-# The Zoom App Observers keep using the workers.dev origin they are registered with.
-DEFAULT_API_ORIGIN = 'https://live-api.liweilin.org'
 PAGE = 'live.html'
 ASSET_DIR = 'live_overview'
 
@@ -42,19 +39,26 @@ def read_config(path):
         raise ValueError(f'{path}: missing {", ".join(missing)}')
     conf['miniconf_url'] = conf['miniconf_url'].rstrip('/')
     conf['official_site_url'] = str(values.get('official_site_url') or '')  # optional
+    # The two backends (Cloudflare Workers). live_overview_api: schedule and live counts; use its
+    # custom domain, *.workers.dev is blocked on some networks (e.g. mainland China). warmup_api:
+    # the Warm-up Discussion's, for the easter egg's sign-in and finders (egg-account.js).
+    conf['live_overview_api'] = str(values.get('live_overview_api') or '').rstrip('/')
+    conf['warmup_api'] = str(values.get('warmup_api') or '').rstrip('/')
+    conf['slack_app_name'] = str(values.get('slack_app_name') or '')
     return conf
 
 
-def render_page(text, asset_prefix, home):
-    text = re.sub(r'(\.js|\.css)\?v=[^"\s]+', lambda m: m.group(1) + '?v=' + PUBLIC_RELEASE, text)
-    text = re.sub(r'(data-build-version>)[^<]*', lambda m: m.group(1) + 'UI ' + PUBLIC_RELEASE, text)
+def render_page(text, asset_prefix, home, version):
+    text = re.sub(r'(data-build-version>)[^<]*', lambda m: m.group(1) + 'UI ' + version, text)
     # Root-absolute links were written for a dedicated host; here pages live at
-    # {prefix}/live.html and {prefix}/live_overview/*.
+    # {prefix}/live.html and {prefix}/live_overview/*. ?v=: browsers cache GitHub Pages files for
+    # 10 minutes, so a fresh page must not run against stale scripts.
     def relink(m):
-        path = m[2]
-        target = home + path if not path or path.startswith('#') else asset_prefix + path
-        return f'{m[1]}="{target}"'
-    text = re.sub(r'(src|href)="/(?!/)([^"]*)"', relink, text)
+        path, frag = m[2], m[3] or ''
+        if not path:   # "/" or "/#section": the live page
+            return f'{m[1]}="{home + frag}"'
+        return f'{m[1]}="{asset_prefix + path}?v={version}{frag}"'
+    text = re.sub(r'(src|href)="/(?!/)([^"?#]*)(#[^"]*)?"', relink, text)
     return text
 
 
@@ -108,26 +112,22 @@ def write_site(out, api_origin, conf, schedule):
         stage = Path(tmp)
         assets = stage / ASSET_DIR
         assets.mkdir()
-        for name in ASSETS:
-            text = (ROOT / 'overview-source' / name).read_text(encoding='utf-8')
-            if name.endswith('.js'):
-                text = re.sub(r"const ISMIR_BUILD_VERSION = '[^']+';", f"const ISMIR_BUILD_VERSION = '{PUBLIC_RELEASE}';", text)
-            if name == 'index.html':
-                (stage / PAGE).write_text(render_page(text, ASSET_DIR + '/', ''), encoding='utf-8')
-                continue
-            if name.endswith('.html'):
-                text = render_page(text, './', '../' + PAGE)
-            (assets / name).write_text(text, encoding='utf-8')
+        texts = {name: asset_source(name).read_text(encoding='utf-8') for name in ASSETS}
         config = {
-            'staticHosting': True,
             'apiOrigin': api_origin,
-            'conference': {'name': conf['name'], 'date': conf['date'], 'timezone': conf['timezone'], 'miniconfUrl': conf['miniconf_url'], 'officialSiteUrl': conf['official_site_url']},
+            'loungeOrigin': os.environ.get('WARMUP_API_ORIGIN') or conf['warmup_api'],
+            'conference': {'name': conf['name'], 'date': conf['date'], 'timezone': conf['timezone'], 'miniconfUrl': conf['miniconf_url'], 'officialSiteUrl': conf['official_site_url'], 'slackAppName': conf['slack_app_name']},
         }
-        (assets / 'public-site-config.js').write_text(
-            'window.ISMIR_PUBLIC_CONFIG = Object.assign(' + json.dumps(config, ensure_ascii=False)
-            + ", { fallbackUrl: new URL('schedule-snapshot.json', document.currentScript.src).href });\n", encoding='utf-8')
+        texts['public-site-config.js'] = ('window.ISMIR_PUBLIC_CONFIG = Object.assign(' + json.dumps(config, ensure_ascii=False)
+                                          + ", { fallbackUrl: new URL('schedule-snapshot.json', document.currentScript.src).href });\n")
         # snapshot() drops every link, so raw Zoom live_url never reaches the static site.
-        (assets / 'schedule-snapshot.json').write_text(json.dumps(snapshot(schedule), ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        texts['schedule-snapshot.json'] = json.dumps(snapshot(schedule), ensure_ascii=False, indent=2) + '\n'
+        version = content_version(texts)
+        for name, text in texts.items():
+            if name == 'index.html':
+                (stage / PAGE).write_text(render_page(text, ASSET_DIR + '/', '', version), encoding='utf-8')
+            else:
+                (assets / name).write_text(render_page(text, './', '../' + PAGE, version) if name.endswith('.html') else text, encoding='utf-8')
 
         (out / PAGE).unlink(missing_ok=True)
         shutil.rmtree(out / ASSET_DIR, ignore_errors=True)
@@ -140,14 +140,15 @@ def main():
     parser.add_argument('--mockup', action='store_true', help='Read ../sitedata_mock instead of ../sitedata (never syncs the backend)')
     parser.add_argument('--data', help='Explicit data_path (overrides --mockup; never syncs the backend)')
     parser.add_argument('--out', default=str(ROOT / 'build'))
-    parser.add_argument('--api-origin', default=os.environ.get('LIVE_OVERVIEW_API_ORIGIN', DEFAULT_API_ORIGIN))
+    parser.add_argument('--api-origin', help='Backend origin (default: $LIVE_OVERVIEW_API_ORIGIN, else live_overview_api in config.yml)')
     args = parser.parse_args()
-    parts = urlsplit(args.api_origin)
-    if parts.scheme != 'https' or not parts.netloc or parts.path or parts.query or parts.fragment:
-        parser.error('API origin must be an HTTPS origin without a path')
     data_path = (Path(args.data) if args.data else REPO / ('sitedata_mock' if args.mockup else 'sitedata')).resolve()
 
     conf = read_config(data_path / 'config.yml')
+    args.api_origin = (args.api_origin or os.environ.get('LIVE_OVERVIEW_API_ORIGIN') or conf['live_overview_api']).rstrip('/')
+    parts = urlsplit(args.api_origin)
+    if parts.scheme != 'https' or not parts.netloc or parts.path or parts.query or parts.fragment:
+        parser.error('API origin must be an HTTPS origin without a path (set live_overview_api in config.yml)')
     schedule, notes, problems = load_schedule(data_path, conf)
     for note in notes:
         print(note)

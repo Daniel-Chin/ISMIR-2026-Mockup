@@ -30,9 +30,8 @@ REPO = ROOT.parent
 PUBLIC = ROOT / "public"
 PAGE = "lounge.html"
 ASSET_DIR = "lounge"
-DEFAULT_API_ORIGIN = "https://lounge.liweilin.org"   # custom domain; *.workers.dev is blocked on some networks
 # Files the page loads; everything else in public/ (local probes, etc.) stays out of the build.
-ASSETS = ["app.js", "board.js", "wall.js", "room.js", "api.js", "canon-egg.js", "theme.js", "styles.css"]
+ASSETS = ["app.js", "board.js", "wall.js", "room.js", "api.js", "styles.css"]
 ASSET_DIRS = ["vendor", "data"]
 
 
@@ -54,16 +53,16 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--mockup", action="store_true", help="read ../sitedata_mock instead of ../sitedata")
     ap.add_argument("--out", type=Path, default=ROOT / "build")
-    ap.add_argument("--api-origin", default=os.environ.get("PRECONF_API_ORIGIN") or DEFAULT_API_ORIGIN)
+    ap.add_argument("--api-origin", help="the Worker's origin (default: $PRECONF_API_ORIGIN, else warmup_api in config.yml)")
     args = ap.parse_args()
+    sitedata = REPO / ("sitedata_mock" if args.mockup else "sitedata")
 
-    api = args.api_origin.rstrip("/")
+    api = (args.api_origin or os.environ.get("PRECONF_API_ORIGIN") or build_data.read_simple_yaml(sitedata / "config.yml").get("warmup_api") or "").rstrip("/")
     parts = urlsplit(api)
     local = parts.hostname in ("localhost", "127.0.0.1")   # local cross-origin testing only
     if parts.scheme not in (("https", "http") if local else ("https",)) or not parts.netloc or parts.path:
         sys.exit(f"--api-origin must be an https origin, got {api!r}")
 
-    sitedata = REPO / ("sitedata_mock" if args.mockup else "sitedata")
     sys.argv = [sys.argv[0], "--sitedata", str(sitedata)]
     build_data.main()   # refresh public/data/program.json and public/vendor/
 

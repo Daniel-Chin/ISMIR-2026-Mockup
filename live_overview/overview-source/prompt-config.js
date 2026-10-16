@@ -18,6 +18,7 @@
           throw new Error('Invalid prompt configuration.');
         }
         const values = {
+          conferenceName: window.ISMIRSite?.conference?.name || snapshot?.conference?.name || 'the conference',
           // Inside miniconf the shareable page is {prefix}/live.html, not this asset dir.
           pageUrl: window.ISMIRSite?.conference?.miniconfUrl
             ? (kind === 'history' ? new URL('./history.html', configUrl).href : window.ISMIRSite.programSite + '/live.html')

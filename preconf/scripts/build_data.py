@@ -33,7 +33,15 @@ PUBLIC_FIELDS = {
     "fun_facts": "funFact",  # author-provided; shown by the piano easter egg, as on the live overview
 }
 OVERVIEW_SOURCE = ROOT.parent / "live_overview" / "overview-source"
-VENDORED = {"styles.css": "overview.css", "timezone-preference.js": "timezone-preference.js"}
+SHARED = ROOT.parent / "shared"   # used by the Live Overview too
+# Copied into public/vendor/ (generated, gitignored): the live overview's stylesheet, so both sites
+# look the same, and the files both sites share.
+VENDORED = {
+    OVERVIEW_SOURCE / "styles.css": "overview.css",
+    SHARED / "timezone-preference.js": "timezone-preference.js",
+    SHARED / "site-chrome.js": "site-chrome.js",
+    SHARED / "canon-egg.js": "canon-egg.js",
+}
 FLAG_FIELDS = {"StudentAuthor": "student", "AwardNominee": "award", "is_tismir": "tismir", "SpecialTrack": "special"}
 
 
@@ -196,6 +204,8 @@ def main():
             "miniconfUrl": miniconf,
             "officialSiteUrl": config.get("official_site_url", ""),
             "helpdeskUrl": config.get("helpdesk_url", ""),
+            "venueCity": config.get("venue_city", ""),
+            "slackAppName": config.get("slack_app_name", ""),
         },
         "days": days,
         "sessions": {s["id"]: s for s in sessions},
@@ -210,7 +220,7 @@ def main():
     vendor = ROOT / "public" / "vendor"
     vendor.mkdir(parents=True, exist_ok=True)
     for src, dst in VENDORED.items():
-        (vendor / dst).write_bytes((OVERVIEW_SOURCE / src).read_bytes())
+        (vendor / dst).write_bytes(src.read_bytes())
 
     print(f"{len(sessions)} sessions, {len(papers)} papers -> {out_json.relative_to(ROOT)}")
     if missing:

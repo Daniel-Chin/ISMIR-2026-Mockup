@@ -115,7 +115,7 @@ const app = {
         // Inside Slack's in-app browser the slack:// link does nothing. Never send phones to the
         // web sign-in here: with the Slack app installed it ends in Slackbot. Point to the Home
         // tab instead; devices without Slack can still use the browser sign-in.
-        toast('Open the ISMIR2026 Lounge app in Slack and tap “Enter the Discussion”.', {
+        toast(`Open the ${hall.program?.conference?.slackAppName || 'our'} app in Slack and tap “Enter the Discussion”.`, {
           action: { label: 'Open Slack', run: () => { location.href = `https://slack.com/app_redirect?team=${encodeURIComponent(team)}&app=${encodeURIComponent(id)}`; } },
           ms: 20000,
         });
@@ -220,7 +220,8 @@ function slotTimes(slot) {
   const hm = d => new Intl.DateTimeFormat('en-GB', { timeZone: zone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(d);
   const offset = window.ISMIRTimeZone?.getUTCOffset?.(start) || '';
   const main = `${day} ${hm(start)}–${hm(end)}${offset ? ' ' + offset : ''}`;
-  return { main, venue: zone === venue ? '' : `Abu Dhabi ${venueText}` };
+  const city = hall.program.conference.venueCity || 'Venue';
+  return { main, venue: zone === venue ? '' : `${city} ${venueText}` };
 }
 
 function refreshSessionTimes() {
@@ -817,17 +818,6 @@ function applyConference(conf) {
   if (/^https:\/\//.test(conf.helpdeskUrl || '')) help.href = conf.helpdeskUrl; else help.remove();
 }
 
-// ---------- collapsible nav ----------
-/** Below 1100px the nav sits behind a menu button (styles.css); this opens and closes it. */
-function initNavToggle() {
-  const button = $('#nav-toggle'), nav = $('#main-nav');
-  const set = open => { nav.classList.toggle('is-open', open); button.setAttribute('aria-expanded', String(open)); };
-  button.addEventListener('click', e => { e.stopPropagation(); set(!nav.classList.contains('is-open')); });
-  nav.addEventListener('click', e => { if (e.target.closest('a')) set(false); });
-  document.addEventListener('click', e => { if (!e.target.closest('.site-header')) set(false); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') set(false); });
-}
-
 // ---------- boot ----------
 async function main() {
   const handoff = takeTokenFromHash();
@@ -842,7 +832,6 @@ async function main() {
   });
   window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
   renderAuth();
-  initNavToggle();
   const params = new URLSearchParams(location.search);
   if (params.get('login_error')) {
     toast(params.get('login_error').slice(0, 160), { error: true, ms: 8000 });

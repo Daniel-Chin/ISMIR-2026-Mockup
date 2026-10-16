@@ -14,7 +14,7 @@ Same shape as [live_overview/integration.md](../live_overview/integration.md). I
 ## Scripts
 Both assume `./preconf` is the current directory.
 - `install.sh`: checks for Python 3.9+. There are no other dependencies.
-- `build.sh [--mockup]`: reads `./sitedata` (or `./sitedata_mock`) and `./live_overview/overview-source` (for the shared look), then writes the build paths above.
+- `build.sh [--mockup]`: reads `./sitedata` (or `./sitedata_mock`), `./live_overview/overview-source/styles.css` (the shared look) and `./shared/` (files both sites use), then writes the build paths above.
 - Order in CI (`.github/workflows/refresh-website.yml`):
   1. `pull_from_google_sheet.py`
   2. `build.sh`
@@ -23,11 +23,12 @@ Both assume `./preconf` is the current directory.
   Paper data is therefore re-frozen on every refresh.
 
 ## Input data
-- From `{data_path}`: `config.yml` (`name`, `date`, `timezone`, `miniconf_url`, `official_site_url`, `helpdesk_url`), `papers.csv`, `session_assignment.csv`, `events.csv` (rows titled "Oral Session - N" / "Poster Session - N").
+- From `{data_path}`: `config.yml` (`name`, `date`, `timezone`, `miniconf_url`, `official_site_url`, `helpdesk_url`, `warmup_api`, `venue_city`, `slack_app_name`), `papers.csv`, `session_assignment.csv`, `events.csv` (rows titled "Oral Session - N" / "Poster Session - N").
 - Only public paper fields are exported. Reviews and raw Drive paths for anything other than PDF/video/poster/slides links are never written to the build.
 
 ## Backend URL
-- Default: `https://lounge.liweilin.org` (the Worker's custom domain; `*.workers.dev` is blocked on some networks, e.g. mainland China). Override with the env var `PRECONF_API_ORIGIN` or `build.sh --api-origin …`.
+- `warmup_api` in `config.yml` (the Worker's custom domain; `*.workers.dev` is blocked on some networks, e.g. mainland China). Override with the env var `PRECONF_API_ORIGIN` or `build.sh --api-origin …`.
+- The Live Overview uses the same Worker for its easter egg (sign-in and the finders list).
 - The Worker must list the Pages host in its `EXTRA_ORIGINS`.
 - The Worker validates rooms and boards by pattern, not against the paper list. Data refreshes therefore never require a backend redeploy.
 

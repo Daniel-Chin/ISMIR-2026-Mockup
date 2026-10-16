@@ -4,14 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>History Events</title>
-  <script>
-    try {
-      document.documentElement.dataset.theme = localStorage.getItem("ismirColorTheme") || "light";
-    } catch (error) {
-      document.documentElement.dataset.theme = "light";
-    }
-  </script>
-  <link rel="stylesheet" href="/styles.css?v=1.0.0-ui.6" />
+  <link rel="stylesheet" href="/styles.css" />
+  <!-- Theme and menu button (shared with the Warm-up Discussion); in <head> so the theme never flashes. -->
+  <script src="/site-chrome.js"></script>
 </head>
 <body>
   <header class="site-header">
@@ -27,7 +22,11 @@
       <a data-site-link="miniconf">Mini Conf</a>
       <a data-site-link="official" target="_blank" rel="noopener noreferrer">Official Website</a>
     </nav>
-    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch color theme">🌙 Lights Off</button>
+    <div class="header-tools">
+      <!-- Your name and Sign out, only while signed in (egg-account.js); never a Sign in button. -->
+      <div class="account-slot" id="account-slot" hidden></div>
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch color theme">🌙 Lights Off</button>
+    </div>
   </header>
 
   <main>
@@ -77,16 +76,17 @@
     <span><span data-conf="name"></span> Live Overview</span>
     <span class="connection" id="connection-status" role="status">Connecting…</span>
     <span>Historical poster telemetry displays peak online count only.</span>
-  <span class="build-version" data-build-version>UI 1.0.0-ui.6</span>
+  <span class="build-version" data-build-version>UI dev</span>
   </footer>
 
-  <script src="/public-site-config.js?v=1.0.0-ui.6"></script>
-  <script src="/site-integration.js?v=1.0.0-ui.6"></script>
-  <script src="/public-connection.js?v=1.0.0-ui.6"></script>
-  <script src="/timezone-preference.js?v=1.0.0-ui.6"></script>
-  <script src="/prompt-config.js?v=1.0.0-ui.6"></script>
-  <script src="/history.js?v=1.0.0-ui.6"></script>
-  <script src="/cursor-avatars.js?v=1.0.0-ui.6"></script>
-  <script src="/theme-toggle.js?v=1.0.0-ui.6"></script>
+  <script src="/public-site-config.js"></script>
+  <script src="/site-integration.js"></script>
+  <script src="/public-connection.js"></script>
+  <script src="/timezone-preference.js"></script>
+  <script src="/prompt-config.js"></script>
+  <script src="/overview-common.js"></script>
+  <script src="/history.js"></script>
+  <script src="/egg-account.js"></script>
+  <script src="/cursor-avatars.js"></script>
 </body>
 </html>

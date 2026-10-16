@@ -2,7 +2,7 @@
   "version": 1,
   "overview": {
     "paragraphs": [
-      "You are helping me attend ISMIR 2026 using the live conference overview at:",
+      "You are helping me attend {{conferenceName}} using the live conference overview at:",
       "{{pageUrl}}",
       "This website is the live source of truth for the conference. It shows what is happening now, upcoming sessions, completed sessions, Zoom attendance, active poster conversations, paper information, session links, times, and other live conference status.",
       "First, visit the website and briefly:\n1. Summarize what is happening at the conference right now.\n2. Tell me what is coming up next and what may be worth attending.\n3. Give me a short, friendly guide to using the overview page effectively as a conference attendee.",
@@ -15,7 +15,7 @@
   },
   "history": {
     "paragraphs": [
-      "You are helping me explore what has already happened at ISMIR 2026 using the conference history page:",
+      "You are helping me explore what has already happened at {{conferenceName}} using the conference history page:",
       "{{pageUrl}}",
       "This page is the source of truth for completed conference activity. It contains finished sessions, their times, papers, session details, peak Zoom attendance where available, and other archived conference information.",
       "First, visit the history page and briefly:\n1. Summarize what has happened at the conference so far.\n2. Highlight interesting sessions, papers, themes, or patterns worth looking back at.\n3. Give me a short, friendly guide to using the history page to explore completed sessions and papers.",
