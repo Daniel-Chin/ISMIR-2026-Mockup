@@ -534,3 +534,12 @@ html:not([data-theme="light"]) .canon-egg-board li { background: rgba(255, 255, 
 .pc-note, .pc-pin { contain: layout style; }
 /* Posted, waiting for the server's confirmation (a fraction of a second). */
 .pc-note.is-pending { opacity: .72; }
+
+.pc-test-notice {
+  margin: 16px;
+  padding: 12px 16px;
+  border: 2px solid var(--danger);
+  background: var(--pc-panel);
+  color: var(--ink);
+  box-shadow: var(--pc-shadow-sm);
+}
