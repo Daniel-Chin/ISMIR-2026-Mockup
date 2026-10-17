@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import queue
+import os
 import random
 import shutil
 import subprocess
@@ -71,6 +72,10 @@ def beep() -> None:
         cmds = [['pw-play', snd], ['paplay', snd], ['canberra-gtk-play', '-i', 'complete']]
     for cmd in cmds:
         if shutil.which(cmd[0]):
+            if os.environ.get('SUDO_UID') and os.geteuid() == 0:
+                # root can't reach the user's audio server; play as the invoking user
+                uid = os.environ['SUDO_UID']
+                cmd = ['sudo', '-u', f'#{uid}', 'env', f'XDG_RUNTIME_DIR=/run/user/{uid}', *cmd]
             subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             return
     print('\a', end='', flush=True)
@@ -171,8 +176,8 @@ def main() -> None:
                     continue
                 try:
                     make_unlisted(t)
-                    print('done one video')
                     beep()
+                    print('done one video')
                 except Stopped:
                     pass
         finally:
