@@ -4,10 +4,13 @@ The implementation should change every year, unless they decided to standardize 
 '''
 
 import csv
+import io
 from dataclasses import dataclass, field, fields
 from datetime import datetime
 from pathlib import Path
 from pprint import pprint
+
+import pyperclip
 
 INPUT_PATH = '~/ismir2026/uploaded_mats.csv'  # Use your own path
 MAX_PAPER_ID = 800
@@ -175,6 +178,20 @@ def write_into_sitedata(papers: dict[int, AuthorUploadedMaterials], history: His
     print(f'Author materials updated in {output_path}.')
     print(f'Please paste the updated {", ".join(output_map.values())} columns back into the Google Sheet '
           'papers tab before running pull_from_google_sheet.py.')
+    for column in output_map.values():
+        if input(f'Copy {column} (with header, in papers.csv row order) to the clipboard? [y/N] ').strip().lower() == 'y':
+            copy_column(headers, rows, column)
+
+
+def copy_column(headers: list[str], rows: list[list[str]], column: str) -> None:
+    """With quoted multi-line cells, which Google Sheets parses on paste, keeping the newlines."""
+    index = headers.index(column)
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, dialect='excel-tab')
+    writer.writerow([column])
+    writer.writerows([row[index]] for row in rows)
+    pyperclip.copy(buffer.getvalue())
+    print(f'Copied. Paste into the {column} header cell.')
 
 if __name__ == '__main__':
     write_into_sitedata(*parse_materials())
