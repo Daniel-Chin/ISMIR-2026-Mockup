@@ -42,10 +42,9 @@
       not loop.last }}
       {% endfor %}
     </p>
-    {# As on the paper page (poster.html); the LBD sheet spells it "In-Person". #}
-    {% set lbd_presentation = lbd.content.presentation_mode | replace('In-Person', 'In-person') %}
+    {# As on the paper page (poster.html). #}
     <h4 class="text-muted text-center">
-      {% if lbd_presentation and lbd_presentation != '[Not Answered]' %}Presented {{lbd_presentation}}{% else %}Presentation mode TBA{% endif %}
+      {% if lbd.content.presentation_mode %}Presented {{lbd.content.presentation_mode}}{% else %}Presentation mode TBA{% endif %}
     </h4>
   </div>
 </div>

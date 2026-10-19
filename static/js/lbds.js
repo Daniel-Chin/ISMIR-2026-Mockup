@@ -326,7 +326,10 @@ const card_html = openreview => {
             <div class="pp-card-header">
             <div class="checkbox-paper ${openreview.content.read ? 'selected' : ''}" style="display: block;position: absolute; bottom:35px;left: 35px;">✓</div>
             <h5 class="card-title" align="center">  ${openreview.content.title} </h5>
-            <h6 class="card-subtitle text-muted" align="center"> ${openreview.content.authors.join(', ')} </h6>
+            <h6 class="card-subtitle text-muted" align="center"> ${openreview.content.authors.join(', ')}
+                <br><br>
+                <em>${openreview.content.presentation_mode ? `Presented ${openreview.content.presentation_mode}` : 'Presentation mode TBA'}</em>
+            </h6>
                 ${card_image(openreview, render_mode !== 'list')}
                 ` + button +
                 `</div>

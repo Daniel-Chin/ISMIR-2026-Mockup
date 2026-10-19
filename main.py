@@ -625,7 +625,9 @@ def format_lbd(v):
             "youtube_id": convert_drive_link(youtube_id),
             "channel_url": v.get("channel_url", ""),
             "channel_name": v.get("slack_channel") or v.get("channel_name", ""),
-            "presentation_mode": v.get("presentation_mode", ""),
+            # As the papers' paper_presentation: "Virtual" / "In-person", '' when not known yet.
+            "presentation_mode": "" if v.get("presentation_mode", "").strip() == "[Not Answered]"
+            else v.get("presentation_mode", "").strip().replace("In-Person", "In-person"),
             "day": 4,
             "keywords": keywords,
         },
