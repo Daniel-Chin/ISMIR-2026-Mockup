@@ -34,7 +34,7 @@
       {% endfor %}
     </h3>
     <p class="card-text text-center">
-      <span class>Primary Subject:</span>
+      <span class>Keywords:</span>
       {% for keyword in lbd.content.keywords %}
       <a
         href="lbds.html?filter=keywords&search={{keyword}}"
@@ -116,6 +116,7 @@ endif %}
       <p></p>
     </div>
   </div>
+  {% if lbd.content.paper_link %}
   <div id="paper" class="collapse">
     {% set lbd_paper_link_url = lbd.content.paper_link | replace('/preview', '') %}
     <button class="fullscreen-button btn btn-primary mb-3">Fullscreen</button>
@@ -125,6 +126,8 @@ endif %}
     <p class="mt-2 text-center"><a href="{{lbd_paper_link_url}}" target="_blank"
       rel="noopener noreferrer" style="text-decoration: underline;">Open in Google Drive</a></p>
   </div>
+  {% endif %}
+  {% if lbd.content.poster_link %}
   <div id="poster" class="collapse">
     {% set lbd_poster_link_url = lbd.content.poster_link | replace('/preview', '') %}
     <button class="fullscreen-button btn btn-primary mb-3">Fullscreen</button>
@@ -134,6 +137,7 @@ endif %}
     <p class="mt-2 text-center"><a href="{{lbd_poster_link_url}}" target="_blank"
       rel="noopener noreferrer" style="text-decoration: underline;">Open in Google Drive</a></p>
   </div>
+  {% endif %}
   {% if lbd.content.youtube_id or lbd.content.bilibili_id %}
   <div id="video" class="collapse">
     {% if lbd.content.youtube_id %}

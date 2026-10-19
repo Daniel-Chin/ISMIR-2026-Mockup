@@ -109,7 +109,9 @@ def presenter_mode(raw):
 # (The page embeds them, so no raw Drive links leave the build.)
 MATERIAL_SECTIONS = [("paper", "raw_pdf_path"), ("poster", "raw_poster_pdf"), ("video", "video")]
 # The same for LBDs (lbds.csv, shown at lbd_<uid>.html#<id>; conditions as in templates/lbd.html).
-LBD_MATERIAL_SECTIONS = [("paper", "paper_link"), ("poster", "poster_link"), ("video", "youtube_id")]
+# The real LBD sheet has the papers' columns; the mock one its own (second name), as main.py format_lbd.
+LBD_MATERIAL_SECTIONS = [("paper", ("raw_pdf_path", "paper_link")), ("poster", ("raw_poster_pdf", "poster_link")),
+                         ("video", ("video_path", "youtube_id"))]
 
 
 def lbd_authors(raw):
@@ -125,8 +127,16 @@ def lbd_authors(raw):
     return "; ".join(names) or "Authors TBA"
 
 
+def lbd_presenter_mode(row):
+    """Real sheet: presentation_mode ("Virtual", "In-Person"); mock: Slack lp-* / lv-* channels."""
+    if (row.get("presentation_mode") or "").strip():
+        mode = row["presentation_mode"].strip().lower()
+        return "" if "not answered" in mode else presenter_mode(mode)
+    return {"lp": "onsite", "lv": "online"}.get((row.get("channel_name") or "").strip().lower()[:2], "")
+
+
 def read_lbds(sd, miniconf):
-    """All LBDs, in programme order. They share one session, so they are not grouped.
+    """All LBDs, in programme order (position, else CMT id). They share one session, so they are not grouped.
 
     Boards and links use the CMT id (uid), as the miniconf's lbd_<uid>.html pages do.
     """
@@ -146,12 +156,11 @@ def read_lbds(sd, miniconf):
             "uid": uid,
             "displayId": f"LBD-{uid}",
             "title": (r.get("title") or "").strip(),
-            "authors": lbd_authors(r.get("authors", "")),
+            "authors": overview_authors(r["authors_and_affil"]) if (r.get("authors_and_affil") or "").strip() else lbd_authors(r.get("authors", "")),
             "channelUrl": (r.get("channel_url") or "").strip(),
             "pageUrl": f"{miniconf}/lbd_{uid}.html" if miniconf else "",
-            # Slack channels are lp-* (in person) or lv-* (virtual); unknown otherwise.
-            "presenterMode": {"lp": "onsite", "lv": "online"}.get((r.get("channel_name") or "").strip().lower()[:2], ""),
-            "materials": [section for section, col in LBD_MATERIAL_SECTIONS if (r.get(col) or "").strip()],
+            "presenterMode": lbd_presenter_mode(r),
+            "materials": [section for section, cols in LBD_MATERIAL_SECTIONS if any((r.get(c) or "").strip() for c in cols)],
         })
     return lbds
 

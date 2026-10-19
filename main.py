@@ -488,7 +488,8 @@ def paper_thumbnail_path(v) -> str:
             url_map = json.load(f)
     except FileNotFoundError:
         return ""
-    url = (v.get("raw_thumbnail") or v.get("thumbnail") or "").strip()
+    # Papers: raw_thumbnail (mock: thumbnail); LBDs: raw_thumbnail_path.
+    url = (v.get("raw_thumbnail") or v.get("raw_thumbnail_path") or v.get("thumbnail") or "").strip()
     return f"static/paper_images/{url_map[url]}" if url in url_map else ""
 
 
@@ -578,36 +579,55 @@ def format_paper(v):
 
 
 def format_lbd(v):
-    list_keys = ["authors", "session", "primary_subject"]
-    list_fields = {k: extract_list_field(v, k) for k in list_keys}
-    youtube_id = v.get("youtube_id", "")
-    if youtube_id and not youtube_id.startswith(("http://", "https://")):
-        youtube_id = f"https://www.youtube.com/embed/{youtube_id}"
+    """One LBD for the templates.
+
+    The real LBD sheet has the papers' columns (authors_and_affil, raw_pdf_path, raw_poster_pdf,
+    video_path, key_words, slack_channel); the mock one has its own (authors as "Last, First",
+    paper_link, poster_link, youtube_id, primary_subject, channel_name). Both are read.
+    """
+    if v.get("authors_and_affil", "").strip():
+        authors = remove_affiliation(v["authors_and_affil"])
+    else:
+        authors = [
+            (
+                " ".join(reversed(x.replace(" ", "").replace("*", "").split(",")))
+                if "," in x
+                else x.replace("*", "")
+            )
+            for x in extract_list_field(v, "authors")
+        ]
+    if "key_words" in v:
+        keywords = [k.strip() for k in re.split(r"[,;\n]", v["key_words"]) if k.strip() and k.strip() != "[Not Answered]"]
+    else:
+        keywords = extract_list_field(v, "primary_subject")
+    if v.get("video_path", "").strip():
+        youtube_id = f"https://www.youtube.com/embed/{get_yt_id(v['video_path'])}"
+    else:
+        youtube_id = v.get("youtube_id", "")
+        if youtube_id and not youtube_id.startswith(("http://", "https://")):
+            youtube_id = f"https://www.youtube.com/embed/{youtube_id}"
     return {
         "id": v["uid"],
-        "position": v["position"],
+        "position": v.get("position", ""),
         "forum": v["uid"],
         "content": {
             "title": v["title"],
-            "authors": [
-                (
-                    " ".join(reversed(x.replace(" ", "").replace("*", "").split(",")))
-                    if "," in x
-                    else x.replace("*", "")
-                )
-                for x in list_fields["authors"]
-            ],
+            "authors": authors,
             "abstract": v["abstract"],
             "TLDR": v["abstract"],
-            "session": list_fields["session"],
-            "thumbnail_link": v.get("thumbnail_link", ""),
-            "poster_link": convert_drive_link(v.get("poster_link", "")),
-            "paper_link": convert_drive_link(v.get("paper_link", "")),
+            "session": extract_list_field(v, "session") if v.get("session", "").strip() else [],
+            # Downloaded like the papers' (real sheet); the mock sheet names a static image.
+            "thumbnail": paper_thumbnail_path(v) or v.get("thumbnail_link", ""),
+            "poster_link": convert_drive_link(v.get("raw_poster_pdf") or v.get("poster_link", "")),
+            "paper_link": convert_drive_link(v.get("raw_pdf_path") or v.get("paper_link", "")),
             "poster_type": v.get("poster_type", ""),
             "bilibili_id": v.get("bilibili_id", ""),
             "youtube_id": convert_drive_link(youtube_id),
+            "channel_url": v.get("channel_url", ""),
+            "channel_name": v.get("slack_channel") or v.get("channel_name", ""),
+            "presentation_mode": v.get("presentation_mode", ""),
             "day": 4,
-            "keywords": list_fields["primary_subject"],
+            "keywords": keywords,
         },
     }
 
