@@ -262,10 +262,12 @@ function canonEggRender(backdrop, view) {
   });
   copy.replaceChildren();
   links.replaceChildren();
+  backdrop.dataset.view = view.kind;
   if (view.kind === 'congrats') {
     kicker.textContent = 'Easter egg found';
     title.textContent = 'Congratulations!';
-    copy.append(para(`You are the ${canonEggOrdinal(view.rank)} person to find the hidden easter egg!`), para(CANON_EGG_FACTS_NOTE));
+    // rank 0: the server has not answered yet (canonEggShowResult).
+    copy.append(para(view.rank ? `You are the ${canonEggOrdinal(view.rank)} person to find the hidden easter egg!` : 'You found the hidden easter egg! Recording your find…'), para(CANON_EGG_FACTS_NOTE));
     links.append(toBoard());
   } else if (view.kind === 'congrats-signin') {
     kicker.textContent = 'Easter egg found';
@@ -341,21 +343,28 @@ function canonEggRender(backdrop, view) {
  * Solved. Signed in: the server records it; the first time, show the rank. Signed out, first
  * time on this browser: congratulate and offer sign-in; only signing in from that message
  * claims a place. Every other solve: a random paper fun fact.
+ *
+ * The message opens at once, with the music: what this browser knows decides it (found here
+ * before? then a fun fact). The server's answer, a second or two later, only fills in the rank,
+ * or turns a fun fact into the congratulations if it was a first find after all.
  */
-async function canonEggShowResult() {
+let canonEggSolveId = 0;
+function canonEggShowResult() {
   const api = window.PC_EGG;
-  let view = { kind: 'fact' };
-  if (api?.user) {
-    try {
-      const r = await api.solve();
-      if (r?.ok && r.first) view = { kind: 'congrats', rank: r.rank };
-    } catch (_) { /* offline: fall back to a fun fact */ }
-    canonEggStore.set(CANON_EGG_FOUND_KEY, '1');
-  } else if (api && !canonEggStore.get(CANON_EGG_FOUND_KEY)) {
-    canonEggStore.set(CANON_EGG_FOUND_KEY, '1');
-    view = { kind: 'congrats-signin' };
+  const foundHere = !!canonEggStore.get(CANON_EGG_FOUND_KEY);
+  canonEggStore.set(CANON_EGG_FOUND_KEY, '1');
+  if (!api?.user) {
+    canonEggOpenDialog({ kind: api && !foundHere ? 'congrats-signin' : 'fact' });
+    return;
   }
-  canonEggOpenDialog(view);
+  const id = ++canonEggSolveId;
+  canonEggOpenDialog(foundHere ? { kind: 'fact' } : { kind: 'congrats', rank: 0 });
+  // Still showing this solve's message (not closed, not moved on to the list of finders)?
+  const current = (kind) => id === canonEggSolveId && document.querySelector(`.canon-egg-funfact-backdrop[data-view="${kind}"]`);
+  api.solve().then((r) => {
+    if (r?.ok && r.first) { if (current('congrats') || current('fact')) canonEggOpenDialog({ kind: 'congrats', rank: r.rank }); }
+    else if (current('congrats')) canonEggOpenDialog({ kind: 'fact' });   // found before, on another device
+  }).catch(() => { if (current('congrats')) canonEggOpenDialog({ kind: 'fact' }); });   // offline: not recorded
 }
 
 /** Back from "Sign in" in the message: claim the place and show the leaderboard with it. */
