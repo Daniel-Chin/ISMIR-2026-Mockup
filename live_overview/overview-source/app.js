@@ -648,7 +648,9 @@ function renderUpcomingCard(e) {
 
 function renderUpcoming(state) {
   if (!els.upcoming) return;
-  const upcoming = groupTutorialEvents(getUpcomingEvents(state)).slice(0, 14);
+  // Every upcoming event, to the end of the conference: a cut-off list would leave people
+  // wondering whether anything comes after it.
+  const upcoming = groupTutorialEvents(getUpcomingEvents(state));
   const groups = [];
   upcoming.forEach((event) => {
     const key = timelineDateKey(event.startsAt);
