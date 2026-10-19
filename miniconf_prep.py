@@ -50,12 +50,14 @@ def parse_arguments():
     # add-admins-to-tutorials
     # setup-tutorials-invite-attendees
     # setup-tutorials (compatibility: runs both stages)
+    # setup-papers-setup-channels
     # setup-papers-create-channels
     # setup-papers-set-desc
     # setup-event-channels
     # create-event-channels
     # set-event-channel-desc
-    # setup-lbd
+    # setup-lbd-channels
+    # create-lbd-channels
     # setup-music
     # setup-sponsors
     # remove-author-email
@@ -140,11 +142,16 @@ def setEventChannelDesc(data_path):
 
     batch_set_channel_description_interactive(data_path)
 
-def setupLbds(lbdCsvFile):
+def setupLbdChannels(lbdCsvFile):
     from modules.lbds import Lbds
 
-    lbdObj = Lbds(lbdCsvFile, useDummyValues)
-    lbdObj.setupSlackChannels(slackUtils)
+    Lbds(lbdCsvFile).setupSlackChannels()
+
+
+def createLbdChannels(lbdCsvFile):
+    from modules.lbds import Lbds
+
+    Lbds(lbdCsvFile).createSlackChannels()
 
 
 def setupMusic(musicCsvFile):
@@ -184,7 +191,7 @@ if __name__ == "__main__":
         )
 
     if "setup" in action or "process" in action or action in {
-        "create-event-channels", "create-tutorial-channels", "set-event-channel-desc",
+        "create-event-channels", "create-tutorial-channels", "create-lbd-channels", "set-event-channel-desc",
         "add-admins-to-tutorials",
     }:
         if action == "setup-zoom":
@@ -249,8 +256,11 @@ if __name__ == "__main__":
     elif action == "set-event-channel-desc":
         setEventChannelDesc(data_path)
 
-    elif action == "setup-lbd":
-        setupLbds(os.path.join(data_path, "lbds.csv"))
+    elif action == "setup-lbd-channels":
+        setupLbdChannels(os.path.join(data_path, "lbds.csv"))
+
+    elif action == "create-lbd-channels":
+        createLbdChannels(os.path.join(data_path, "lbds.csv"))
 
     elif action == "setup-music":
         setupMusic(os.path.join(data_path, "music.csv"))

@@ -26,7 +26,7 @@ sitedata/papers.csv ── miniconf_prep.py --action setup-papers-<step>
 | `utils/slack.py` | Thin Slack Web API wrapper: channel/user lookups, channel creation, invites, topic/purpose, CSV `channel_url` writeback, rate-limit retry |
 | `modules/papers.py` | `Papers`: channel naming (`title2channelID`) and the four paper steps |
 | `modules/{lbds,music,industry,tutorials}.py` | Same idea for other content types — see [Non-paper modules](#non-paper-modules) |
-| `miniconf_prep.py` | CLI entry point (`--action setup-papers-*`, `setup-event-channels`, `create-event-channels`, `setup-tutorials-*`, `setup-lbd`, `setup-music`, `setup-sponsors`) |
+| `miniconf_prep.py` | CLI entry point (`--action setup-papers-*`, `setup-event-channels`, `create-event-channels`, `setup-tutorials-*`, `setup-lbd-channels`, `create-lbd-channels`, `setup-music`, `setup-sponsors`) |
 
 ## One-time setup (human, ~10 min)
 
@@ -110,6 +110,10 @@ the workspace (workspace admin, or an app-approval flow).
 .venv/bin/python miniconf_prep.py --mockup --action create-tutorial-channels
 # It's normal to not be able to see the channels at this stage --- they are private even to admins. So run the next step:  
 .venv/bin/python miniconf_prep.py --mockup --action add-admins-to-tutorials
+
+# 7. LBDs: name channels lbd{uid}-{first-3-title-words} into lbds.csv slack_channel, then create them and write channel_url
+.venv/bin/python miniconf_prep.py --mockup --action setup-lbd-channels
+.venv/bin/python miniconf_prep.py --mockup --action create-lbd-channels
 ```
 
 Omit `--mockup` for the real conference data and add `--prod true` for
@@ -301,9 +305,9 @@ They were ported to the current
 now also reload channel data between creation and link-writeback, like
 `papers.py`. The papers path remains the most exercised one; the non-paper
 actions have not been run against a live workspace since the port, so give
-them a mock-workspace pass before a real run. LBD naming:
-`lp-{position}-{lastname}` (physical) / `lv-…` (virtual), from
-`primary_author`.
+them a mock-workspace pass before a real run. LBDs have only
+`setup-lbd-channels` / `create-lbd-channels` (no invites); channel names are
+`lbd{uid}-{first-3-title-words}`.
 
 ## Testing without credentials
 

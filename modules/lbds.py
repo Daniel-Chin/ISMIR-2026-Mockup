@@ -1,65 +1,40 @@
 import pandas as pd
-import copy
-import time
+from tqdm import tqdm
+
+from utils import slack as slackUtils
 
 
-# Defining the class that exposes the methods related to papaers.
+def lbd_channel_name(row, _):
+    return slackUtils.build_channel_name(f"lbd{row['uid']}", row["title"])
+
+
 class Lbds:
-    """
-    This method takes the config data loaded and the papers csv file.
-    """
-    def __init__(self, lbdsCsvFile, useDummyValues):
-        print("Initialising lbds")
+    def __init__(self, lbdsCsvFile):
         self.lbdsCsvFile = lbdsCsvFile
-        self.useDummyValues = useDummyValues
 
-    """
-    This method inputs the zoomUtils and setup zoom calls for the all the sessions.
-    """
-    def setupSlackChannels(self, slackUtils):
-        if(self.lbdsCsvFile is None):
-            raise Exception("self.lbdsCsvFile passed in contructor is null")
-        
-        # Reading the papers data.
-        csv_data = pd.read_csv(self.lbdsCsvFile)
+    def setupSlackChannels(self):
+        csv_data = pd.read_csv(self.lbdsCsvFile, dtype=str, keep_default_na=False)
+        csv_data = slackUtils.populate_channel_names(csv_data, "slack_channel", lbd_channel_name)
+        csv_data.to_csv(self.lbdsCsvFile, index=False)
+        print(
+            'LBD channel names generated. Please paste the updated "slack_channel" column back into the Google Sheet.'
+        )
 
-        print(csv_data)
-        slack_channel_column = "channel_name"
+    def createSlackChannels(self):
+        csv_data = pd.read_csv(self.lbdsCsvFile, dtype=str, keep_default_na=False)
+        channel_names = [
+            str(name).strip() for name in csv_data["slack_channel"].fillna("").tolist() if str(name).strip()
+        ]
 
-        # Preparing the slack channel name.
-        for index, row in csv_data.iterrows():
-            names_array = row["primary_author"].lower().strip().split()
-            names_array.reverse()
-            if(row["session"].strip() == "Physical"):
-                csv_data.loc[index, slack_channel_column] = "lp-" + str(row["position"]) + "-" + str(names_array[0])
-            else:
-                csv_data.loc[index, slack_channel_column] = "lv-" + str(row["position"]) + "-" + str(names_array[0])
+        with tqdm(channel_names, desc="Creating Slack channels", unit="channel") as progress:
+            slackUtils.createSlackChannels(progress, is_private=False, quiet=True)
 
-        # Overwriting the file.
-        csv_data.to_csv(self.lbdsCsvFile)
-        
-        print("########### Now creating slack channels ##########")
-        slackUtils.createSlackChannels(csv_data[slack_channel_column].tolist(), is_private=False)
-
-        # Force reloading all channel data so the new channels are found.
         slackUtils.loadAllChannelData()
 
-        # Adding the channel link to the file.
-        slackUtils.addChannelLinksToCSV(self.lbdsCsvFile, slack_channel_column)
-
-        user_data = {}
-        author_emails_column = "author_emails"
-        # Creating data to add authors to the respective channel for lbds.
-        for index, row in csv_data.iterrows():
-            if(self.useDummyValues):
-                user_data[row[slack_channel_column]] = ["fake1@gmail.com", "fake2@gmail.com"]
-            else:
-                user_data[row[slack_channel_column]] = list(map(str.strip, str(row[author_emails_column]).split(",")))    
-        
-        print(user_data)
-
-        # Now sending emails.
-        for channel, emails in user_data.items():
-            for email in emails:
-                print("Adding user ", email, " to channel ", channel)
-                slackUtils.inviteUserToChannel(email, channel)
+        slackUtils.write_channel_links_to_csv(
+            csv_data,
+            self.lbdsCsvFile,
+            slackUtils,
+            "slack_channel",
+            remind_to_paste_to_sheet=True,
+        )
