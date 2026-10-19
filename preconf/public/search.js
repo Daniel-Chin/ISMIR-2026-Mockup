@@ -108,13 +108,17 @@ export class SearchBox {
     this.input.addEventListener('input', () => this.openMenu());
     this.input.addEventListener('focus', () => this.openMenu());
     this.input.addEventListener('keydown', e => this.onKey(e));
-    // Leaving the box closes the list (a click on a suggestion lands first: pointerdown below).
+    // Leaving the box closes the list (a click on a suggestion lands first, see below).
     this.input.addEventListener('blur', () => setTimeout(() => this.closeMenu(), 120));
-    this.menu.addEventListener('pointerdown', e => {
+    // A suggestion is picked on click, not on pointerdown: picked on the press, the list would
+    // close at once and a phone's click, which follows the finger lifting, would land on what
+    // lay under it (the title / keyword / author buttons, which clear the search). The press
+    // only keeps the focus in the box.
+    this.menu.addEventListener('pointerdown', e => { if (e.target.closest('[data-value]')) e.preventDefault(); });
+    this.menu.addEventListener('mousedown', e => e.preventDefault());
+    this.menu.addEventListener('click', e => {
       const opt = e.target.closest('[data-value]');
-      if (!opt) return;
-      e.preventDefault();
-      this.pick(opt.dataset.value);
+      if (opt) this.pick(opt.dataset.value);
     });
   }
 
