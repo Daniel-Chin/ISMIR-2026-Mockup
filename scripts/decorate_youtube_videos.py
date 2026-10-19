@@ -13,12 +13,14 @@ import io
 import json
 import os
 import re
+import subprocess
 import tempfile
 import unicodedata
 from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, cast
 
+import pyperclip
 from tqdm import tqdm
 
 from utils.session_assignment import parse_file
@@ -143,7 +145,7 @@ def unique_object(pairs: list[tuple[str, Any]]) -> APIObject:
 
 def validate_local(
     csv_path: Path, video_dir: Path, caption_dir: Path,
-) -> tuple[list[str], list[PaperRow], dict[str, PaperRow], bytes, dict[str, Path]]:
+) -> tuple[list[str], list[PaperRow], dict[str, PaperRow], bytes, dict[str, Path], dict[str, Path]]:
     original = csv_path.read_bytes()
     reader = csv.DictReader(io.StringIO(original.decode('utf-8-sig'), newline=''))
     fields = list(reader.fieldnames or [])
@@ -203,9 +205,9 @@ def validate_local(
                 raise SafetyError(f'Drive {kind} provenance mismatch for local UID: {uid}')
         return found
 
-    check_dir(video_dir, 'video', 'raw_video')
+    local_videos = check_dir(video_dir, 'video', 'raw_video')
     captions = check_dir(caption_dir, 'captions', 'raw_captions')
-    return fields, rows, papers, original, captions
+    return fields, rows, papers, original, local_videos, captions
 
 
 def metadata(description: object) -> Metadata | None:
@@ -238,6 +240,8 @@ def execute(request: HttpRequest) -> APIObject:
         if any(reason in str(content) for reason in ('quotaExceeded', 'dailyLimitExceeded')):
             raise SafetyError('YouTube quota exhausted; aborted immediately') from exc
         raise SafetyError(f'YouTube request failed; aborted without retry: {exc}') from exc
+    if request.method == 'DELETE' and result == '':  # 204 No Content
+        return {}
     if not isinstance(result, dict):
         raise SafetyError('Unexpected API response')
     return result
@@ -722,6 +726,7 @@ def authenticate() -> Resource:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    rows: Sequence[PaperRow] = ()
     try:
         parser = argparse.ArgumentParser(description=__doc__)
         parser.add_argument('--input', type=Path, default=ROOT / 'sitedata/papers.csv')
@@ -735,7 +740,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.add_argument('--no-playlists', action='store_true', help='Skip playlist sync')
         args = parser.parse_args(argv)
         dry_run = args.dry_run or args.drier_run
-        fields, rows, papers, original, captions = validate_local(args.input, args.videos, args.captions)
+        fields, rows, papers, original, local_videos, captions = validate_local(args.input, args.videos, args.captions)
         if args.drier_run:
             print('DRIER RUN: no auth or API calls; pretending YouTube has no uploads.')
             youtube = cast('Resource', None)
@@ -767,9 +772,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f'Papers with raw_video but no current YouTube upload ({len(missing)}); upload by hand:')
         for uid in missing:
             print(f'  {uid}')
+        if paths := [str(local_videos[uid]) for uid in missing if uid in local_videos]:
+            for start in range(0, len(paths), 15):
+                try:
+                    subprocess.run(['dragon-drop', '--all', *paths[start:start + 15]], check=False)
+                except OSError as e:
+                    print(f'dragon-drop failed: {e}')
         return 0
     finally:
-        print('Reminder: paste the video column back into Google Sheets.')
+        if rows:
+            pyperclip.copy('\n'.join(['video', *(row.get('video', '') for row in rows)]))
+            print('Copied the video column (with header, in papers.csv row order). '
+                  'Paste it into the video header cell in Google Sheets.')
 
 
 if __name__ == '__main__':

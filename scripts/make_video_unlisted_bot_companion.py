@@ -17,7 +17,11 @@ from __future__ import annotations
 
 import argparse
 import queue
+import os
 import random
+import shutil
+import subprocess
+import sys
 import threading
 import time
 
@@ -53,6 +57,28 @@ class Stopped(Exception):
 def wait(at_least: float) -> None:
     if stop.wait(at_least + random.uniform(0, 0.6) + debug_extra_wait):
         raise Stopped
+
+
+def beep() -> None:
+    """Play a short sound without blocking; falls back to the terminal bell."""
+    if sys.platform == 'win32':
+        import winsound
+        winsound.MessageBeep()
+        return
+    if sys.platform == 'darwin':
+        cmds = [['afplay', '/System/Library/Sounds/Glass.aiff']]
+    else:
+        snd = '/usr/share/sounds/freedesktop/stereo/complete.oga'
+        cmds = [['pw-play', snd], ['paplay', snd], ['canberra-gtk-play', '-i', 'complete']]
+    for cmd in cmds:
+        if shutil.which(cmd[0]):
+            if os.environ.get('SUDO_UID') and os.geteuid() == 0:
+                # root can't reach the user's audio server; play as the invoking user
+                uid = os.environ['SUDO_UID']
+                cmd = ['sudo', '-u', f'#{uid}', 'env', f'XDG_RUNTIME_DIR=/run/user/{uid}', *cmd]
+            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return
+    print('\a', end='', flush=True)
 
 
 def find_keyboard() -> evdev.InputDevice:
@@ -150,6 +176,7 @@ def main() -> None:
                     continue
                 try:
                     make_unlisted(t)
+                    beep()
                     print('done one video')
                 except Stopped:
                     pass
