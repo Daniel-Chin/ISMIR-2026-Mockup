@@ -561,6 +561,7 @@ export class BoardView {
     }
     this.frame.classList.toggle('is-fullscreen', on);
     this.titleBar.hidden = !on;
+    this.opts.onFullscreen?.(on);   // e.g. a wall's search box goes along (app.js)
     this.fsButton.textContent = on ? '⤡ Collapse' : '⤢ Expand';
     if (on) {
       this.scrim = el('div', 'pc-scrim');

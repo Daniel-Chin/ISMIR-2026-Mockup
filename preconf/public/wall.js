@@ -77,8 +77,9 @@ export const sameLayout = (a, b) => !!a && !!b && a.perRow === b.perRow && a.row
 
 /** Shape (width / height) of the wall's expanded view in this window. */
 export function screenAspect() {
-  // The expanded board: the window minus the site header, margins and the board's title bar.
-  return Math.max(200, window.innerWidth - 28) / Math.max(200, window.innerHeight - 150);
+  // The expanded board: the window minus the site header, margins, the board's title bar and
+  // the search bar under it.
+  return Math.max(200, window.innerWidth - 28) / Math.max(200, window.innerHeight - 200);
 }
 
 /** The paper (or LBD) uid a note belongs to on this wall; '' for notes from elsewhere. */
@@ -273,13 +274,33 @@ export class WallView extends BoardView {
    * Show only the papers in `uids` (a Set; null shows all) and their notes. Nothing moves: the
    * others are just hidden, so clearing the search puts the wall back as it was.
    */
-  setFilter(uids) {
+  setFilter(uids, { fit = true } = {}) {
     this.filter = uids || null;
     for (const pin of this.surface.querySelectorAll('.pc-pin')) pin.classList.toggle('pc-filtered-out', !!this.filter && !this.filter.has(pin.dataset.uid));
     for (const [id, node] of this.els) {
       const n = this.room.notes.get(id);
       if (n) node.classList.toggle('pc-filtered-out', this.filteredOut(n));
     }
+    if (fit) this.fitFilter();
+  }
+
+  /** Glide to just what the search shows, its papers and their notes; no search: the whole wall. */
+  fitFilter() {
+    if (!this.scroller.clientWidth) { this.pendingFit = true; return; }   // hidden (the hall is shown): see shown()
+    this.pendingFit = false;
+    if (!this.filter) { this.glideTo(this.fitCamera()); return; }
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    const add = (x, y, w, h) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + w); y1 = Math.max(y1, y + h); };
+    for (const uid of this.filter) {
+      const pin = this.wall.pins.get(uid);
+      if (pin) add(pin.x, pin.y, pin.w, pin.h);
+    }
+    for (const node of this.els.values()) {
+      if (node.classList.contains('pc-filtered-out')) continue;
+      add(parseFloat(node.style.left) || 0, parseFloat(node.style.top) || 0, node._w || NOTE_W, node._h || NOTE_H);
+    }
+    if (x0 === Infinity) return;   // nothing found: stay where you are
+    this.glideTo(this.frameRect({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, 1.12));
   }
 
   notePos(n) {
@@ -371,6 +392,7 @@ export class WallView extends BoardView {
   shown() {
     this.renderAll();
     this.layout(true);
+    if (this.pendingFit) this.fitFilter();
   }
 
   /** Camera that frames rect r (with a margin). */

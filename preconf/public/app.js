@@ -381,20 +381,34 @@ const lbdWallLayout = () => (lbds.layout ||= buildWallLayout(lbdWallSpec(hall.pr
 function makeWall(rooms) {
   papers.wall = new WallView($('#paper-wall'), {
     room: rooms, app, items: hall.program.papers, layout: wallLayout(), buildPin: pinCard,
-    regionHead: wallRegionHead, noteTag: paperTag,
+    regionHead: wallRegionHead, noteTag: paperTag, onFullscreen: dockSearch(papers, '#paper-search'),
   });
-  papers.wall.setFilter(papers.match);
+  papers.wall.setFilter(papers.match, { fit: !!papers.match });
   refreshSessionTimes();
 }
 
 function makeLbdWall(rooms) {
   lbds.wall = new WallView($('#lbd-wall'), {
     room: rooms, app, title: 'LBD Wall', items: hall.lbdById, layout: lbdWallLayout(), buildPin: p => pinCard(p, { lbd: true }),
-    regionHead: lbdRegionHead, noteTag: lbdTag,
+    regionHead: lbdRegionHead, noteTag: lbdTag, onFullscreen: dockSearch(lbds, '#lbd-search'),
   });
-  lbds.wall.setFilter(lbds.match);
+  lbds.wall.setFilter(lbds.match, { fit: !!lbds.match });
   refreshSessionTimes();
 }
+
+/** Expanded, a wall takes its section's search box along, in a bar under its title. */
+const dockSearch = (state, home) => on => {
+  const root = state.search?.root;
+  if (!root) return;
+  if (on) {
+    const bar = el('div', 'pc-fs-search');
+    bar.append(root);
+    state.wall.titleBar.after(bar);
+  } else {
+    $(home).prepend(root);
+    state.wall.frame.querySelector('.pc-fs-search')?.remove();
+  }
+};
 
 // Rotating a tablet or resizing the window can call for another arrangement of a wall (more
 // or fewer areas per row): rebuild the view, keeping its live connections.
@@ -992,7 +1006,7 @@ function initLbdView() {
   if (!hall.program.lbds?.length) return;   // "Opening soon": no views to switch
   hall.lbdById = Object.fromEntries(hall.program.lbds.map(l => [l.uid, l]));
   renderLbdHall();
-  $('#lbd-view').hidden = false;
+  $('#lbd-search').hidden = false;   // the LBDs' search row, with the view switch
   $('#lbd-view').addEventListener('click', e => {
     const b = e.target.closest('button[data-view]');
     if (b) setLbdView(b.dataset.view);
@@ -1032,7 +1046,6 @@ function initSearch() {
     },
   });
   if (!program.lbds?.length) return;
-  $('#lbd-search').hidden = false;
   lbds.search = new SearchBox($('#lbd-search'), {
     items: searchItems(program.lbds),
     label: 'Search LBDs',

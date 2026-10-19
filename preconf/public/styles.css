@@ -457,8 +457,12 @@ dialog.pc-composer::backdrop { background: rgba(4, 6, 12, .6); }
 }
 
 /* ---------- search (search.js): the miniconf's search box ---------- */
-.pc-search-row { margin: 0 0 14px; }
+.pc-search-row { display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; margin: 0 0 14px; }
+/* An expanded wall's copy of the row (app.js dockSearch): above the board, its list over it. */
+.pc-fs-search { position: relative; z-index: 6; padding: 8px 12px; border-bottom: 2px solid var(--pc-border); background: var(--pc-panel); }
 .pc-search { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+/* In its row the box takes the room left of the view switch, so both share one line. */
+.pc-search-row > .pc-search { flex: 1 1 480px; min-width: 0; }
 .pc-search-field { position: relative; display: flex; flex: 0 1 360px; min-width: 0; }
 .pc-search-input {
   flex: 1; min-width: 0; padding: 6px 10px; font: inherit; font-size: .85rem; color: var(--ink);

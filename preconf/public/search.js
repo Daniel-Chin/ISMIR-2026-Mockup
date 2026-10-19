@@ -102,7 +102,7 @@ export class SearchBox {
     }
     this.count = el('span', 'pc-search-count');
     this.root.append(field, this.seg, this.count);
-    mount.append(this.root);
+    mount.prepend(this.root);
     this.setMode(DEFAULT_MODE);
 
     this.input.addEventListener('input', () => this.openMenu());
