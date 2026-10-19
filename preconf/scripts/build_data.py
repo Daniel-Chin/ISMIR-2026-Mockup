@@ -161,6 +161,8 @@ def read_lbds(sd, miniconf):
             "pageUrl": f"{miniconf}/lbd_{uid}.html" if miniconf else "",
             "presenterMode": lbd_presenter_mode(r),
             "materials": [section for section, cols in LBD_MATERIAL_SECTIONS if any((r.get(c) or "").strip() for c in cols)],
+            # Empty for now; once filled, the LBD Wall puts each group in its own area.
+            **({"group": r["group_id"].strip()} if (r.get("group_id") or "").strip() else {}),
         })
     return lbds
 

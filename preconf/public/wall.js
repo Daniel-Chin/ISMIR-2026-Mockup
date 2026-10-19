@@ -1,12 +1,13 @@
 // The Paper Wall: one big board showing every paper at once, an alternative to the Paper Hall.
+// The LBD Wall is the same for the Late-Breaking Demos (app.js): one area for all of them, or one
+// per group should LBDs get groups.
 //
-// Papers are pinned cards (fixed, nobody can move them), laid out like the hall: one row of
-// sessions per day, and inside each session area the papers in two rows. Notes sit around their
-// paper's pin. A note on the wall is the same note as on the paper's own board (same server
+// Papers are pinned cards (fixed, nobody can move them), laid out like the hall: one area per
+// session, and inside each area the papers in two rows (LBD Wall: as many rows as fit the screen
+// best). Notes sit around their paper's pin. A note on the wall is the same note as on the paper's own board (same server
 // object, so edits and deletes show in both views); only its position differs: x/y on the paper
 // board, wx/wy (an offset from the paper's pin) on the wall. See WALL_REACH in board-core.js.
 
-import { Room } from './room.js';
 import { BoardView, NOTE_W, el } from './board.js';
 
 // Logical wall units (the same units as note sizes: a note is NOTE_W wide).
@@ -20,46 +21,59 @@ const NOTE_H = 128;                        // footprint used when finding a free
 const SLOT_GAP = 20;
 
 /**
- * Where every session area and pin goes: sessions in programme order (as in the hall), `perRow`
- * areas to a row. Note positions on the wall are offsets from their paper's pin, so the areas
- * can be arranged differently on every screen and notes still follow their papers.
+ * What a wall shows (app.js builds one for papers and one for LBDs):
+ *   prefix  the notes' board prefix: 'paper' (boards paper:<uid>) or 'lbd' (lbd:<uid>)
+ *   groups  its areas in order: { id, uids, ...anything regionHead needs }, e.g. one per session
+ *   rows    rows of papers in each area: a number, or 'fit' for whatever fills the screen best
  */
-function placeWall(program, perRow) {
+
+/**
+ * Where every area and pin goes: groups in order (as in the hall), `perRow` areas to a row and
+ * `rows` rows of papers in each. Note positions on the wall are offsets from their paper's pin,
+ * so the areas can be arranged differently on every screen and notes still follow their papers.
+ */
+function placeWall(spec, perRow, rows) {
   const regions = [], pins = new Map();
-  const sessions = program.days.flatMap(day => day.sessions.map(sid => ({ s: program.sessions[sid], day: day.day })))
-    .filter(({ s }) => s?.papers.length);
+  const groups = spec.groups.filter(g => g.uids.length);
   let x = MARGIN, y = MARGIN, rowH = 0, width = 0;
-  sessions.forEach(({ s, day }, n) => {
+  groups.forEach((g, n) => {
     if (n && n % perRow === 0) { y += rowH + GAP; x = MARGIN; rowH = 0; }
-    const cols = Math.ceil(s.papers.length / PAPER_ROWS);
-    const w = REGION_PAD * 2 + cols * CELL_W, h = REGION_PAD * 2 + REGION_HEAD + PAPER_ROWS * CELL_H;
-    regions.push({ id: s.id, day, x, y, w, h });
-    s.papers.forEach((uid, i) => {
+    const r = Math.min(rows, g.uids.length), cols = Math.ceil(g.uids.length / r);
+    const w = REGION_PAD * 2 + cols * CELL_W, h = REGION_PAD * 2 + REGION_HEAD + r * CELL_H;
+    regions.push({ ...g, x, y, w, h });
+    g.uids.forEach((uid, i) => {
       const cell = { x: x + REGION_PAD + (i % cols) * CELL_W, y: y + REGION_PAD + REGION_HEAD + Math.floor(i / cols) * CELL_H, w: CELL_W, h: CELL_H };
-      pins.set(String(uid), { uid: String(uid), session: s.id, x: cell.x + PIN_IN_CELL.x, y: cell.y + PIN_IN_CELL.y, w: PIN_W, h: PIN_H, cell });
+      pins.set(String(uid), { uid: String(uid), group: g.id, x: cell.x + PIN_IN_CELL.x, y: cell.y + PIN_IN_CELL.y, w: PIN_W, h: PIN_H, cell });
     });
     x += w + GAP;
     width = Math.max(width, x - GAP + MARGIN);
     rowH = Math.max(rowH, h);
   });
-  return { W: Math.max(width, 2000), H: Math.max(y + rowH + MARGIN, 1000), regions, pins, perRow };
+  return { W: Math.max(width, 2000), H: Math.max(y + rowH + MARGIN, 1000), regions, pins, perRow, rows, prefix: spec.prefix };
 }
 
 /**
  * The wall laid out for a screen of shape `aspect` (width / height of the expanded view): the
- * number of sessions per row whose wall shape comes closest, so an expanded wall fills tall
- * phones, tablets and ultra-wide monitors alike.
+ * number of areas per row (and, for rows: 'fit', of rows of papers) whose wall shape comes
+ * closest, so an expanded wall fills tall phones, tablets and ultra-wide monitors alike.
  */
-export function buildWallLayout(program, aspect = 2.2) {
-  const count = program.days.reduce((n, d) => n + d.sessions.filter(sid => program.sessions[sid]?.papers.length).length, 0);
+export function buildWallLayout(spec, aspect = 2.2) {
+  const groups = spec.groups.filter(g => g.uids.length);
+  const most = Math.max(1, ...groups.map(g => g.uids.length));
+  const rowChoices = spec.rows === 'fit' ? Array.from({ length: most }, (_, i) => i + 1) : [spec.rows || PAPER_ROWS];
   let best = null;
-  for (let perRow = 1; perRow <= Math.max(1, count); perRow++) {
-    const layout = placeWall(program, perRow);
-    const miss = Math.abs(Math.log(layout.W / layout.H) - Math.log(aspect));
-    if (!best || miss < best.miss - 1e-9) best = { layout, miss };
+  for (let perRow = 1; perRow <= Math.max(1, groups.length); perRow++) {
+    for (const rows of rowChoices) {
+      const layout = placeWall(spec, perRow, rows);
+      const miss = Math.abs(Math.log(layout.W / layout.H) - Math.log(aspect));
+      if (!best || miss < best.miss - 1e-9) best = { layout, miss };
+    }
   }
   return best.layout;
 }
+
+/** Same arrangement? (A resize only rebuilds the wall when it would change.) */
+export const sameLayout = (a, b) => !!a && !!b && a.perRow === b.perRow && a.rows === b.rows;
 
 /** Shape (width / height) of the wall's expanded view in this window. */
 export function screenAspect() {
@@ -67,7 +81,11 @@ export function screenAspect() {
   return Math.max(200, window.innerWidth - 28) / Math.max(200, window.innerHeight - 150);
 }
 
-const uidOf = note => (typeof note.board === 'string' && note.board.startsWith('paper:') ? note.board.slice(6) : '');
+/** The paper (or LBD) uid a note belongs to on this wall; '' for notes from elsewhere. */
+const uidIn = (layout, note) => {
+  const prefix = layout.prefix + ':';
+  return typeof note.board === 'string' && note.board.startsWith(prefix) ? note.board.slice(prefix.length) : '';
+};
 const hits = (a, b, pad = 0) => a.x < b.x + b.w + pad && b.x < a.x + a.w + pad && a.y < b.y + b.h + pad && b.y < a.y + a.h + pad;
 
 /**
@@ -112,7 +130,7 @@ export function wallPositions(layout, notes) {
   const out = new Map();
   const legacy = new Map();
   for (const n of notes) {
-    const uid = uidOf(n), pin = layout.pins.get(uid);
+    const uid = uidIn(layout, n), pin = layout.pins.get(uid);
     if (!pin) continue;
     if (Number.isFinite(n.wx) && Number.isFinite(n.wy)) out.set(n.id, { x: pin.x + n.wx, y: pin.y + n.wy });
     else (legacy.get(uid) || legacy.set(uid, []).get(uid)).push(n);
@@ -155,25 +173,24 @@ export function freeBoardSpot(notes, W, H) {
 }
 
 /**
- * Every session room at once, presented to BoardView as one room: a merged note map, events
- * passed through, and each message routed to the room that owns the note. `roomFor(sid)` hands
- * out the session's Room (app.js shares them with the hall, so each session has one connection).
+ * Several rooms at once (every poster session's), presented to BoardView as one room: a merged
+ * note map, events passed through, and each message routed to the room that owns the note.
+ * `rooms` maps a key to its Room (app.js shares them with the hall, so each session has one
+ * connection); `keyForCreate(msg)` names the room a new note goes to.
  */
 export class WallRooms {
-  constructor(program, roomFor = sid => new Room('session:' + sid)) {
-    this.program = program;
+  constructor(rooms, keyForCreate) {
+    this.keyForCreate = keyForCreate;
     this.notes = new Map();
     this.owner = new Map();
     this.me = null;
     this.limits = { boardW: 2000, boardH: 1000, expand: 1, textMax: 600 };
     this.paperLimits = { boardW: 4000, boardH: 2480 };
     this.listeners = new Set();
-    this.rooms = new Map();
+    this.rooms = rooms;
     this.unsubs = [];
     this.resetFrame = 0;
-    for (const sid of Object.keys(program.sessions)) {
-      const room = roomFor(sid);
-      this.rooms.set(sid, room);
+    for (const room of rooms.values()) {
       this.unsubs.push(room.subscribe(ev => this.onRoom(room, ev)));
       if (room.ready) this.onRoom(room, { type: 'reset' });   // already live (opened by the hall)
     }
@@ -204,7 +221,7 @@ export class WallRooms {
   }
 
   roomFor(msg) {
-    if (msg.t === 'create') return this.rooms.get(this.program.papers[uidOf(msg)]?.session);
+    if (msg.t === 'create') return this.rooms.get(this.keyForCreate(msg));
     return this.owner.get(msg.id);
   }
 
@@ -227,7 +244,8 @@ export class WallRooms {
 
 /**
  * The wall itself: BoardView's camera, notes and dragging, with pins drawn underneath and note
- * positions read from wx/wy. `buildPin(paper)` (app.js) makes a pin's card.
+ * positions read from wx/wy. From app.js: `layout` (buildWallLayout), `items` (uid -> paper or
+ * LBD), `buildPin(item)` makes a pin's card and `regionHead(region)` an area's title band.
  */
 export class WallView extends BoardView {
   constructor(mount, o) {
@@ -247,17 +265,17 @@ export class WallView extends BoardView {
   get W() { return this.opts.layout.W; }
   get H() { return this.opts.layout.H; }
 
-  owns(n) { return this.opts.layout.pins.has(uidOf(n)); }
+  owns(n) { return this.opts.layout.pins.has(uidIn(this.wall, n)); }
 
   notePos(n) {
-    const pin = this.opts.layout.pins.get(uidOf(n));
+    const pin = this.opts.layout.pins.get(uidIn(this.wall, n));
     if (Number.isFinite(n.wx) && Number.isFinite(n.wy)) return { x: pin.x + n.wx, y: pin.y + n.wy };
     // Older notes: computed spots, the same for every viewer.
-    return wallPositions(this.opts.layout, [...this.room.notes.values()].filter(m => uidOf(m) === uidOf(n))).get(n.id) || { x: pin.x + PIN_W + SLOT_GAP, y: pin.y };
+    return wallPositions(this.opts.layout, [...this.room.notes.values()].filter(m => uidIn(this.wall, m) === uidIn(this.wall, n))).get(n.id) || { x: pin.x + PIN_W + SLOT_GAP, y: pin.y };
   }
 
   sendMove(final, id, x, y) {
-    const n = this.room.notes.get(id), pin = n && this.wall.pins.get(uidOf(n));
+    const n = this.room.notes.get(id), pin = n && this.wall.pins.get(uidIn(this.wall, n));
     if (!pin) return false;
     const msg = { t: final ? 'wmove' : 'wdrag', id, wx: Math.round(x - pin.x), wy: Math.round(y - pin.y) };
     return final ? this.room.send(msg) : this.room.raw(msg);
@@ -280,7 +298,7 @@ export class WallView extends BoardView {
   onRoom(ev) {
     if (ev.type === 'drag') return;   // a move on a paper board, not here
     if (ev.type === 'wdrag') {
-      const n = this.room.notes.get(ev.id), pin = n && this.wall.pins.get(uidOf(n));
+      const n = this.room.notes.get(ev.id), pin = n && this.wall.pins.get(uidIn(this.wall, n));
       if (!pin) return;
       super.onRoom({ type: 'drag', id: ev.id, x: pin.x + ev.wx, y: pin.y + ev.wy });
       return;
@@ -293,20 +311,20 @@ export class WallView extends BoardView {
   buildWall() {
     const layer = el('div', 'pc-wall-layer');
     const pins = el('div', 'pc-wall-layer pc-wall-pins');
-    const { program, buildPin, regionHead } = this.opts;
+    const { items, buildPin, regionHead } = this.opts;
     for (const r of this.wall.regions) {
       const box = el('section', 'pc-wall-region');
       Object.assign(box.style, { left: r.x + 'px', top: r.y + 'px', width: r.w + 'px', height: r.h + 'px' });
-      const head = regionHead(program.sessions[r.id], r);
+      const head = regionHead(r);
       head.classList.add('pc-wall-region-head');
-      head.title = 'Zoom to this session';
+      head.title = 'Zoom to this area';
       head.addEventListener('click', () => this.glideTo(this.frameRect(r)));
       head.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.glideTo(this.frameRect(r)); } });
       box.append(head);
       layer.append(box);
     }
     for (const pin of this.wall.pins.values()) {
-      const card = buildPin(program.papers[pin.uid]);
+      const card = buildPin(items[pin.uid]);
       card.classList.add('pc-pin');
       card.dataset.uid = pin.uid;
       Object.assign(card.style, { left: pin.x + 'px', top: pin.y + 'px', width: PIN_W + 'px', height: PIN_H + 'px' });
@@ -346,7 +364,7 @@ export class WallView extends BoardView {
     return { s: this.clampScale(Math.min(vw / (r.w * margin), vh / (r.h * margin))), cx: r.x + r.w / 2, cy: r.y + r.h / 2 };
   }
 
-  /** Glide to one session's area (deep links). */
+  /** Glide to one area, e.g. a session's (deep links). */
   focusSession(id) {
     const r = this.wall.regions.find(r => r.id === id);
     if (r) this.glideTo(this.frameRect(r));
@@ -379,7 +397,7 @@ export class WallView extends BoardView {
   async commentOn(uid, at) {
     this.stopTour();
     if (!this.app.requireLogin('post a note')) return;
-    const paper = this.opts.program.papers[uid];
+    const paper = this.opts.items[uid], board = `${this.wall.prefix}:${uid}`;
     const result = await this.app.composer.open({ heading: 'New note', where: `${paper.displayId || '#' + uid} ${paper.title}`, max: this.room.limits.textMax });
     if (!result) return;
     const pin = this.wall.pins.get(uid);
@@ -388,8 +406,8 @@ export class WallView extends BoardView {
       ? { wx: Math.round(Math.min(Math.max(0, at.x), this.W - NOTE_W) - pin.x), wy: Math.round(Math.min(Math.max(0, at.y), this.H - 160) - pin.y) }
       : wallSlotFor(this.wall, uid, notes);
     const { boardW, boardH } = this.room.paperLimits;
-    const spot = freeBoardSpot(notes.filter(n => n.board === 'paper:' + uid), boardW, boardH);
-    this.room.send({ t: 'create', board: 'paper:' + uid, text: result.text, color: result.color, ...spot, ...slot });
+    const spot = freeBoardSpot(notes.filter(n => n.board === board), boardW, boardH);
+    this.room.send({ t: 'create', board, text: result.text, color: result.color, ...spot, ...slot });
   }
 
   destroy({ keepRooms = false } = {}) {
@@ -398,4 +416,3 @@ export class WallView extends BoardView {
   }
 }
 
-export { uidOf };

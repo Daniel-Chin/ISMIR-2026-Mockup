@@ -109,12 +109,20 @@
     <section id="lbd" class="section">
       <div class="section-heading">
         <div>
-          <h2 class="section-with-icon"><span class="section-icon section-icon-completed" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 2.5l2.6 6 6.4.6-4.9 4.2 1.5 6.3L12 16.3l-5.6 3.3 1.5-6.3L3 9.1l6.4-.6z"></path></svg></span>LBD Hall</h2>
+          <h2 class="section-with-icon"><span class="section-icon section-icon-completed" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 2.5l2.6 6 6.4.6-4.9 4.2 1.5 6.3L12 16.3l-5.6 3.3 1.5-6.3L3 9.1l6.4-.6z"></path></svg></span><span id="lbd-view-title">LBD Hall</span></h2>
           <p class="section-note">Late-Breaking Demos.</p>
+        </div>
+        <div class="pc-head-actions" id="lbd-view" hidden>
+          <span class="pc-seg-label">View</span>
+          <div class="pc-seg" role="group" aria-label="LBD view">
+            <button type="button" data-view="wall" title="Every LBD on one wall">Wall</button>
+            <button type="button" data-view="hall" title="Every LBD as a card with its own board">Hall</button>
+          </div>
         </div>
       </div>
       <div class="pc-lbd-placeholder"><strong>Opening soon</strong>Late-Breaking Demo boards will appear here once the LBD list is published.</div>
       <div id="lbd-hall" hidden></div>
+      <div id="lbd-wall" class="pc-wall" hidden></div>
     </section>
   </main>
 

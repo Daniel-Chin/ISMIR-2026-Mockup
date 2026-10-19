@@ -1,6 +1,6 @@
 import { Room } from './room.js';
 import { BoardView, timeAgo } from './board.js';
-import { WallRooms, WallView, buildWallLayout, screenAspect, wallSlotFor } from './wall.js';
+import { WallRooms, WallView, buildWallLayout, sameLayout, screenAspect, wallSlotFor } from './wall.js';
 import { apiFetch, apiUrl, takeTokenFromHash, clearToken, onSessionChange, hasSession } from './api.js';
 
 const COLORS = { sun: '#ffe27a', mint: '#a8f0c6', sky: '#a9dcff', rose: '#ffbfd0', lilac: '#dccbff', sand: '#f3dcae' };
@@ -9,6 +9,7 @@ const COLS_KEY = 'pcPapersPerRow';
 const LBD_COLS_KEY = 'pcLbdsPerRow';
 const COLOR_KEY = 'pcLastColor';
 const VIEW_KEY = 'pcPaperView';   // 'wall' (default) or 'hall'
+const LBD_VIEW_KEY = 'pcLbdView';  // the same for the LBDs
 
 const $ = sel => document.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -354,31 +355,63 @@ function scheduleBadges() {
   });
 }
 
-// ---------- paper wall (alternative view of the hall) ----------
+// ---------- paper wall and LBD wall (alternative views of the halls) ----------
+// What each wall shows (see wall.js): the papers by poster session, two rows to an area; the
+// LBDs in one area (one per group, should LBDs get a group), as many rows as fit the screen.
+const paperWallSpec = program => ({
+  prefix: 'paper', rows: 2,
+  groups: program.days.flatMap(day => day.sessions.map(sid => ({ id: sid, day: day.day, uids: program.sessions[sid]?.papers || [] }))),
+});
+const lbdWallSpec = program => {
+  const groups = new Map();
+  for (const l of program.lbds) {
+    const g = l.group || '';
+    (groups.get(g) || groups.set(g, []).get(g)).push(l.uid);
+  }
+  return { prefix: 'lbd', rows: 'fit', groups: [...groups].map(([group, uids]) => ({ id: group ? 'LBD-' + group : 'LBD', group, uids })) };
+};
+
 const papers = { view: 'hall', wall: null, layout: null };
-const wallLayout = () => (papers.layout ||= buildWallLayout(hall.program, screenAspect()));
+const lbds = { view: 'wall', wall: null, layout: null };
+const wallLayout = () => (papers.layout ||= buildWallLayout(paperWallSpec(hall.program), screenAspect()));
+const lbdWallLayout = () => (lbds.layout ||= buildWallLayout(lbdWallSpec(hall.program), screenAspect()));
 
 function makeWall(rooms) {
-  papers.wall = new WallView($('#paper-wall'), { room: rooms, app, program: hall.program, layout: wallLayout(), buildPin: pinCard, regionHead: wallRegionHead, noteTag: paperTag });
+  papers.wall = new WallView($('#paper-wall'), {
+    room: rooms, app, items: hall.program.papers, layout: wallLayout(), buildPin: pinCard,
+    regionHead: wallRegionHead, noteTag: paperTag,
+  });
   refreshSessionTimes();
 }
 
-// Rotating a tablet or resizing the window can call for another arrangement of the wall (more
-// or fewer sessions per row): rebuild the view, keeping its live connections.
+function makeLbdWall(rooms) {
+  lbds.wall = new WallView($('#lbd-wall'), {
+    room: rooms, app, title: 'LBD Wall', items: hall.lbdById, layout: lbdWallLayout(), buildPin: p => pinCard(p, { lbd: true }),
+    regionHead: lbdRegionHead, noteTag: lbdTag,
+  });
+  refreshSessionTimes();
+}
+
+// Rotating a tablet or resizing the window can call for another arrangement of a wall (more
+// or fewer areas per row): rebuild the view, keeping its live connections.
+function relayoutWall(state, spec, make) {
+  const next = buildWallLayout(spec, screenAspect());
+  if (sameLayout(next, state.layout)) return;
+  state.layout = next;
+  if (!state.wall) return;
+  const expanded = state.wall.frame.classList.contains('is-fullscreen');
+  const rooms = state.wall.room;
+  state.wall.destroy({ keepRooms: true });
+  make(rooms);
+  if (expanded) state.wall.toggleFullscreen();
+}
 let wallResizeTimer = 0;
 window.addEventListener('resize', () => {
   clearTimeout(wallResizeTimer);
   wallResizeTimer = setTimeout(() => {
     if (!hall.program) return;
-    const next = buildWallLayout(hall.program, screenAspect());
-    if (next.perRow === papers.layout?.perRow) return;
-    papers.layout = next;
-    if (!papers.wall) return;
-    const expanded = papers.wall.frame.classList.contains('is-fullscreen');
-    const rooms = papers.wall.room;
-    papers.wall.destroy({ keepRooms: true });
-    makeWall(rooms);
-    if (expanded) papers.wall.toggleFullscreen();
+    relayoutWall(papers, paperWallSpec(hall.program), makeWall);
+    if (hall.program.lbds?.length) relayoutWall(lbds, lbdWallSpec(hall.program), makeLbdWall);
   }, 300);
 });
 /** "P1-01" for a note on a paper's board: shown after the author on every paper note. */
@@ -401,7 +434,8 @@ function setPaperView(view, { link = true } = {}) {
     else {
       // One live connection per session. Kept (idle) while the hall is shown, so going back to
       // the wall, or jumping to a paper on it, shows every note at once.
-      const rooms = new WallRooms(hall.program, sessionRoom);
+      const rooms = new WallRooms(new Map(Object.keys(hall.program.sessions).map(sid => [sid, sessionRoom(sid)])),
+        msg => hall.program.papers[msg.board.slice('paper:'.length)]?.session);
       rooms.subscribe(ev => { if (ev.type === 'error') handleRoomError(ev); });
       makeWall(rooms);
     }
@@ -418,14 +452,21 @@ function initPaperView() {
   setPaperView(shared.has('wall') ? 'wall' : shared.has('hall') ? 'hall' : store.get(VIEW_KEY, 'wall'), { link: false });
 }
 
-/** A session's title band on the wall: "Mon · PS-01" and its Oral / Poster times. */
-function wallRegionHead(s, region) {
+/** An area's title band on a wall: "Mon · PS-01" and its Oral / Poster times. */
+function wallRegionHead(region, s = hall.program.sessions[region.id], name = `${region.day} · ${s.id}`) {
   // A div, not a <button>: overview.css restyles every bare button.
   const head = el('div', '');
   head.setAttribute('role', 'button');
   head.tabIndex = 0;
-  head.append(el('span', 'pc-wall-region-name', `${region.day} · ${s.id}`), timeBlock(s, 'pc-wall-region-time'));
+  head.append(el('span', 'pc-wall-region-name', name), timeBlock(s, 'pc-wall-region-time'));
   return head;
+}
+
+/** The LBD area's band: "Thu · Late-Breaking Demos" (or its group) and the LBD session's time. */
+function lbdRegionHead(region) {
+  const s = hall.program.lbdSession, date = s.slots[0]?.date;
+  const day = date ? new Date(date + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }) + ' · ' : '';
+  return wallRegionHead(region, s, day + (region.group ? `LBD · ${region.group}` : 'Late-Breaking Demos'));
 }
 
 /** Hall -> Wall: show paper `uid` on the wall, at 1000%, in the middle of the view. */
@@ -442,6 +483,18 @@ function showInHall(uid) {
   openPaper(uid);
 }
 
+/** The same two jumps for an LBD. */
+function showLbdOnWall(uid) {
+  setLbdView('wall', { link: false });
+  setLink('#lbdwall&lbd=' + encodeURIComponent(uid));
+  openLbd(uid);
+}
+function showLbdInHall(uid) {
+  setLbdView('hall', { link: false });
+  setLink('#lbdhall&lbd=' + encodeURIComponent(uid));
+  openLbd(uid);
+}
+
 /** "Presented In-person" plus a link to the same paper in the other view. */
 function presenterRow(p, cls, jump) {
   const row = el('div', cls);
@@ -455,30 +508,32 @@ function presenterRow(p, cls, jump) {
   return row;
 }
 
-/** A paper pinned to the wall: title, links, a Comment button; authors and time at the foot. */
-function pinCard(p) {
+/** A paper (or, lbd: true, an LBD) pinned to the wall: title, links, a Comment button; authors and time at the foot. */
+function pinCard(p, { lbd = false } = {}) {
   const card = el('article', '');
   card.append(el('span', 'pc-pin-tack'));
   const top = el('div', 'pc-pin-top');
   const comment = el('a', 'link-button pc-add-note pc-pin-comment', '+ Comment');
   comment.href = '#'; comment.setAttribute('role', 'button'); comment.dataset.comment = '';
-  top.append(paperIdLink(p, 'pc-pin-id pc-permalink', 'wall'), comment);
+  top.append(paperIdLink(p, 'pc-pin-id pc-permalink', lbd ? 'lbdwall' : 'wall'), comment);
   const title = el('h4', 'pc-pin-title');
-  const titleLink = linkButton(p.posterUrl, p.title);
+  const titleLink = linkButton(lbd ? p.pageUrl && p.pageUrl + '#detail' : p.posterUrl, p.title);
   if (titleLink) { titleLink.className = ''; title.append(titleLink); } else title.textContent = p.title;
   title.title = p.title;
   const foot = el('div', 'pc-pin-foot');
   const authors = el('span', 'pc-pin-authors', p.authors);
   authors.title = p.authors;
   foot.append(authors, presentTime(p));
-  const mode = presenterRow(p, 'pc-pin-mode', { label: 'In the Hall →', title: 'Open this paper in the Hall view', go: showInHall });
+  const mode = presenterRow(p, 'pc-pin-mode', lbd
+    ? { label: 'In the Hall →', title: 'Open this LBD in the Hall view', go: showLbdInHall }
+    : { label: 'In the Hall →', title: 'Open this paper in the Hall view', go: showInHall });
   card.append(top, title, mode, paperLinks(p), foot);
   return card;
 }
 
-/** When the paper is presented: its session's poster slot, in the zone chosen in the hero. */
+/** When the paper is presented: its session's poster slot (LBDs: the LBD session), in the zone chosen in the hero. */
 function presentTime(p) {
-  const s = hall.program.sessions[p.session];
+  const s = p.session ? hall.program.sessions[p.session] : hall.program.lbdSession;
   const box = el('span', 'pc-pin-time');
   if (!s) return box;
   const i = Math.max(0, s.slots.findIndex(slot => slot.kind === 'poster'));
@@ -510,8 +565,11 @@ function closeSession({ keepHash = false } = {}) {
  *   lounge.html#session=PS-03              a poster session, opened
  *   lounge.html#session=PS-03&paper=3      one paper's board in it (paper = papers.csv uid)
  *   lounge.html#paper=3                    same; the session is looked up (miniconf links use this)
- *   lounge.html#lbd                        LBD Hall
- *   lounge.html#lbd=569                    one LBD's board (569 = its CMT id, as lbd_569.html)
+ *   lounge.html#lbd                        LBD Hall section (in the view used last)
+ *   lounge.html#lbdwall / #lbdhall         the LBDs, as the LBD Wall / the LBD Hall
+ *   lounge.html#lbdwall&lbd=569            one LBD on the wall  } what "copy link" shares;
+ *   lounge.html#lbdhall&lbd=569            one LBD in the hall  } 569 = its CMT id (lbd_569.html)
+ *   lounge.html#lbd=569                    one LBD, in the view used last
  */
 function setLink(hash) {
   if (location.hash !== hash) history.replaceState(null, '', location.pathname + location.search + hash);
@@ -526,7 +584,12 @@ function paperLink(uid) {
 function route() {
   const params = new URLSearchParams(location.hash.slice(1));
   const paper = params.get('paper'), session = params.get('session'), lbd = params.get('lbd');
-  if (lbd) return openLbd(lbd);
+  if (hall.program.lbds?.length && (lbd || params.has('lbdwall') || params.has('lbdhall'))) {
+    if (params.has('lbdwall') && lbds.view !== 'wall') setLbdView('wall', { link: false });
+    if (params.has('lbdhall') && lbds.view !== 'hall') setLbdView('hall', { link: false });
+    if (lbd) openLbd(lbd); else keepInView(document.getElementById('lbd'));
+    return;
+  }
   // Shared links (#wall&paper=… / #hall&paper=…) open that view, whatever the visitor used last.
   if (params.has('wall') && papers.view !== 'wall') setPaperView('wall', { link: false });
   if (params.has('hall') && papers.view !== 'hall') setPaperView('hall', { link: false });
@@ -686,10 +749,10 @@ function linkButton(href, label) {
   return a;
 }
 
-/** The link people share: it opens this paper in `view` ('wall' or 'hall'), whatever view the
- * visitor used last, or (view 'lbd') this LBD in the LBD Hall. */
+/** The link people share: it opens this paper in `view` ('wall' or 'hall'), or this LBD in
+ * 'lbdwall' / 'lbdhall', whatever view the visitor used last. */
 const shareLink = (uid, view) => location.origin + location.pathname + location.search +
-  (view === 'lbd' ? `#lbd=${encodeURIComponent(uid)}` : `#${view}&paper=${encodeURIComponent(uid)}`);
+  (view.startsWith('lbd') ? `#${view}&lbd=${encodeURIComponent(uid)}` : `#${view}&paper=${encodeURIComponent(uid)}`);
 
 /** The paper id as a permalink: click it to copy a link to this paper in the view it sits in. */
 function paperIdLink(p, cls, view) {
@@ -713,7 +776,7 @@ function paperIdLink(p, cls, view) {
 
 /**
  * Same markup and classes as the live overview's paper card, minus its Zoom/speaker parts.
- * LBDs use it too (lbd: true): no Paper Wall, and their links go to the miniconf LBD page.
+ * LBDs use it too (lbd: true): the LBD Wall, and links to the miniconf LBD page.
  */
 function paperCard(p, { lbd = false } = {}) {
   const card = el('article', 'paper-card live-paper-card');
@@ -722,7 +785,7 @@ function paperCard(p, { lbd = false } = {}) {
   const status = el('div', 'paper-card-status-row');
   const count = el('span', 'pc-note-count', '0 notes');
   count.dataset.count = '';
-  const id = paperIdLink(p, 'paper-id pc-permalink', lbd ? 'lbd' : 'hall');
+  const id = paperIdLink(p, 'paper-id pc-permalink', lbd ? 'lbdhall' : 'hall');
   status.append(id, count);
 
   const copy = el('div', 'paper-card-copy');
@@ -749,7 +812,9 @@ function paperCard(p, { lbd = false } = {}) {
   copy.append(title, authorsWrap);
 
   const controls = el('div', 'paper-card-controls');
-  const modeRow = presenterRow(p, 'presenter-mode-row', lbd ? null : { label: 'On the Wall →', title: 'Show this paper on the Paper Wall', go: showOnWall });
+  const modeRow = presenterRow(p, 'presenter-mode-row', lbd
+    ? { label: 'On the Wall →', title: 'Show this LBD on the LBD Wall', go: showLbdOnWall }
+    : { label: 'On the Wall →', title: 'Show this paper on the Paper Wall', go: showOnWall });
   const links = paperLinks(p);
   controls.append(modeRow);
   if (links.childElementCount) controls.append(links);
@@ -832,7 +897,6 @@ function renderLbdHall() {
   if (!lbds?.length) return;   // nothing published yet: the "Opening soon" placeholder stays
   document.querySelector('.pc-lbd-placeholder')?.remove();
   const root = $('#lbd-hall');
-  root.hidden = false;
   const room = sessionRoom('LBD');
 
   const head = el('div', 'pc-lbd-head');
@@ -877,6 +941,8 @@ function renderLbdHall() {
         room, board: 'lbd:' + l.uid, title: `${l.displayId} ${l.title}`, app, fitNotes: true, dblclickExpands: true,
         emptyText: 'No notes yet: tap + Note to start the discussion',
         noteTag: lbdTag,
+        // The same note also appears on the LBD Wall, beside this LBD's pin.
+        createExtras: () => wallSlotFor(lbdWallLayout(), String(l.uid), [...room.notes.values()]),
       });
       lbdHall.boards.push(board);
       e.target.querySelector('[data-add]').addEventListener('click', ev => { ev.preventDefault(); board.compose(); });
@@ -908,10 +974,46 @@ function renderLbdHall() {
   if (room.ready) updateCounts();
 }
 
-/** lounge.html#lbd=569: bring that LBD's card into view (569 = its CMT id, as lbd_569.html). */
+/** Switch the LBD section between the wall (default) and the hall (one grid of cards). */
+function setLbdView(view, { link = true } = {}) {
+  view = view === 'hall' ? 'hall' : 'wall';
+  if (view === 'hall' && lbds.wall?.frame.classList.contains('is-fullscreen')) lbds.wall.toggleFullscreen();
+  lbds.view = view;
+  store.set(LBD_VIEW_KEY, view);
+  $('#lbd-hall').hidden = view !== 'hall';
+  $('#lbd-wall').hidden = view !== 'wall';
+  $('#lbd-view-title').textContent = view === 'wall' ? 'LBD Wall' : 'LBD Hall';
+  document.querySelectorAll('#lbd-view button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === view)));
+  if (view === 'wall') {
+    if (lbds.wall) lbds.wall.shown();
+    // One room for every LBD, shared with the hall (which already reports its errors).
+    else makeLbdWall(new WallRooms(new Map([['LBD', sessionRoom('LBD')]]), () => 'LBD'));
+  } else requestAnimationFrame(() => syncAuthorOverflow(lbdHall.grid));
+  if (link) setLink(view === 'wall' ? '#lbdwall' : '#lbdhall');
+}
+
+function initLbdView() {
+  if (!hall.program.lbds?.length) return;   // "Opening soon": no views to switch
+  hall.lbdById = Object.fromEntries(hall.program.lbds.map(l => [l.uid, l]));
+  renderLbdHall();
+  $('#lbd-view').hidden = false;
+  $('#lbd-view').addEventListener('click', e => {
+    const b = e.target.closest('button[data-view]');
+    if (b) setLbdView(b.dataset.view);
+  });
+  const shared = new URLSearchParams(location.hash.slice(1));
+  setLbdView(shared.has('lbdwall') ? 'wall' : shared.has('lbdhall') ? 'hall' : store.get(LBD_VIEW_KEY, 'wall'), { link: false });
+}
+
+/** One LBD (569 = its CMT id, as lbd_569.html): on the wall, fly to its pin; in the hall, its card. */
 function openLbd(uid) {
+  if (lbds.view === 'wall' && lbds.layout?.pins.has(uid)) {
+    document.getElementById('lbd')?.scrollIntoView();
+    lbds.wall.focusPaper(uid);
+    return;
+  }
   const card = lbdHall.cards.get(uid);
-  if (!card) { document.getElementById('lbd')?.scrollIntoView(); return; }
+  if (!card) { keepInView(document.getElementById('lbd')); return; }
   focusCard(card);
 }
 
@@ -986,7 +1088,7 @@ async function main() {
   applyConference(program.conference);
   renderHall();
   initPaperView();
-  renderLbdHall();
+  initLbdView();
   refreshSessionTimes();
   window.addEventListener('ismir-timezone-change', refreshSessionTimes);
   window.addEventListener('resize', () => {
