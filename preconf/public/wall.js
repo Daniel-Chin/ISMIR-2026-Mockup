@@ -77,9 +77,9 @@ export const sameLayout = (a, b) => !!a && !!b && a.perRow === b.perRow && a.row
 
 /** Shape (width / height) of the wall's expanded view in this window. */
 export function screenAspect() {
-  // The expanded board: the window minus the site header, margins, the board's title bar and
-  // the search bar under it.
-  return Math.max(200, window.innerWidth - 28) / Math.max(200, window.innerHeight - 200);
+  // The expanded board: the window minus its margins, the board's title bar and the search bar
+  // under it.
+  return Math.max(200, window.innerWidth - 28) / Math.max(200, window.innerHeight - 144);
 }
 
 /** The paper (or LBD) uid a note belongs to on this wall; '' for notes from elsewhere. */

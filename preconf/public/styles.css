@@ -243,7 +243,7 @@ html[data-theme="light"] .pc-btn-primary { background: #102a52; color: #fff; bor
      :has() then just skip this one. */
   .pc-board-frame:not(.is-fullscreen):has(:focus-visible) > .pc-board-tools { opacity: 1; pointer-events: auto; }
 }
-.pc-board-frame.is-fullscreen { position: fixed; inset: 70px 14px 14px; z-index: 60; display: flex; flex-direction: column; }
+.pc-board-frame.is-fullscreen { position: fixed; inset: 14px; z-index: 60; display: flex; flex-direction: column; }
 .pc-board-frame.is-fullscreen .pc-board-scroll { flex: 1; height: auto !important; }
 .pc-scrim { position: fixed; inset: 0; z-index: 55; background: rgba(4, 6, 12, .62); }
 /* An expanded board owns every gesture: the page behind neither scrolls nor bounces, and a
