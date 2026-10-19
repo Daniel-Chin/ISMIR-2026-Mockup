@@ -91,14 +91,17 @@ endif %}
       </button>
       {% endif %}
     </div>
-    {% if lbd.content.channel_url and config.lbd_day_release >= lbd.content.day
-    | int %}
     <div class="btn-group ml-3 mb-3">
+      {% if lbd.content.channel_url and config.lbd_day_release >= lbd.content.day
+      | int %}
       <a href="{{lbd.content.channel_url}}" class="btn btn-primary"
         target="_blank" rel="noopener noreferrer">{% include
         'slack_svg.html' %} {{lbd.content.channel_name}}</a>
+      {% endif %}
+      {# This LBD's board in the Warm-up Discussion (preconf/, lounge.html), in the LBD Hall. #}
+      <a href="lounge.html#lbd={{lbd.id}}" class="btn btn-outline-primary"
+        target="_blank" rel="noopener">Discussion</a>
     </div>
-    {% endif %}
   </div>
 </div>
 <div class="poster-content">

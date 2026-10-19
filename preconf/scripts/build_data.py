@@ -108,6 +108,52 @@ def presenter_mode(raw):
 # Same conditions as templates/poster.html: the section exists only when its column is filled.
 # (The page embeds them, so no raw Drive links leave the build.)
 MATERIAL_SECTIONS = [("paper", "raw_pdf_path"), ("poster", "raw_poster_pdf"), ("video", "video")]
+# The same for LBDs (lbds.csv, shown at lbd_<uid>.html#<id>; conditions as in templates/lbd.html).
+LBD_MATERIAL_SECTIONS = [("paper", "paper_link"), ("poster", "poster_link"), ("video", "youtube_id")]
+
+
+def lbd_authors(raw):
+    """'Last, First; Last, First' -> 'First Last; First Last', as main.py format_lbd shows them."""
+    names = []
+    for part in (raw or "").split(";"):
+        part = part.replace("*", "").strip()
+        if "," in part:
+            last, _, first = part.partition(",")
+            part = f"{first.strip()} {last.strip()}"
+        if part:
+            names.append(re.sub(r"\s+", " ", part))
+    return "; ".join(names) or "Authors TBA"
+
+
+def read_lbds(sd, miniconf):
+    """All LBDs, in programme order. They share one session, so they are not grouped.
+
+    Boards and links use the CMT id (uid), as the miniconf's lbd_<uid>.html pages do.
+    """
+    path = sd / "lbds.csv"
+    if not path.is_file():
+        return []
+    with open(path, encoding="utf-8", newline="") as f:
+        rows = [r for r in csv.DictReader(f) if re.fullmatch(r"\d{1,6}", (r.get("uid") or "").strip())]
+
+    def order(r):
+        pos = (r.get("position") or "").strip()
+        return (int(pos) if pos.isdigit() else 10**9, int(r["uid"]))
+    lbds = []
+    for r in sorted(rows, key=order):
+        uid = r["uid"].strip()
+        lbds.append({
+            "uid": uid,
+            "displayId": f"LBD-{uid}",
+            "title": (r.get("title") or "").strip(),
+            "authors": lbd_authors(r.get("authors", "")),
+            "channelUrl": (r.get("channel_url") or "").strip(),
+            "pageUrl": f"{miniconf}/lbd_{uid}.html" if miniconf else "",
+            # Slack channels are lp-* (in person) or lv-* (virtual); unknown otherwise.
+            "presenterMode": {"lp": "onsite", "lv": "online"}.get((r.get("channel_name") or "").strip().lower()[:2], ""),
+            "materials": [section for section, col in LBD_MATERIAL_SECTIONS if (r.get(col) or "").strip()],
+        })
+    return lbds
 
 
 def hhmm(value):
@@ -142,9 +188,11 @@ def main():
 
     # "Oral Session - 1" / "Poster Session - 1" in events.csv: each session's papers get a short
     # oral slot and a poster slot. Same title match as live_overview/scripts/update_schedule.py.
-    slots = {}
+    slots, lbd_slot = {}, None
     with open(sd / "events.csv", encoding="utf-8", newline="") as f:
         for ev in csv.DictReader(f):
+            if (ev.get("category") or "").strip().upper() == "LBD" and lbd_slot is None:
+                lbd_slot = {"kind": "lbd", "date": ev["start_date"].strip(), "start": hhmm(ev["start_time"]), "end": hhmm(ev["end_time"])}
             m = re.fullmatch(r"(Poster|Oral)\s+Session\s*-?\s*(\d+)", (ev.get("title") or "").strip(), re.I)
             if m:
                 slots.setdefault(int(m.group(2)), {})[m.group(1).lower()] = {
@@ -216,7 +264,9 @@ def main():
         "days": days,
         "sessions": {s["id"]: s for s in sessions},
         "papers": papers,
-        "lbds": [],  # sitedata has no LBD table yet
+        # One session for every LBD: its time, and the LBDs in programme order.
+        "lbdSession": {"id": "LBD", "slots": [lbd_slot] if lbd_slot else []},
+        "lbds": read_lbds(sd, miniconf),
     }
 
     out_json = ROOT / "public" / "data" / "program.json"
@@ -226,9 +276,14 @@ def main():
     vendor = ROOT / "public" / "vendor"
     vendor.mkdir(parents=True, exist_ok=True)
     for src, dst in VENDORED.items():
-        (vendor / dst).write_bytes(src.read_bytes())
+        data = src.read_bytes()
+        if dst == "overview.css":
+            # The overview scopes its paper-card styles to #live-events; the LBD Hall's grid
+            # (#lbd-grid) is on the page at the same time as an open session's, so it gets them too.
+            data = data.replace(b"#live-events", b":is(#live-events, #lbd-grid)")
+        (vendor / dst).write_bytes(data)
 
-    print(f"{len(sessions)} sessions, {len(papers)} papers -> {out_json.relative_to(ROOT)}")
+    print(f"{len(sessions)} sessions, {len(papers)} papers, {len(program['lbds'])} LBDs -> {out_json.relative_to(ROOT)}")
     if missing:
         print(f"WARNING: {len(missing)} assigned uids missing from papers.csv: {', '.join(missing)}")
 

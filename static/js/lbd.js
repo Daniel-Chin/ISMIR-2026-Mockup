@@ -8,6 +8,27 @@ $('.lbd-buttons button').on('click', function() {
   }
 });
 
+// Deep links: lbd_<uid>.html#paper (or #poster, #video, #details, #detail; any case) opens that
+// section, as if its button had been pressed, so a link can point at it. Used by the Warm-up
+// Discussion. Returns false when the URL names no section on this page.
+function openSectionFromHash() {
+  var id = (window.location.hash || '').slice(1).toLowerCase();
+  if (id === 'detail') id = 'details';
+  if (!/^[a-z][\w-]*$/.test(id)) return false;
+  var button = $('.lbd-buttons button[data-target="#' + id + '"]');
+  if (!button.length) return false;
+  if (!$('#' + id).hasClass('show')) button.trigger('click');
+  button[0].scrollIntoView({ block: 'start' });
+  return true;
+}
+
+// Pressing a section button puts it in the address bar too, so the link can be copied.
+$('.lbd-buttons button[data-target^="#"]').on('click', function() {
+  var hash = $(this).attr('data-target');
+  if (window.history.replaceState && window.location.hash !== hash) window.history.replaceState(null, '', hash);
+});
+$(window).on('hashchange', openSectionFromHash);
+
 $('.fullscreen-button').on('click', function() {
   fullscreen($(this).next('.fullscreen-iframe')[0])
 })
@@ -70,5 +91,6 @@ function fullscreenChange() {
 $("#fullscreen-iframe button#presentationMode").css('display', 'none !important');
 
 $(window).ready(function() {
-  $('.lbd-buttons button').first().trigger("click");
+  // A #section in the URL wins; otherwise open the first section, as before.
+  if (!openSectionFromHash()) $('.lbd-buttons button').first().trigger("click");
 })

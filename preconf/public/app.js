@@ -6,6 +6,7 @@ import { apiFetch, apiUrl, takeTokenFromHash, clearToken, onSessionChange, hasSe
 const COLORS = { sun: '#ffe27a', mint: '#a8f0c6', sky: '#a9dcff', rose: '#ffbfd0', lilac: '#dccbff', sand: '#f3dcae' };
 const USER_KEY = 'pcUser';
 const COLS_KEY = 'pcPapersPerRow';
+const LBD_COLS_KEY = 'pcLbdsPerRow';
 const COLOR_KEY = 'pcLastColor';
 const VIEW_KEY = 'pcPaperView';   // 'wall' (default) or 'hall'
 
@@ -207,7 +208,7 @@ function zonedToDate(date, hhmm, timeZone) {
 
 const viewerZone = () => window.ISMIRTimeZone?.getTimeZone?.() || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-const SLOT_LABELS = { oral: 'Oral', poster: 'Poster', session: '' };
+const SLOT_LABELS = { oral: 'Oral', poster: 'Poster', session: '', lbd: '' };
 
 /** One slot in the zone chosen in the hero, plus the venue time when they differ. */
 function slotTimes(slot) {
@@ -225,10 +226,13 @@ function slotTimes(slot) {
   return { main, venue: zone === venue ? '' : `${city} ${venueText}` };
 }
 
+/** A poster session, or "LBD": the one session every LBD shares. */
+const sessionById = id => (id === 'LBD' ? hall.program.lbdSession : hall.program.sessions[id]);
+
 function refreshSessionTimes() {
   if (!hall.program) return;
   document.querySelectorAll('[data-session-time]').forEach(node => {
-    const slots = hall.program.sessions[node.dataset.sessionTime].slots;
+    const slots = sessionById(node.dataset.sessionTime)?.slots || [];
     node.querySelectorAll('[data-slot]').forEach(line => {
       const t = slotTimes(slots[Number(line.dataset.slot)]);
       line.querySelector('.pc-time-main').textContent = t.main;
@@ -311,7 +315,7 @@ const SNAPSHOT_FRESH_MS = 15_000;
 function sessionRoom(sid) {
   let room = sessionRooms.get(sid);
   if (!room) {
-    room = new Room('session:' + sid);
+    room = new Room(sid === 'LBD' ? 'lbd' : 'session:' + sid);
     room.subscribe(ev => {
       if (ev.type === 'reset') userFromRoom(room);
       if (['reset', 'upsert', 'remove'].includes(ev.type)) scheduleBadges();
@@ -325,6 +329,7 @@ function sessionRoom(sid) {
 async function loadSnapshot() {
   try {
     const ids = Object.keys(hall.program.sessions);
+    if (hall.program.lbds?.length) ids.push('LBD');
     const res = await apiFetch('/api/snapshot?rooms=' + encodeURIComponent(ids.join(',')), { cache: 'no-store' });
     if (!res.ok) return;
     const data = await res.json();
@@ -441,6 +446,7 @@ function showInHall(uid) {
 function presenterRow(p, cls, jump) {
   const row = el('div', cls);
   row.append(el('div', 'presenter-mode-line', PRESENTER_LABELS[p.presenterMode] || 'Presentation mode TBA'));
+  if (!jump) return row;
   const a = el('a', 'pc-view-jump', jump.label);
   a.href = '#';
   a.title = jump.title;
@@ -504,6 +510,8 @@ function closeSession({ keepHash = false } = {}) {
  *   lounge.html#session=PS-03              a poster session, opened
  *   lounge.html#session=PS-03&paper=3      one paper's board in it (paper = papers.csv uid)
  *   lounge.html#paper=3                    same; the session is looked up (miniconf links use this)
+ *   lounge.html#lbd                        LBD Hall
+ *   lounge.html#lbd=569                    one LBD's board (569 = its CMT id, as lbd_569.html)
  */
 function setLink(hash) {
   if (location.hash !== hash) history.replaceState(null, '', location.pathname + location.search + hash);
@@ -517,7 +525,8 @@ function paperLink(uid) {
 /** Go to whatever the current #fragment names. */
 function route() {
   const params = new URLSearchParams(location.hash.slice(1));
-  const paper = params.get('paper'), session = params.get('session');
+  const paper = params.get('paper'), session = params.get('session'), lbd = params.get('lbd');
+  if (lbd) return openLbd(lbd);
   // Shared links (#wall&paper=… / #hall&paper=…) open that view, whatever the visitor used last.
   if (params.has('wall') && papers.view !== 'wall') setPaperView('wall', { link: false });
   if (params.has('hall') && papers.view !== 'hall') setPaperView('hall', { link: false });
@@ -537,7 +546,8 @@ function route() {
     return;
   }
   const section = location.hash.slice(1);
-  if (['welcome', 'papers', 'lbd', 'home'].includes(section)) document.getElementById(section)?.scrollIntoView();
+  // The wall above the LBD Hall can still be growing, so keep the section in place meanwhile.
+  if (['welcome', 'papers', 'lbd', 'home'].includes(section)) keepInView(document.getElementById(section));
 }
 
 function openPaper(uid) {
@@ -546,15 +556,24 @@ function openPaper(uid) {
   if (hall.open?.id !== paper.session) openSession(paper.session, false);
   setLink(paperLink(uid));
   const card = document.getElementById('paper-' + uid);
-  if (!card) return;
+  if (card) focusCard(card);
+}
+
+/** Highlight a card and keep it just under the sticky header while the page settles. */
+function focusCard(card) {
   card.classList.add('pc-paper-focus');
   setTimeout(() => card.classList.remove('pc-paper-focus'), 2600);
-  // Put the card's top edge just inside the view, right under the sticky header. Content above
+  keepInView(card);
+}
+
+/** Keep `node` just under the sticky header while the page settles. */
+function keepInView(node) {
+  // Put the top edge just inside the view, right under the sticky header. Content above
   // (boards, fonts) can still shift while the page settles, so re-align a few times, unless
   // the user scrolls.
   const align = () => {
     const header = document.querySelector('.site-header')?.getBoundingClientRect().bottom || 0;
-    const y = card.getBoundingClientRect().top + scrollY - header - 8;   // 8px: the focus outline shows
+    const y = node.getBoundingClientRect().top + scrollY - header - 8;   // 8px: the focus outline shows
     if (Math.abs(y - scrollY) > 2) window.scrollTo({ top: y, behavior: 'instant' });
   };
   let userScrolled = false;
@@ -668,8 +687,9 @@ function linkButton(href, label) {
 }
 
 /** The link people share: it opens this paper in `view` ('wall' or 'hall'), whatever view the
- * visitor used last. */
-const shareLink = (uid, view) => location.origin + location.pathname + location.search + `#${view}&paper=${encodeURIComponent(uid)}`;
+ * visitor used last, or (view 'lbd') this LBD in the LBD Hall. */
+const shareLink = (uid, view) => location.origin + location.pathname + location.search +
+  (view === 'lbd' ? `#lbd=${encodeURIComponent(uid)}` : `#${view}&paper=${encodeURIComponent(uid)}`);
 
 /** The paper id as a permalink: click it to copy a link to this paper in the view it sits in. */
 function paperIdLink(p, cls, view) {
@@ -691,24 +711,27 @@ function paperIdLink(p, cls, view) {
   return id;
 }
 
-/** Same markup and classes as the live overview's paper card, minus its Zoom/speaker parts. */
-function paperCard(p) {
+/**
+ * Same markup and classes as the live overview's paper card, minus its Zoom/speaker parts.
+ * LBDs use it too (lbd: true): no Paper Wall, and their links go to the miniconf LBD page.
+ */
+function paperCard(p, { lbd = false } = {}) {
   const card = el('article', 'paper-card live-paper-card');
-  card.id = 'paper-' + p.uid;
+  card.id = (lbd ? 'lbd-' : 'paper-') + p.uid;
 
   const status = el('div', 'paper-card-status-row');
   const count = el('span', 'pc-note-count', '0 notes');
   count.dataset.count = '';
-  const id = paperIdLink(p, 'paper-id pc-permalink', 'hall');
+  const id = paperIdLink(p, 'paper-id pc-permalink', lbd ? 'lbd' : 'hall');
   status.append(id, count);
 
   const copy = el('div', 'paper-card-copy');
   const title = el('h4', 'paper-title');
-  const titleLink = linkButton(p.posterUrl, p.title);
+  const titleLink = linkButton(lbd ? p.pageUrl && p.pageUrl + '#detail' : p.posterUrl, p.title);
   if (titleLink) { titleLink.className = ''; title.append(titleLink); } else title.textContent = p.title;
   const authorsWrap = el('div', 'paper-authors-wrap');
   const authors = el('div', 'paper-authors', p.authors);
-  authors.id = 'paper-authors-' + p.uid;
+  authors.id = card.id + '-authors';
   authors.dataset.paperAuthors = '';
   const more = el('button', 'paper-authors-toggle', 'more');
   more.type = 'button';
@@ -726,7 +749,7 @@ function paperCard(p) {
   copy.append(title, authorsWrap);
 
   const controls = el('div', 'paper-card-controls');
-  const modeRow = presenterRow(p, 'presenter-mode-row', { label: 'On the Wall →', title: 'Show this paper on the Paper Wall', go: showOnWall });
+  const modeRow = presenterRow(p, 'presenter-mode-row', lbd ? null : { label: 'On the Wall →', title: 'Show this paper on the Paper Wall', go: showOnWall });
   const links = paperLinks(p);
   controls.append(modeRow);
   if (links.childElementCount) controls.append(links);
@@ -744,13 +767,14 @@ function paperCard(p) {
 }
 
 /**
- * Slack / Paper / Poster / Video. Paper, Poster and Video open the miniconf paper page in a new
- * tab, at that section (poster.js there opens the section named by the #fragment).
+ * Slack / Paper / Poster / Video. Paper, Poster and Video open the miniconf paper (or LBD) page
+ * in a new tab, at that section (poster.js / lbd.js there open the section named by the #fragment).
  */
 function paperLinks(p) {
   const links = el('div', 'link-row');
   const has = new Set(p.materials || []);
-  const section = id => (has.has(id) && p.posterUrl ? `${p.posterUrl}#${id}` : '');
+  const page = p.posterUrl || p.pageUrl;
+  const section = id => (has.has(id) && page ? `${page}#${id}` : '');
   for (const a of [linkButton(p.channelUrl, 'Slack'), linkButton(section('paper'), 'Paper'), linkButton(section('poster'), 'Poster'), linkButton(section('video'), 'Video')]) {
     if (a) links.append(a);
   }
@@ -793,6 +817,102 @@ async function refreshCounts() {
       if (badge) badge.textContent = `${sessionNoteCount(s)} notes`;
     }
   } catch { /* badges are best effort */ }
+}
+
+// ---------- LBD hall ----------
+// Every LBD shares one session, so they are not grouped: one grid of cards, one room ("lbd",
+// boards "lbd:<CMT id>"). Boards are made as their cards come near the view, so a long list
+// costs nothing until it is scrolled through.
+const lbdHall = { grid: null, cards: new Map(), boards: [] };
+const lbdTag = n => (n.board?.startsWith('lbd:') ? 'LBD-' + n.board.slice(4) : '');
+const noteCountText = n => `${n} note${n === 1 ? '' : 's'}`;
+
+function renderLbdHall() {
+  const { lbds, lbdSession } = hall.program;
+  if (!lbds?.length) return;   // nothing published yet: the "Opening soon" placeholder stays
+  document.querySelector('.pc-lbd-placeholder')?.remove();
+  const root = $('#lbd-hall');
+  root.hidden = false;
+  const room = sessionRoom('LBD');
+
+  const head = el('div', 'pc-lbd-head');
+  const sub = el('div', 'pc-sub');
+  const total = el('span', 'pc-stat', noteCountText(0));
+  sub.append(timeBlock(lbdSession, 'pc-panel-time'), el('span', 'pc-stat-sep', '·'),
+    el('span', 'pc-stat', `${lbds.length} LBD${lbds.length === 1 ? '' : 's'}`), el('span', 'pc-stat-sep', '·'), total);
+  const tools = el('div', 'pc-head-actions');
+  const seg = el('div', 'pc-seg');
+  seg.setAttribute('role', 'group');
+  seg.setAttribute('aria-label', 'LBDs per row');
+  tools.append(el('span', 'pc-seg-label', 'Per row'), seg);
+  head.append(sub, tools);
+
+  // Shares the overview's card styles with an open session's grid (see build_data.py).
+  const grid = lbdHall.grid = el('div', 'pc-paper-grid live-poster-paper-panel');
+  grid.id = 'lbd-grid';
+  const setCols = n => {
+    store.set(LBD_COLS_KEY, n);
+    grid.style.setProperty('--cols', n);
+    requestAnimationFrame(() => syncAuthorOverflow(grid));
+    seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.n) === n)));
+  };
+  for (const n of [1, 2, 3, 4]) {
+    const b = el('button', '', String(n));
+    b.type = 'button'; b.dataset.n = n;
+    b.addEventListener('click', () => {
+      setCols(n);
+      // New card widths: once the boards have re-laid out, show each one's default view again.
+      requestAnimationFrame(() => requestAnimationFrame(() => { for (const board of lbdHall.boards) { board.layout(); board.fitToNotes(); } }));
+    });
+    seg.append(b);
+  }
+
+  const counters = new Map();
+  const near = new IntersectionObserver(entries => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      near.unobserve(e.target);
+      const l = hall.program.lbds.find(x => 'lbd-' + x.uid === e.target.id);
+      const board = new BoardView(e.target.querySelector('.pc-paper-board'), {
+        room, board: 'lbd:' + l.uid, title: `${l.displayId} ${l.title}`, app, fitNotes: true, dblclickExpands: true,
+        emptyText: 'No notes yet: tap + Note to start the discussion',
+        noteTag: lbdTag,
+      });
+      lbdHall.boards.push(board);
+      e.target.querySelector('[data-add]').addEventListener('click', ev => { ev.preventDefault(); board.compose(); });
+    }
+  }, { rootMargin: '800px 0px' });
+  for (const l of lbds) {
+    const card = paperCard(l, { lbd: true });
+    grid.append(card);
+    lbdHall.cards.set(l.uid, card);
+    counters.set('lbd:' + l.uid, card.querySelector('[data-count]'));
+    near.observe(card);
+  }
+  root.replaceChildren(head, grid);
+  setCols(store.get(LBD_COLS_KEY, 2));
+
+  const updateCounts = () => {
+    let sum = 0;
+    for (const [bid, node] of counters) {
+      const n = room.countFor(bid);
+      sum += n;
+      node.textContent = noteCountText(n);
+    }
+    total.textContent = noteCountText(sum);
+  };
+  room.subscribe(ev => {
+    if (ev.type === 'error') handleRoomError(ev);
+    if (['reset', 'upsert', 'remove'].includes(ev.type)) updateCounts();
+  });
+  if (room.ready) updateCounts();
+}
+
+/** lounge.html#lbd=569: bring that LBD's card into view (569 = its CMT id, as lbd_569.html). */
+function openLbd(uid) {
+  const card = lbdHall.cards.get(uid);
+  if (!card) { document.getElementById('lbd')?.scrollIntoView(); return; }
+  focusCard(card);
 }
 
 // ---------- welcome reception ----------
@@ -866,9 +986,13 @@ async function main() {
   applyConference(program.conference);
   renderHall();
   initPaperView();
+  renderLbdHall();
   refreshSessionTimes();
   window.addEventListener('ismir-timezone-change', refreshSessionTimes);
-  window.addEventListener('resize', () => { if (hall.open) syncAuthorOverflow(hall.open.panel); });
+  window.addEventListener('resize', () => {
+    if (hall.open) syncAuthorOverflow(hall.open.panel);
+    if (lbdHall.grid) syncAuthorOverflow(lbdHall.grid);
+  });
   // Session badges: refresh every 20 s while the page is visible, and at once when it comes
   // back to the foreground (another tab, another app, a phone waking up).
   snapshotReady.then(refreshCounts);

@@ -352,15 +352,15 @@ html:not([data-theme="light"]) .pc-session-panel-head button.pc-fs-btn:not(.deta
 
 .pc-paper-grid { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); gap: 18px; margin-top: 16px; }
 /* Paper cards are the live overview's own .live-paper-card (see app.js paperCard). */
-#live-events.pc-paper-grid .live-paper-card { min-height: 0; }
+:is(#live-events, #lbd-grid).pc-paper-grid .live-paper-card { min-height: 0; }
 /* Paper titles stay links, but at rest without the overview's underline, highlighter band and ↗. */
 /* Hover / focus keep the overview's highlight block. */
-#live-events.pc-paper-grid .paper-title a:not(:hover):not(:focus-visible),
-html[data-theme="light"] #live-events.pc-paper-grid .paper-title a:not(:hover):not(:focus-visible) {
+:is(#live-events, #lbd-grid).pc-paper-grid .paper-title a:not(:hover):not(:focus-visible),
+html[data-theme="light"] :is(#live-events, #lbd-grid).pc-paper-grid .paper-title a:not(:hover):not(:focus-visible) {
   text-decoration: none !important; background: none !important;
 }
-#live-events.pc-paper-grid .paper-title a::after { content: none !important; }
-#live-events.pc-paper-grid .paper-title a { text-decoration: none !important; }
+:is(#live-events, #lbd-grid).pc-paper-grid .paper-title a::after { content: none !important; }
+:is(#live-events, #lbd-grid).pc-paper-grid .paper-title a { text-decoration: none !important; }
 .pc-add-note::after { content: none !important; }   /* not an external link: no ↗ */
 /* The paper-card copy gets its size from a #live-events rule; give the Welcome one the same. */
 #welcome-add.pc-add-note { font-size: .76rem; height: 28px; }
@@ -369,7 +369,7 @@ html[data-theme="light"] #live-events.pc-paper-grid .paper-title a:not(:hover):n
 html[data-theme="light"] .pc-add-note:not(:hover):not(:focus-visible) { background: #cdeef7 !important; }
 html:not([data-theme="light"]) .pc-add-note:not(:hover):not(:focus-visible) { background: linear-gradient(180deg, #1d3a57 0%, #11253d 100%) !important; }
 /* A paper opened from its miniconf page (#paper=<uid>) flashes briefly. */
-#live-events.pc-paper-grid .live-paper-card.pc-paper-focus { outline: 3px solid var(--gold); outline-offset: 3px; transition: outline-color .6s ease; }
+:is(#live-events, #lbd-grid).pc-paper-grid .live-paper-card.pc-paper-focus { outline: 3px solid var(--gold); outline-offset: 3px; transition: outline-color .6s ease; }
 a.pc-permalink { text-decoration: none; cursor: pointer; }
 a.pc-permalink:hover { text-decoration: underline; text-underline-offset: 3px; }
 .pc-note-count { color: var(--pc-note-count); font-size: .74rem; font-weight: 900; letter-spacing: .04em; white-space: nowrap; }
@@ -392,6 +392,8 @@ html:not([data-theme="light"]) .pc-board-frame { border-color: #5a6a86; box-shad
 html:not([data-theme="light"]) .pc-note.dragging { box-shadow: 10px 10px 0 rgba(5, 8, 15, .6); }
 html:not([data-theme="light"]) .pc-board-empty { color: rgba(255, 255, 255, .55); }
 
+.pc-lbd-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-bottom: 12px; border-bottom: 2px dashed var(--pc-border); }
+.pc-lbd-head .pc-sub { margin-top: 0; font-size: .85rem; }
 .pc-lbd-placeholder { padding: 28px; text-align: center; color: var(--muted); border: 2px dashed var(--pc-border); background: var(--pc-panel); }
 .pc-lbd-placeholder strong { display: block; color: var(--pc-title); font-size: 1.15rem; margin-bottom: 6px; }
 
