@@ -10,7 +10,7 @@ again, so the CI cache (.github/workflows/refresh-website.yml) avoids duplicate
 requests to Google.
 
 If Google rate-limits us, wait 5 minutes and retry. Abort if any thumbnail is
-over 1 MB.
+over 1.2 MB.
 
 Usage:
   python scripts/download_paper_thumbnails.py [--mockup]
@@ -33,7 +33,7 @@ MAP_NAME = "url_map.json"
 THUMBNAIL_COLUMNS = ("raw_thumbnail", "raw_thumbnail_path", "thumbnail")
 RATE_LIMIT_WAIT_SECONDS = 5 * 60
 MAX_RATE_LIMIT_RETRIES = 6
-MAX_BYTES = 1_000_000
+MAX_BYTES = 1_200_000
 
 
 def drive_file_id(url: str) -> str | None:
