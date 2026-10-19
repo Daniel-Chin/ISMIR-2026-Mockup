@@ -31,7 +31,7 @@ PUBLIC = ROOT / "public"
 PAGE = "lounge.html"
 ASSET_DIR = "lounge"
 # Files the page loads; everything else in public/ (local probes, etc.) stays out of the build.
-ASSETS = ["app.js", "board.js", "wall.js", "room.js", "api.js", "styles.css"]
+ASSETS = ["app.js", "board.js", "wall.js", "room.js", "api.js", "search.js", "styles.css"]
 ASSET_DIRS = ["vendor", "data"]
 
 

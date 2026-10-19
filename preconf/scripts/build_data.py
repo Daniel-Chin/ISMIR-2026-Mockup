@@ -127,6 +127,28 @@ def lbd_authors(raw):
     return "; ".join(names) or "Authors TBA"
 
 
+def miniconf_list(value):
+    """main.py extract_list_field: split on ';' and '->', trim, capitalise the first letter."""
+    terms = (t.strip() for part in (value or "").split(";") for t in part.split("->"))
+    return [t[:1].upper() + t[1:] for t in terms if t]
+
+
+def paper_keywords(row):
+    """The keywords the miniconf searches papers by (main.py format_paper), for the same search here."""
+    words = miniconf_list(row.get("primary_subject")) + miniconf_list(row.get("secondary_subject"))
+    words += ["TISMIR"] if row.get("is_tismir", "").strip() in {"TRUE", "Yes"} else []
+    words += ["Awards Nominee"] if flag_set("AwardNominee", row.get("AwardNominee", "")) else []
+    words += ["Open Review"] if row.get("publish_reviews", "").strip() in {"TRUE", "Yes"} else []
+    return list(dict.fromkeys(words))
+
+
+def lbd_keywords(row):
+    """As main.py format_lbd: the real sheet's key_words, or the mock sheet's primary_subject."""
+    if "key_words" in row:
+        return list(dict.fromkeys(k.strip() for k in re.split(r"[,;\n]", row["key_words"]) if k.strip() and k.strip() != "[Not Answered]"))
+    return miniconf_list(row.get("primary_subject"))
+
+
 def lbd_presenter_mode(row):
     """Real sheet: presentation_mode ("Virtual", "In-Person"); mock: Slack lp-* / lv-* channels."""
     if (row.get("presentation_mode") or "").strip():
@@ -160,6 +182,7 @@ def read_lbds(sd, miniconf):
             "channelUrl": (r.get("channel_url") or "").strip(),
             "pageUrl": f"{miniconf}/lbd_{uid}.html" if miniconf else "",
             "presenterMode": lbd_presenter_mode(r),
+            "keywords": lbd_keywords(r),
             "materials": [section for section, cols in LBD_MATERIAL_SECTIONS if any((r.get(c) or "").strip() for c in cols)],
             # Empty for now; once filled, the LBD Wall puts each group in its own area.
             **({"group": r["group_id"].strip()} if (r.get("group_id") or "").strip() else {}),
@@ -245,6 +268,7 @@ def main():
             paper["authors"] = overview_authors(row.get("authors_and_affil", ""))
             paper["presenterMode"] = presenter_mode(row.get("paper_presentation", ""))
             paper["materials"] = [section for section, col in MATERIAL_SECTIONS if row.get(col, "").strip()]
+            paper["keywords"] = paper_keywords(row)
             papers[uid] = paper
         found = slots.get(int(number.group()), {}) if number else {}
         # Oral first, then poster; fall back to the combined window when events.csv lacks them.

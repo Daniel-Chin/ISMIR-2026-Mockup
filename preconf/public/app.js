@@ -1,6 +1,7 @@
 import { Room } from './room.js';
 import { BoardView, timeAgo } from './board.js';
 import { WallRooms, WallView, buildWallLayout, sameLayout, screenAspect, wallSlotFor } from './wall.js';
+import { SearchBox } from './search.js';
 import { apiFetch, apiUrl, takeTokenFromHash, clearToken, onSessionChange, hasSession } from './api.js';
 
 const COLORS = { sun: '#ffe27a', mint: '#a8f0c6', sky: '#a9dcff', rose: '#ffbfd0', lilac: '#dccbff', sand: '#f3dcae' };
@@ -371,8 +372,9 @@ const lbdWallSpec = program => {
   return { prefix: 'lbd', rows: 'fit', groups: [...groups].map(([group, uids]) => ({ id: group ? 'LBD-' + group : 'LBD', group, uids })) };
 };
 
-const papers = { view: 'hall', wall: null, layout: null };
-const lbds = { view: 'wall', wall: null, layout: null };
+// match: the uids a search shows (null: no search). See initSearch.
+const papers = { view: 'hall', wall: null, layout: null, match: null, search: null, results: null };
+const lbds = { view: 'wall', wall: null, layout: null, match: null, search: null };
 const wallLayout = () => (papers.layout ||= buildWallLayout(paperWallSpec(hall.program), screenAspect()));
 const lbdWallLayout = () => (lbds.layout ||= buildWallLayout(lbdWallSpec(hall.program), screenAspect()));
 
@@ -381,6 +383,7 @@ function makeWall(rooms) {
     room: rooms, app, items: hall.program.papers, layout: wallLayout(), buildPin: pinCard,
     regionHead: wallRegionHead, noteTag: paperTag,
   });
+  papers.wall.setFilter(papers.match);
   refreshSessionTimes();
 }
 
@@ -389,6 +392,7 @@ function makeLbdWall(rooms) {
     room: rooms, app, title: 'LBD Wall', items: hall.lbdById, layout: lbdWallLayout(), buildPin: p => pinCard(p, { lbd: true }),
     regionHead: lbdRegionHead, noteTag: lbdTag,
   });
+  lbds.wall.setFilter(lbds.match);
   refreshSessionTimes();
 }
 
@@ -469,8 +473,14 @@ function lbdRegionHead(region) {
   return wallRegionHead(region, s, day + (region.group ? `LBD · ${region.group}` : 'Late-Breaking Demos'));
 }
 
+/** A link to a paper (or LBD) the search hides: show everything again first. */
+function unhide(state, uid) {
+  if (state.match && !state.match.has(String(uid))) state.search.clear();
+}
+
 /** Hall -> Wall: show paper `uid` on the wall, at 1000%, in the middle of the view. */
 function showOnWall(uid) {
+  unhide(papers, uid);
   setPaperView('wall', { link: false });
   setLink('#wall&paper=' + encodeURIComponent(uid));
   document.getElementById('papers')?.scrollIntoView();
@@ -600,7 +610,7 @@ function route() {
   // On the wall, a paper or session link flies there instead of opening the hall.
   if (papers.view === 'wall' && ((paper && hall.program.papers[paper]) || (session && hall.program.sessions[session]))) {
     document.getElementById('papers')?.scrollIntoView();
-    if (paper && hall.program.papers[paper]) papers.wall.focusPaper(paper); else papers.wall.focusSession(session);
+    if (paper && hall.program.papers[paper]) { unhide(papers, paper); papers.wall.focusPaper(paper); } else { papers.search?.clear(); papers.wall.focusSession(session); }
     return;
   }
   if (paper && hall.program.papers[paper]) return openPaper(paper);
@@ -616,6 +626,11 @@ function route() {
 function openPaper(uid) {
   const paper = hall.program.papers[uid];
   if (!paper) { document.getElementById('papers')?.scrollIntoView(); return; }
+  // Found by the search: its card is in the results.
+  if (papers.match?.has(String(uid))) {
+    const found = document.getElementById('paper-' + uid);
+    if (found) { setLink('#hall&paper=' + encodeURIComponent(uid)); focusCard(found); return; }
+  }
   if (hall.open?.id !== paper.session) openSession(paper.session, false);
   setLink(paperLink(uid));
   const card = document.getElementById('paper-' + uid);
@@ -648,6 +663,7 @@ function keepInView(node) {
 function openSession(id, scroll) {
   const s = hall.program.sessions[id];
   if (!s) return;
+  papers.search?.clear();   // sessions are hidden while searching
   closeSession({ keepHash: true });
   setLink('#session=' + encodeURIComponent(id));
   const card = document.querySelector(`.pc-session-card[data-session="${CSS.escape(id)}"]`);
@@ -902,34 +918,15 @@ function renderLbdHall() {
   const head = el('div', 'pc-lbd-head');
   const sub = el('div', 'pc-sub');
   const total = el('span', 'pc-stat', noteCountText(0));
+  lbdHall.filter = uids => { for (const [uid, card] of lbdHall.cards) card.hidden = !!uids && !uids.has(uid); };
   sub.append(timeBlock(lbdSession, 'pc-panel-time'), el('span', 'pc-stat-sep', '·'),
     el('span', 'pc-stat', `${lbds.length} LBD${lbds.length === 1 ? '' : 's'}`), el('span', 'pc-stat-sep', '·'), total);
-  const tools = el('div', 'pc-head-actions');
-  const seg = el('div', 'pc-seg');
-  seg.setAttribute('role', 'group');
-  seg.setAttribute('aria-label', 'LBDs per row');
-  tools.append(el('span', 'pc-seg-label', 'Per row'), seg);
-  head.append(sub, tools);
-
   // Shares the overview's card styles with an open session's grid (see build_data.py).
   const grid = lbdHall.grid = el('div', 'pc-paper-grid live-poster-paper-panel');
   grid.id = 'lbd-grid';
-  const setCols = n => {
-    store.set(LBD_COLS_KEY, n);
-    grid.style.setProperty('--cols', n);
-    requestAnimationFrame(() => syncAuthorOverflow(grid));
-    seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.n) === n)));
-  };
-  for (const n of [1, 2, 3, 4]) {
-    const b = el('button', '', String(n));
-    b.type = 'button'; b.dataset.n = n;
-    b.addEventListener('click', () => {
-      setCols(n);
-      // New card widths: once the boards have re-laid out, show each one's default view again.
-      requestAnimationFrame(() => requestAnimationFrame(() => { for (const board of lbdHall.boards) { board.layout(); board.fitToNotes(); } }));
-    });
-    seg.append(b);
-  }
+  const tools = el('div', 'pc-head-actions');
+  tools.append(el('span', 'pc-seg-label', 'Per row'), perRowControl(grid, LBD_COLS_KEY, 'LBDs per row', () => lbdHall.boards));
+  head.append(sub, tools);
 
   const counters = new Map();
   const near = new IntersectionObserver(entries => {
@@ -956,7 +953,6 @@ function renderLbdHall() {
     near.observe(card);
   }
   root.replaceChildren(head, grid);
-  setCols(store.get(LBD_COLS_KEY, 2));
 
   const updateCounts = () => {
     let sum = 0;
@@ -1007,6 +1003,7 @@ function initLbdView() {
 
 /** One LBD (569 = its CMT id, as lbd_569.html): on the wall, fly to its pin; in the hall, its card. */
 function openLbd(uid) {
+  unhide(lbds, uid);
   if (lbds.view === 'wall' && lbds.layout?.pins.has(uid)) {
     document.getElementById('lbd')?.scrollIntoView();
     lbds.wall.focusPaper(uid);
@@ -1015,6 +1012,128 @@ function openLbd(uid) {
   const card = lbdHall.cards.get(uid);
   if (!card) { keepInView(document.getElementById('lbd')); return; }
   focusCard(card);
+}
+
+// ---------- search (the miniconf's, see search.js) ----------
+// One box per section, for both of its views. The walls hide what it leaves out, in place; the
+// Paper Hall shows the papers found as cards instead of the sessions; the LBD Hall hides the
+// other cards.
+const searchItems = list => list.map(p => ({ uid: p.uid, title: p.title, keywords: p.keywords || [], authors: p.authors.split('; ').filter(a => a && a !== 'Authors TBA') }));
+
+function initSearch() {
+  const program = hall.program;
+  papers.search = new SearchBox($('#paper-search'), {
+    items: searchItems(program.days.flatMap(d => d.sessions.flatMap(sid => program.sessions[sid].papers.map(uid => program.papers[uid])))),
+    label: 'Search papers',
+    onChange: uids => {
+      papers.match = uids;
+      papers.wall?.setFilter(uids);
+      showPaperResults(uids);
+    },
+  });
+  if (!program.lbds?.length) return;
+  $('#lbd-search').hidden = false;
+  lbds.search = new SearchBox($('#lbd-search'), {
+    items: searchItems(program.lbds),
+    label: 'Search LBDs',
+    onChange: uids => {
+      lbds.match = uids;
+      lbds.wall?.setFilter(uids);
+      lbdHall.filter?.(uids);
+    },
+  });
+}
+
+/** Per-row buttons for a grid of cards; `boards()` are re-fitted after a change. */
+function perRowControl(grid, key, label, boards) {
+  const seg = el('div', 'pc-seg');
+  seg.setAttribute('role', 'group');
+  seg.setAttribute('aria-label', label);
+  const setCols = n => {
+    store.set(key, n);
+    grid.style.setProperty('--cols', n);
+    requestAnimationFrame(() => syncAuthorOverflow(grid));
+    seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.n) === n)));
+  };
+  for (const n of [1, 2, 3, 4]) {
+    const b = el('button', '', String(n));
+    b.type = 'button'; b.dataset.n = n;
+    b.addEventListener('click', () => {
+      setCols(n);
+      requestAnimationFrame(() => requestAnimationFrame(() => { for (const board of boards()) { board.layout(); board.fitToNotes(); } }));
+    });
+    seg.append(b);
+  }
+  setCols(store.get(key, 2));
+  return seg;
+}
+
+/** Paper Hall while searching: the papers found, as cards with their boards, instead of the sessions. */
+function showPaperResults(uids) {
+  const old = papers.results;
+  if (old) {
+    old.near.disconnect();
+    for (const b of old.boards) b.destroy();
+    for (const off of old.unsubs) off();
+    old.panel.remove();
+    papers.results = null;
+  }
+  document.querySelectorAll('#paper-hall .pc-day-row').forEach(row => { row.hidden = !!uids; });
+  if (!uids) return;
+  closeSession({ keepHash: true });
+  const program = hall.program;
+  const found = program.days.flatMap(d => d.sessions.flatMap(sid => program.sessions[sid].papers)).filter(uid => uids.has(String(uid)));
+  const panel = el('section', 'pc-session-panel pc-search-results');
+  const head = el('div', 'pc-session-panel-head');
+  head.append(el('h3', '', found.length ? `${found.length} paper${found.length === 1 ? '' : 's'} found` : 'No papers found'));
+  // As an opened session's grid: the overview's card styles are scoped to #live-events, and no
+  // session is open while searching.
+  const grid = el('div', 'pc-paper-grid live-poster-paper-panel');
+  grid.id = 'live-events';
+  const state = { panel, boards: [], unsubs: [], near: null };
+  const tools = el('div', 'pc-head-actions');
+  tools.append(el('span', 'pc-seg-label', 'Per row'), perRowControl(grid, COLS_KEY, 'Papers per row', () => state.boards));
+  head.append(tools);
+  panel.append(head, grid);
+  $('#paper-hall').append(panel);
+
+  // Boards as their cards come near the view, as in the LBD Hall: a search can find every paper.
+  state.near = new IntersectionObserver(entries => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      state.near.unobserve(e.target);
+      const uid = e.target.id.slice('paper-'.length), p = program.papers[uid];
+      const room = sessionRoom(p.session);
+      const board = new BoardView(e.target.querySelector('.pc-paper-board'), {
+        room, board: 'paper:' + uid, title: `#${uid} ${p.title}`, app, fitNotes: true, dblclickExpands: true,
+        emptyText: 'No notes yet: tap + Note to start the discussion',
+        noteTag: paperTag,
+        createExtras: () => wallSlotFor(wallLayout(), String(uid), [...room.notes.values()]),
+      });
+      state.boards.push(board);
+      e.target.querySelector('[data-add]').addEventListener('click', ev => { ev.preventDefault(); board.compose(); });
+    }
+  }, { rootMargin: '800px 0px' });
+  const counters = new Map();
+  for (const uid of found) {
+    const card = paperCard(program.papers[uid]);
+    grid.append(card);
+    counters.set('paper:' + uid, { node: card.querySelector('[data-count]'), room: sessionRoom(program.papers[uid].session) });
+    state.near.observe(card);
+  }
+  const update = () => {
+    for (const [bid, { node, room }] of counters) {
+      if (!room.ready) continue;
+      const n = room.countFor(bid);
+      node.textContent = noteCountText(n);
+    }
+  };
+  for (const room of new Set([...counters.values()].map(c => c.room))) {
+    state.unsubs.push(room.subscribe(ev => { if (['reset', 'upsert', 'remove'].includes(ev.type)) update(); }));
+  }
+  update();
+  papers.results = state;
+  requestAnimationFrame(() => syncAuthorOverflow(grid));
 }
 
 // ---------- welcome reception ----------
@@ -1089,10 +1208,12 @@ async function main() {
   renderHall();
   initPaperView();
   initLbdView();
+  initSearch();
   refreshSessionTimes();
   window.addEventListener('ismir-timezone-change', refreshSessionTimes);
   window.addEventListener('resize', () => {
     if (hall.open) syncAuthorOverflow(hall.open.panel);
+    if (papers.results) syncAuthorOverflow(papers.results.panel);
     if (lbdHall.grid) syncAuthorOverflow(lbdHall.grid);
   });
   // Session badges: refresh every 20 s while the page is visible, and at once when it comes

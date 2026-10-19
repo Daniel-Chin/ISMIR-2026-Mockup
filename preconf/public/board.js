@@ -142,6 +142,8 @@ export class BoardView {
   // ---------- hooks (overridden by the Paper Wall) ----------
   /** Does this view show note `n`? */
   owns(n) { return n.board === this.board; }
+  /** Hidden by a search (the walls); its place is kept. */
+  filteredOut() { return false; }
   /** Where note `n` sits on this surface. */
   notePos(n) { return { x: n.x, y: n.y }; }
   /** Send a drag preview (final=false) or the drop (final=true); returns false when offline. */
@@ -694,6 +696,7 @@ export class BoardView {
     }
     // Posted, not yet confirmed by the server: shown, but not editable or movable yet.
     node.classList.toggle('is-pending', !!n.pending);
+    node.classList.toggle('pc-filtered-out', this.filteredOut(n));
     const author = node.querySelector('.pc-note-author');
     author.textContent = n.authorName;
     if (this.isMine(n)) author.append(el('span', 'mine', ' (you)'));

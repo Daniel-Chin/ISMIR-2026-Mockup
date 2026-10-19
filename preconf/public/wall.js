@@ -267,6 +267,21 @@ export class WallView extends BoardView {
 
   owns(n) { return this.opts.layout.pins.has(uidIn(this.wall, n)); }
 
+  filteredOut(n) { return !!this.filter && !this.filter.has(uidIn(this.wall, n)); }
+
+  /**
+   * Show only the papers in `uids` (a Set; null shows all) and their notes. Nothing moves: the
+   * others are just hidden, so clearing the search puts the wall back as it was.
+   */
+  setFilter(uids) {
+    this.filter = uids || null;
+    for (const pin of this.surface.querySelectorAll('.pc-pin')) pin.classList.toggle('pc-filtered-out', !!this.filter && !this.filter.has(pin.dataset.uid));
+    for (const [id, node] of this.els) {
+      const n = this.room.notes.get(id);
+      if (n) node.classList.toggle('pc-filtered-out', this.filteredOut(n));
+    }
+  }
+
   notePos(n) {
     const pin = this.opts.layout.pins.get(uidIn(this.wall, n));
     if (Number.isFinite(n.wx) && Number.isFinite(n.wy)) return { x: pin.x + n.wx, y: pin.y + n.wy };
