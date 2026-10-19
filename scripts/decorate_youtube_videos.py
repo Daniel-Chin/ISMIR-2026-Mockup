@@ -20,6 +20,7 @@ from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, cast
 
+import pyperclip
 from tqdm import tqdm
 
 from utils.session_assignment import parse_file
@@ -725,6 +726,7 @@ def authenticate() -> Resource:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    rows: Sequence[PaperRow] = ()
     try:
         parser = argparse.ArgumentParser(description=__doc__)
         parser.add_argument('--input', type=Path, default=ROOT / 'sitedata/papers.csv')
@@ -778,7 +780,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                     print(f'dragon-drop failed: {e}')
         return 0
     finally:
-        print('Reminder: paste the video column back into Google Sheets.')
+        if rows:
+            pyperclip.copy('\n'.join(['video', *(row.get('video', '') for row in rows)]))
+            print('Copied the video column (with header, in papers.csv row order). '
+                  'Paste it into the video header cell in Google Sheets.')
 
 
 if __name__ == '__main__':
