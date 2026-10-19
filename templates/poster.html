@@ -47,7 +47,7 @@
       {% endfor %}
     </p>
     <h4 class="text-muted text-center">
-      Presented {{paper.content.paper_presentation}}
+      {% if paper.content.paper_presentation %}Presented {{paper.content.paper_presentation}}{% else %}Presentation mode TBA{% endif %}
     </h4>
     {% if paper.content.award_session %}
     <h4 class="text-muted text-center">

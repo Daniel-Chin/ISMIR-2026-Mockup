@@ -2829,6 +2829,13 @@ html[data-theme="light"] .upcoming-paper-id { color: #8a5400 !important; }
   margin: 0 0 18px;
 }
 .upcoming-completed-day:last-child { margin-bottom: 0; }
+/* The day heading folds and unfolds its events (app.js renderUpcoming). */
+.upcoming-day-toggle { cursor: pointer; user-select: none; }
+.upcoming-day-toggle:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+.upcoming-completed-date .upcoming-day-count { margin-left: 4px; color: var(--muted); font-weight: 700; }
+.upcoming-completed-date .upcoming-day-action { margin-left: 6px; color: var(--cyan); font-weight: 900; text-decoration: underline; text-underline-offset: 3px; }
+.upcoming-completed-day.is-folded { margin-bottom: 10px; }
+.upcoming-completed-day.is-folded .upcoming-completed-date { margin-bottom: 0; }
 
 .upcoming-completed-date {
   position: relative;

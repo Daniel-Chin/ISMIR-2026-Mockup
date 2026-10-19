@@ -646,6 +646,24 @@ function renderUpcomingCard(e) {
   </article>`;
 }
 
+// Upcoming days after tomorrow start folded (the list runs to the end of the conference); a day
+// the visitor opens or folds stays that way across updates.
+const upcomingDayOpen = new Map();
+const DAY_MS = 24 * 60 * 60 * 1000;
+function upcomingDayIsOpen(key, state) {
+  if (upcomingDayOpen.has(key)) return upcomingDayOpen.get(key);
+  return key <= timelineDateKey(new Date(conferenceNow(state) + DAY_MS).toISOString());
+}
+
+function setUpcomingDayOpen(head, open) {
+  const day = head.closest('.upcoming-completed-day');
+  upcomingDayOpen.set(day.dataset.date, open);
+  head.setAttribute('aria-expanded', String(open));
+  day.classList.toggle('is-folded', !open);
+  day.querySelector('.upcoming-day-events').hidden = !open;
+  head.querySelector('.upcoming-day-action').textContent = open ? 'Hide' : 'Show';
+}
+
 function renderUpcoming(state) {
   if (!els.upcoming) return;
   // Every upcoming event, to the end of the conference: a cut-off list would leave people
@@ -663,12 +681,20 @@ function renderUpcoming(state) {
   });
 
   els.upcoming.innerHTML = upcoming.length
-    ? `<div class="timeline upcoming-completed-timeline">${groups.map(group => `<section class="upcoming-completed-day" data-date="${esc(group.key)}">
-        <div class="upcoming-completed-date"><span class="upcoming-calendar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" focusable="false"><rect x="2.25" y="3.5" width="11.5" height="10" rx="1.25"></rect><path d="M5 2v3M11 2v3M2.5 6.5h11"></path></svg></span><span>${esc(fmtTimelineDate(group.startsAt))}</span></div>
+    ? `<div class="timeline upcoming-completed-timeline">${groups.map((group) => {
+      const open = upcomingDayIsOpen(group.key, state);
+      const count = group.events.reduce((n, e) => n + (e.tutorials?.length || 1), 0);
+      const panelId = `upcoming-day-${group.key}`;
+      // A div, not a <button>: the bare-button styles of this sheet would restyle the heading.
+      return `<section class="upcoming-completed-day${open ? '' : ' is-folded'}" data-date="${esc(group.key)}">
+        <div class="upcoming-completed-date upcoming-day-toggle" role="button" tabindex="0" aria-expanded="${open}" aria-controls="${esc(panelId)}" data-upcoming-day-toggle><span class="upcoming-calendar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" focusable="false"><rect x="2.25" y="3.5" width="11.5" height="10" rx="1.25"></rect><path d="M5 2v3M11 2v3M2.5 6.5h11"></path></svg></span><span>${esc(fmtTimelineDate(group.startsAt))}</span><span class="upcoming-day-count">${count} event${count === 1 ? '' : 's'}</span><span class="upcoming-day-action">${open ? 'Hide' : 'Show'}</span></div>
+        <div class="upcoming-day-events" id="${esc(panelId)}"${open ? '' : ' hidden'}>
         ${groupOverlappingUpcomingEvents(group.events).map(row => `<div class="upcoming-overlap-row" style="--upcoming-columns:${Math.max(1, row.events.length)}">
           ${row.events.map(renderUpcomingCard).join('')}
         </div>`).join('')}
-      </section>`).join('')}</div>`
+        </div>
+      </section>`;
+    }).join('')}</div>`
     : '<article class="empty-card">No upcoming events remain.</article>';
 }
 
@@ -770,7 +796,15 @@ function togglePosterDetail(eventId) {
 }
 
 if (els.upcoming) {
+  els.upcoming.addEventListener('keydown', (event) => {
+    const head = event.target.closest?.('[data-upcoming-day-toggle]');
+    if (!head || (event.key !== 'Enter' && event.key !== ' ')) return;
+    event.preventDefault();
+    setUpcomingDayOpen(head, head.getAttribute('aria-expanded') !== 'true');
+  });
   els.upcoming.addEventListener('click', (event) => {
+    const head = event.target.closest('[data-upcoming-day-toggle]');
+    if (head) { setUpcomingDayOpen(head, head.getAttribute('aria-expanded') !== 'true'); return; }
     const button = event.target.closest('[data-upcoming-paper-toggle]');
     if (!button) return;
     const panelId = button.getAttribute('aria-controls');
