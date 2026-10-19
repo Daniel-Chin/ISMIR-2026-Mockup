@@ -396,17 +396,44 @@ function makeLbdWall(rooms) {
   refreshSessionTimes();
 }
 
-/** Expanded, a wall takes its section's search box along, in a bar under its title. */
+/**
+ * Expanded, a wall takes its section's search box along, in a bar under its title. A button
+ * left of the zoom buttons hides the bar for more wall (remembered in this browser); the search
+ * itself stays on.
+ */
+const FS_SEARCH_KEY = 'pcFsSearchHidden';
 const dockSearch = (state, home) => on => {
   const root = state.search?.root;
   if (!root) return;
+  const wall = state.wall;
   if (on) {
     const bar = el('div', 'pc-fs-search');
     bar.append(root);
-    state.wall.titleBar.after(bar);
+    wall.titleBar.after(bar);
+    const toggle = el('button', 'pc-btn pc-btn-sm pc-zoom-btn pc-fs-search-toggle');
+    toggle.type = 'button';
+    const show = hidden => {
+      bar.hidden = hidden;
+      toggle.textContent = hidden ? 'Search' : 'Hide search';
+      toggle.title = hidden ? 'Show the search box' : 'Hide the search box';
+      toggle.setAttribute('aria-pressed', String(!hidden));
+    };
+    toggle.addEventListener('click', () => {
+      const hidden = !bar.hidden;
+      store.set(FS_SEARCH_KEY, hidden);
+      // The wall gets (or gives back) the bar's height: keep looking at the same place.
+      const view = wall.camera();
+      show(hidden);
+      wall.layout(true);
+      wall.setCamera(wall.reachable(view));
+      if (!hidden) state.search.input.focus();
+    });
+    show(!!store.get(FS_SEARCH_KEY, false));
+    wall.tools.prepend(toggle);
   } else {
     $(home).prepend(root);
-    state.wall.frame.querySelector('.pc-fs-search')?.remove();
+    wall.frame.querySelector('.pc-fs-search')?.remove();
+    wall.tools.querySelector('.pc-fs-search-toggle')?.remove();
   }
 };
 
