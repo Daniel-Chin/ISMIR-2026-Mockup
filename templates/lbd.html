@@ -145,10 +145,17 @@ endif %}
   {% if lbd.content.youtube_id or lbd.content.bilibili_id %}
   <div id="video" class="collapse">
     {% if lbd.content.youtube_id %}
+    {# As on the paper page (poster.html): YouTube needs the referrer to play an embed. #}
     <div style="display: flex; justify-content: center;">
-      <iframe src="{{lbd.content.youtube_id}}" width="960" height="540"
-        allow="encrypted-media" allowfullscreen></iframe>
+      <iframe src="{{lbd.content.youtube_id}}"
+        width="960" height="540" title="YouTube video player" frameborder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+        referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
     </div>
+    {% if config.lbd_youtube_playlist_url %}
+    <p class="mt-2 text-center"><a href="{{ config.lbd_youtube_playlist_url }}" target="_blank"
+      rel="noopener noreferrer" style="text-decoration: underline;">View all LBD videos on YouTube</a></p>
+    {% endif %}
     <br />
     {% endif %}
 

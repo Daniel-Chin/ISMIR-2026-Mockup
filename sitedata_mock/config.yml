@@ -93,3 +93,5 @@ warmup_api: 'https://lounge.liweilin.org'            # Warm-up Discussion: notes
 venue_city: 'Abu Dhabi'                               # "Abu Dhabi 10:00-10:30" next to times shown in the visitor's zone
 slack_app_name: 'ISMIR2026 Lounge'                    # the Warm-up Discussion's Slack app, as attendees see it in Slack
 youtube_channel_url: 'https://www.youtube.com/channel/UC_L9sCoMJqF3I42IAbO7Bfg'
+# The LBD videos' playlist, linked under each LBD's video (templates/lbd.html)
+lbd_youtube_playlist_url: 'https://www.youtube.com/playlist?list=PLaTdrDApBO_Q'
