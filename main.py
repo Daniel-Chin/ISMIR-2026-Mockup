@@ -575,15 +575,22 @@ def format_paper(v):
     }
 
 
+# The real LBD sheet's author columns, best first: the authors as printed in the PDF, then as
+# entered in CMT (LBDs without a PDF have only that), then the papers' column name.
+LBD_AUTHOR_COLUMNS = ("authors_and_affil_from_pdf", "authors_and_affil_from_cmt", "authors_and_affil")
+
+
 def format_lbd(v):
     """One LBD for the templates.
 
-    The real LBD sheet has the papers' columns (authors_and_affil, raw_pdf_path, raw_poster_pdf,
-    video_path, key_words, slack_channel); the mock one has its own (authors as "Last, First",
-    paper_link, poster_link, youtube_id, primary_subject, channel_name). Both are read.
+    The real LBD sheet has the papers' columns (authors in LBD_AUTHOR_COLUMNS, raw_pdf_path,
+    raw_poster_pdf, video_path, key_words, slack_channel); the mock one has its own (authors as
+    "Last, First", paper_link, poster_link, youtube_id, primary_subject, channel_name). Both are read.
     """
-    if v.get("authors_and_affil", "").strip():
-        authors = remove_affiliation(v["authors_and_affil"])
+    authors_and_affil = next((v[c] for c in LBD_AUTHOR_COLUMNS if v.get(c, "").strip()), "")
+    if authors_and_affil:
+        # Names only: no affiliations, no "*" (the corresponding author's mark).
+        authors = [n for n in (a.replace("*", "").strip() for a in remove_affiliation(authors_and_affil)) if n]
     else:
         authors = [
             (

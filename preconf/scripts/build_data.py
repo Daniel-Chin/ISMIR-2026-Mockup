@@ -149,6 +149,12 @@ def lbd_keywords(row):
     return miniconf_list(row.get("primary_subject"))
 
 
+def lbd_authors_and_affil(row):
+    """As main.py format_lbd: the authors as printed in the PDF, else as entered in CMT."""
+    columns = ("authors_and_affil_from_pdf", "authors_and_affil_from_cmt", "authors_and_affil")
+    return next((row[c] for c in columns if (row.get(c) or "").strip()), "")
+
+
 def lbd_presenter_mode(row):
     """Real sheet: presentation_mode ("Virtual", "In-Person"); mock: Slack lp-* / lv-* channels."""
     if (row.get("presentation_mode") or "").strip():
@@ -178,7 +184,7 @@ def read_lbds(sd, miniconf):
             "uid": uid,
             "displayId": f"LBD-{uid}",
             "title": (r.get("title") or "").strip(),
-            "authors": overview_authors(r["authors_and_affil"]) if (r.get("authors_and_affil") or "").strip() else lbd_authors(r.get("authors", "")),
+            "authors": overview_authors(lbd_authors_and_affil(r)) if lbd_authors_and_affil(r) else lbd_authors(r.get("authors", "")),
             "channelUrl": (r.get("channel_url") or "").strip(),
             "pageUrl": f"{miniconf}/lbd_{uid}.html" if miniconf else "",
             "presenterMode": lbd_presenter_mode(r),
