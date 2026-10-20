@@ -92,17 +92,26 @@ slack_channel, channel_url, live_url, thumbnail_link, event_desc
 | ⚙️ `channel_url`, `live_url` | Slack link / Zoom-YouTube stream link |
 | `event_desc` | markdown description shown on the event's page `event_<slugified title>.html`. Every category except `Poster session`, `Oral session`, `Registration`, and `Lunch` gets an event page |
 
-## Tab `lbds` — late-breaking demos
+## Tab `lbds` — late-breaking demos, one row per demo
 
 ```
-uid, position, title, abstract, primary_author, primary_email, authors, affiliations,
-author_emails, paper_link, poster_link, youtube_id, gd_id, thumbnail_link,
-primary_subject, secondary_subject, channel_name, channel_url, session
+uid, title, slack_channel, channel_url, authors_and_affil, abstract,
+paper_presentation, group_id, key_words, presentation_mode, pdf_name, pdf_n_bytes,
+raw_pdf_path, raw_poster_pdf, raw_video_path, raw_thumbnail_path, video_path
 ```
 
-- `authors`: `Last, First; Last, First`
-- `youtube_id`: bare 11-character video ID (not a URL)
-- ⚙️ `channel_name` (`lp-*` physical / `lv-*` virtual), ⚙️ `channel_url`
+| Column | Format / meaning |
+|---|---|
+| `uid` | CMT submission ID |
+| `authors_and_affil` | `Name (Affiliation)*; Name2 (Affiliation2)` — `*` marks the presenter |
+| `paper_presentation`, `group_id` | currently empty |
+| `key_words` | free text from authors; separators vary (`,` or `;`) and may contain newlines |
+| `presentation_mode` | `In-Person`, `Virtual`, or `[Not Answered]` |
+| `pdf_name`, `pdf_n_bytes` | `<uid>_lbd.pdf` and its size in bytes |
+| `raw_pdf_path`, `raw_poster_pdf`, `raw_video_path`, `raw_thumbnail_path` | Google Drive `open?id=` links |
+| `video_path` | YouTube watch URL |
+| ⚙️ `slack_channel` | generated: `lbd{uid}-{first-3-title-words}` |
+| ⚙️ `channel_url` | Slack deep link written back after channel creation |
 
 ## Tab `music` — music program
 

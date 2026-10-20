@@ -352,9 +352,6 @@ def paper_vis():
 def schedule():
     data = _data()
     data["days"] = group_by_days(site_data)
-    data["construction_notice"] = (
-        "A few papers' presentation videos don't show; they are under processing."
-    )
     return render_template("schedule.html", **data)
 
 

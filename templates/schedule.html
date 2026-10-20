@@ -3,9 +3,6 @@
 {% extends "base.html" %}
 {% block head %}
 {{ super() }}
-<script>
-  window.alert({{ construction_notice | tojson }});
-</script>
 {% include 'cal_head.html' %}
 {% endblock %}
 {% block tabs %}
