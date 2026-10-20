@@ -16,9 +16,10 @@
   const slackHelpElement = document.getElementById("zoom-slack-help");
   const slackHelpTextElement = document.getElementById("zoom-slack-help-text");
   const slackHelpLinkElement = document.getElementById("zoom-slack-help-link");
+  const registrantsNoticeElement = document.getElementById("zoom-registrants-notice");
   const checkboxContainer = checkboxElement?.closest(".form-check");
 
-  if (!targetsElement || !configElement || !titleElement || !metaElement || !statusElement || !countdownRowElement || !countdownElement || !pauseCountdownButton || !checkboxElement || !joinButton || !slackHelpElement || !slackHelpTextElement || !slackHelpLinkElement) {
+  if (!targetsElement || !configElement || !titleElement || !metaElement || !statusElement || !countdownRowElement || !countdownElement || !pauseCountdownButton || !checkboxElement || !joinButton || !slackHelpElement || !slackHelpTextElement || !slackHelpLinkElement || !registrantsNoticeElement) {
     throw new Error("Required Zoom redirect elements are missing");
   }
 
@@ -29,6 +30,10 @@
 
   const eventUid = new URLSearchParams(window.location.search).get("event_uid") || "";
   const urlToken = new URLSearchParams(window.location.search).get("token") || "";
+  // Debug: ?debug_no_token=1 treats every token as invalid
+  const forceNoToken = new URLSearchParams(window.location.search).has("debug_no_token");
+  // Debug: ?debug_yes_token=1 treats access as valid, but never sends the passcode
+  const forceYesToken = new URLSearchParams(window.location.search).has("debug_yes_token");
 
   const parsedTargets = JSON.parse(targetsElement.textContent || "{}");
   const zoomConfig = JSON.parse(configElement.textContent || "{}");
@@ -38,7 +43,7 @@
   function showSlackPrompt(targetRoom) {
     const hasChannelLink = Boolean(targetRoom.channel_url);
     const channelLabel = targetRoom.slack_channel ? ` (${targetRoom.slack_channel})` : "";
-    slackHelpTextElement.textContent = "To save credentials for automatic passcode access next time, join Zoom from the Slack channel.";
+    slackHelpTextElement.textContent = "To skip passcodes, join Zoom from channel descriptions on Slack, one-time:";
     if (hasChannelLink) {
       slackHelpLinkElement.href = targetRoom.channel_url;
       slackHelpLinkElement.classList.remove("d-none");
@@ -49,7 +54,7 @@
   }
 
   function validToken(token) {
-    return Boolean(token) && token === accessToken;
+    return !forceNoToken && Boolean(token) && token === accessToken;
   }
 
   function getCookie(name) {
@@ -97,11 +102,13 @@
     }
 
     titleElement.textContent = room.title || "Zoom room";
-    metaElement.textContent = `Room ID: ${room.uid}`;
     return room;
   }
 
   function immediateToken() {
+    if (forceYesToken) {
+      return "debug_yes_token";
+    }
     const savedToken = getCookie(TOKEN_COOKIE);
     if (validToken(urlToken)) {
       return urlToken;
@@ -119,6 +126,9 @@
   function autoToken(state) {
     if (state === "NO") {
       return "";
+    }
+    if (forceYesToken) {
+      return "debug_yes_token";
     }
     const savedToken = getCookie(TOKEN_COOKIE);
     if (validToken(urlToken)) {
@@ -153,7 +163,7 @@
     countdownRowElement.classList.remove("d-none");
     pauseCountdownButton.classList.remove("d-none");
     activeCountdownRoom = targetRoom;
-    activeCountdownPasscode = state === "YES" && Boolean(autoToken(state));
+    activeCountdownPasscode = !forceYesToken && state === "YES" && Boolean(autoToken(state));
     countdownRemaining = AUTO_REDIRECT_SECONDS;
     renderCountdownText();
 
@@ -189,7 +199,9 @@
   checkboxElement.checked = initialCheckboxState;
 
   if (!hasValidAccess()) {
-    statusElement.textContent = "Access token missing or invalid. Join still works with manual passcode entry.";
+    statusElement.classList.add("d-none");
+    joinButton.textContent = "Join Zoom (Passcode required)";
+    registrantsNoticeElement.classList.remove("d-none");
   } else if (savedPreference === "YES") {
     statusElement.textContent = "Saved credentials detected. Redirecting automatically.";
     showCountdown("YES", targetRoom);
@@ -205,7 +217,9 @@
     const token = immediateToken();
     setSavedPreference(state);
 
-    if (state === "YES") {
+    if (forceYesToken) {
+      // leave the real cookie alone
+    } else if (state === "YES") {
       if (token) {
         setCookie(TOKEN_COOKIE, token);
       } else {
@@ -215,6 +229,6 @@
       removeCookie(TOKEN_COOKIE);
     }
 
-    redirectTo(targetRoom, Boolean(token));
+    redirectTo(targetRoom, !forceYesToken && Boolean(token));
   });
 })();
