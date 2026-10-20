@@ -25,11 +25,12 @@
   }
 
   .zoom-eyebrow {
+    text-align: right;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: #1d4ed8;
     font-weight: 700;
-    font-size: 0.8rem;
+    font-size: 0.64rem;
     margin-bottom: 0.75rem;
   }
 
@@ -41,13 +42,6 @@
   .zoom-meta {
     color: rgba(15, 23, 42, 0.72);
     margin-bottom: 1.5rem;
-  }
-
-  .zoom-panel {
-    border-radius: 18px;
-    background: #f8fafc;
-    border: 1px solid rgba(15, 23, 42, 0.08);
-    padding: 1.25rem;
   }
 
   .zoom-countdown-row {
@@ -107,6 +101,11 @@
     color: rgba(15, 23, 42, 0.72);
   }
 
+  .zoom-notice-text {
+    color: #000;
+    font-size: 1.3rem;
+  }
+
   .zoom-alert {
     margin-top: 1rem;
     border-radius: 14px;
@@ -121,37 +120,40 @@
     <h1 id="zoom-room-title" class="zoom-title">Loading room…</h1>
     <div id="zoom-room-meta" class="zoom-meta"></div>
 
-    <div class="zoom-panel">
-      <div class="form-check">
-        <input id="zoom-save-checkbox" class="form-check-input" type="checkbox" checked>
-        <label class="form-check-label" for="zoom-save-checkbox">
-          Save credentials and automatically redirect next time
-        </label>
-      </div>
+    <div class="form-check">
+      <input id="zoom-save-checkbox" class="form-check-input" type="checkbox" checked>
+      <label class="form-check-label" for="zoom-save-checkbox">
+        Save credentials and automatically redirect next time
+      </label>
+    </div>
 
-      <div id="zoom-countdown-row" class="zoom-countdown-row d-none">
-        <div id="zoom-countdown" class="zoom-countdown"></div>
-        <button id="zoom-pause-countdown" type="button" class="btn btn-sm zoom-pause-button">
-          Wait, pause countdown
-        </button>
-      </div>
+    <div id="zoom-countdown-row" class="zoom-countdown-row d-none">
+      <div id="zoom-countdown" class="zoom-countdown"></div>
+      <button id="zoom-pause-countdown" type="button" class="btn btn-sm zoom-pause-button">
+        Wait, pause countdown
+      </button>
+    </div>
 
-      <div class="zoom-actions">
-        <button id="zoom-join-button" type="button" class="btn btn-primary btn-lg">
-          Join Zoom now
-        </button>
-      </div>
+    <div id="zoom-registrants-notice" class="zoom-notice-text d-none">
+      Registrants only!
+    </div>
 
-      <div id="zoom-status" class="zoom-hint">
-        Choose whether this browser should remember the current room credential.
-      </div>
+    <div class="zoom-actions">
+      <button id="zoom-join-button" type="button" class="btn btn-primary btn-lg">
+        Join Zoom now
+      </button>
+    </div>
 
-      <div id="zoom-slack-help" class="zoom-alert alert alert-warning d-none" role="alert">
-        <div id="zoom-slack-help-text" class="mb-2"></div>
-        <a id="zoom-slack-help-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm d-none">
-          Open event Slack channel
-        </a>
-      </div>
+    <div id="zoom-status" class="zoom-hint">
+      Choose whether this browser should remember the current room credential.
+    </div>
+
+    <div id="zoom-slack-help" class="zoom-alert d-none">
+      <div id="zoom-slack-help-text" class="zoom-notice-text mb-2"></div>
+      <a id="zoom-slack-help-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm d-none">
+        Open event Slack channel
+      </a>
+      <div class="zoom-notice-text mt-2">Afterwards, this page will memorize your registered status.</div>
     </div>
   </div>
 </div>
