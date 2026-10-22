@@ -138,6 +138,12 @@ endif %}
     </button>
     {% endif %}
     {% endif %}
+    {% if paper.content.summary_of_updates_post_review != '' %}
+    <button class="card-link btn btn-outline-primary" data-toggle="collapse"
+      type="button" data-target="#post-review-updates">
+      Post-Review Updates
+    </button>
+    {% endif %}
     <!-- {% if paper.content.code != blank %}
     <a href="{{paper.content.code}}" target="_blank" class="card-link">
       Code
@@ -271,6 +277,18 @@ endif %}
     </div>
   </div>
   {% endif %}
+  {% endif %}
+  {% if paper.content.summary_of_updates_post_review != '' %}
+  <div id="post-review-updates" class="pp-card m-3 collapse">
+    <div class="card-body">
+      <div class="card-text">
+        <div class="paper-text">
+          <div class="font-weight-bold mb-3">Post-Review Updates:</div>
+          {{paper.content.summary_of_updates_post_review | markdown | safe}}
+        </div>
+      </div>
+    </div>
+  </div>
   {% endif %}
 </div>
 
