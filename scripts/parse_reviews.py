@@ -18,7 +18,12 @@ OUT_FILE = './sitedata/papers.csv'
 N_REVIEWERS = 4
 REVIEW_COLUMNS = [f'review{i}' for i in range(1, N_REVIEWERS + 1)] + ['meta_review']
 # Question numbers to bold instead of italicize (the main review text). Check against the review form every year.
-BOLD_QUESTIONS = {'Q23'}
+BOLD_QUESTIONS = {
+    # 'Q23', 
+}
+# Questions to publish; the rest are dropped. Check against the review form every year.
+REVIEWER_QUESTIONS = ['Q18', 'Q23']
+META_REVIEWER_QUESTIONS = ['Q18', 'Q23', 'Q25']
 
 
 def parse_bool(value: str) -> bool:
@@ -64,7 +69,13 @@ def parse_file(path: str, has_reviewer_number: bool, publish: dict[int, bool]) -
         expected = ['Paper ID', 'Paper Title'] + (['Reviewer Number'] if has_reviewer_number else [])
         if not headers or headers[:len(expected)] != expected:
             raise ValueError(f'{path}: expected headers to start with {expected}, got {headers}')
-        questions = [format_question(header) for header in headers[len(expected):]]
+        all_questions = [format_question(header) for header in headers[len(expected):]]
+        numbers = [q.split('.', 1)[0] for q in all_questions]
+        wanted = REVIEWER_QUESTIONS if has_reviewer_number else META_REVIEWER_QUESTIONS
+        if missing := set(wanted) - set(numbers):
+            raise ValueError(f'{path}: questions {sorted(missing)} not found in headers')
+        kept = [len(expected) + numbers.index(number) for number in wanted]
+        questions = [all_questions[index - len(expected)] for index in kept]
         for row in reader:
             if len(row) != len(headers):
                 raise ValueError(f'{path} line {reader.line_num}: expected {len(headers)} cells, got {len(row)}')
@@ -83,7 +94,7 @@ def parse_file(path: str, has_reviewer_number: bool, publish: dict[int, bool]) -
             reviews = papers.setdefault(paper_id, {})
             if column in reviews:
                 raise ValueError(f'{path}: paper {paper_id} duplicate {column}')
-            reviews[column] = format_review(questions, row[len(expected):])
+            reviews[column] = format_review(questions, [row[index] for index in kept])
     return papers
 
 
