@@ -75,7 +75,7 @@ See [workflow.md](workflow.md#session-assignments) for numbering and the by-pape
 ## Tab `events` — one row per program slot (the schedule)
 
 ```
-uid, title, day, start_date, start_time, end_time, category, description, organiser,
+uid, title, day, start_date, start_time, end_time, category, organiser,
 organiser_affiliation, organiser_bio, image, web_link,
 slack_channel, channel_url, live_url, thumbnail_link, event_desc
 ```
