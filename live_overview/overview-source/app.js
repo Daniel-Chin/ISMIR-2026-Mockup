@@ -23,7 +23,7 @@ function fmtTime(iso) {
 }
 
 function fmtUtcOffset(iso) {
-  const date = iso ? new Date(iso) : new Date();
+  const date = new Date(iso || serverNow());
   return window.ISMIRTimeZone?.getUTCOffset?.(date) || 'UTC';
 }
 
@@ -48,7 +48,7 @@ function fmtNextEventDateTime(iso) {
 function timeUntilEvent(iso, state) {
   if (!iso) return 'No upcoming event';
   const target = Date.parse(iso);
-  const now = state ? conferenceNow(state) : Date.now();
+  const now = state ? conferenceNow(state) : serverNow();
   if (!Number.isFinite(target) || !Number.isFinite(now)) return '—';
   const diffMs = target - now;
   if (diffMs <= 0) return 'starting now';
@@ -290,7 +290,7 @@ async function buildLlmAttendancePrompt(state) {
   const dashboard = dashboardStats(display);
   const snapshot = {
     conference: display.conference || {},
-    generatedAt: new Date().toISOString(),
+    generatedAt: new Date(serverNow()).toISOString(),
     serverNow: display.serverNow || display.updatedAt || null,
     dashboard: Object.fromEntries(Object.entries(dashboard).map(([k, v]) => [k, { label: v[0], value: v[1], note: v[2] }])),
     liveEvents: live,

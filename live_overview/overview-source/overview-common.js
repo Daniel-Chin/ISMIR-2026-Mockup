@@ -15,9 +15,15 @@ function testClockApplies(state) {
   return window.ISMIRChannel === 'debug' && Boolean(state?.debugClock?.enabled);
 }
 
+/** The server's time now (site-integration.js ISMIRClock), never this computer's own clock. */
+function serverNow() {
+  return window.ISMIRClock ? window.ISMIRClock.now() : Date.now();
+}
+
 /**
  * "Now" for the conference: on live-debug.html, the backend's test clock when an organiser has
- * set one; otherwise, and always on live.html and history.html, the server's real time.
+ * set one; otherwise, and always on live.html and history.html, the server's real time. Both run
+ * on the server's clock, so every computer shows the same moment however its own clock is set.
  */
 function conferenceNow(state) {
   const clock = state?.debugClock || {};
@@ -26,9 +32,11 @@ function conferenceNow(state) {
     const baseReal = Date.parse(clock.baseRealIso || '');
     const speed = Number.isFinite(Number(clock.speed)) ? Number(clock.speed) : 1;
     if (Number.isFinite(baseFake) && Number.isFinite(baseReal)) {
-      return baseFake + (Date.now() - baseReal) * Math.max(0, Math.min(100, speed));
+      return baseFake + (serverNow() - baseReal) * Math.max(0, Math.min(100, speed));
     }
   }
+  if (window.ISMIRClock?.synced) return serverNow();
+  // Not heard from the server yet (saved schedule): the time it was saved at, else this computer's.
   const t = Date.parse(state?.serverNow || '');
   return Number.isFinite(t) ? t : Date.now();
 }

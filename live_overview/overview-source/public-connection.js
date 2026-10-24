@@ -51,15 +51,20 @@
     let cachedRevision = null;
     let seq = 0, lastState = null, lastFresh = 0, lastWs = 0, lastPoll = -Infinity;
     let pending = false, fallbackPending = false, offlineShown = false, retryMs = 1000;
-    const now = () => env.Date.now();
+    const now = () => env.Date.now();   // durations only (freshness, retries)
+    // Absolute times: the server's clock (site-integration.js), else this computer's.
+    const clockNow = () => (env.ISMIRClock ? env.ISMIRClock.now() : env.Date.now());
+    // Each fresh state carries the server's real time (debugClock.realNow; serverNow on older backends).
+    const syncClock = (state, localMs) => env.ISMIRClock?.sync(Date.parse(state?.debugClock?.realNow || state?.serverNow), localMs);
     const cacheKey = 'ismir-public-schedule:' + apiOrigin;
     const valid = state => state && Array.isArray(state.events) && state.conference && typeof state.conference === 'object';
-    function accept(state) {
+    function accept(state, localMs = env.Date.now()) {
       if (stopped || !valid(state)) return;
+      syncClock(state, localMs);
       seq++; lastState = copy(state); lastFresh = now(); offlineShown = false;
       onState(lastState); onStatus(true, 'Live updates connected');
       if (cachedRevision !== state.scheduleRevision || cachedRevision === null) {
-        try { env.localStorage.setItem(cacheKey, JSON.stringify(offline(lastState, now(), true))); cachedRevision = state.scheduleRevision ?? 0; } catch (_) {}
+        try { env.localStorage.setItem(cacheKey, JSON.stringify(offline(lastState, clockNow(), true))); cachedRevision = state.scheduleRevision ?? 0; } catch (_) {}
       }
     }
     async function fallback() {
@@ -76,7 +81,7 @@
           saved = await res.json();
         }
         if (!stopped && !lastState && valid(saved)) {
-          lastState = offline(saved, now(), true); offlineShown = true;
+          lastState = offline(saved, clockNow(), true); offlineShown = true;
           onState(lastState); onStatus(false, lastState.events.length ? 'Live updates unavailable · saved schedule' : 'Unable to load schedule · reconnecting');
         }
       } catch (_) { if (!stopped && !lastState) onStatus(false, 'Unable to load schedule · reconnecting'); }
@@ -88,11 +93,13 @@
       const controller = new env.AbortController(); aborter = controller;
       const timeout = env.setTimeout(() => controller.abort(), 6000);
       try {
+        const sent = env.Date.now();
         const res = await env.fetch(new URL('/api/state', origin).href, { cache: 'no-store', credentials: 'omit', signal: controller.signal });
         if (!res.ok) throw Error('State unavailable');
+        const received = env.Date.now();   // the server answered about halfway through
         const data = await res.json();
         if (!data.ok || !valid(data.state)) throw Error('Invalid state');
-        if (!stopped && at === seq) accept(data.state);
+        if (!stopped && at === seq) accept(data.state, (sent + received) / 2);
       } catch (_) { void fallback(); }
       finally { env.clearTimeout(timeout); pending = false; if (aborter === controller) aborter = null; }
     }
@@ -134,7 +141,7 @@
       }
       // A saved schedule can still cross a session boundary during an outage.
       if (offlineShown && lastState && !testClock(lastState)) {
-        lastState.serverNow = new Date(now()).toISOString(); onState(lastState);
+        lastState.serverNow = new Date(clockNow()).toISOString(); onState(lastState);
       }
     }
     const focus = () => { if (!stopped) { tick(); void refresh(); } };

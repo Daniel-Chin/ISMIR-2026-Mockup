@@ -1,6 +1,8 @@
 // A scalable corkboard bound to one board id inside a Room.
 // All user text goes through textContent; nothing from the server is parsed as HTML.
 
+import { serverClock } from './api.js';
+
 export const NOTE_W = 230;     // default width; short notes keep it
 const NOTE_W_MAX = 680;        // widest a long note may grow (600 chars fit well below this)
 const NOTE_RATIO_MIN = 0.5;    // a long note's height / width lands in [0.5, 1)
@@ -33,7 +35,7 @@ export const el = (tag, cls, text) => {
 };
 
 export function timeAgo(ts) {
-  const s = Math.max(0, (Date.now() - ts) / 1000);
+  const s = Math.max(0, (serverClock.now() - ts) / 1000);   // note times are the server's
   if (s < 45) return 'just now';
   if (s < 3600) return `${Math.round(s / 60)}m ago`;
   if (s < 86400) return `${Math.round(s / 3600)}h ago`;

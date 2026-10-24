@@ -51,6 +51,25 @@
     });
   }
 
+  /**
+   * The server's clock. Every time these pages show or decide on (what is live, the test clock on
+   * live-debug.html, "today") is read from it, never from this computer's clock, which may be set
+   * wrong. Each answer from the backend (public-connection.js) sets the offset; until the first,
+   * this computer's clock stands in.
+   */
+  const clock = {
+    offset: 0,
+    synced: false,
+    now() { return Date.now() + this.offset; },
+    /** The server said `serverMs` at about `localMs` (this computer's clock then). */
+    sync(serverMs, localMs = Date.now()) {
+      if (!Number.isFinite(serverMs) || !Number.isFinite(localMs)) return;
+      this.offset = serverMs - localMs;
+      this.synced = true;
+    },
+  };
+  window.ISMIRClock = clock;
+
   window.ISMIRSite = {
     conference: conf,
     programSite,

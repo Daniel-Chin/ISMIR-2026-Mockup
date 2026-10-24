@@ -2,7 +2,7 @@ import { Room } from './room.js';
 import { BoardView, timeAgo } from './board.js';
 import { WallRooms, WallView, buildWallLayout, sameLayout, screenAspect, wallSlotFor } from './wall.js';
 import { SearchBox } from './search.js';
-import { apiFetch, apiUrl, takeTokenFromHash, clearToken, onSessionChange, hasSession } from './api.js';
+import { apiFetch, apiUrl, takeTokenFromHash, clearToken, onSessionChange, hasSession, serverClock } from './api.js';
 
 const COLORS = { sun: '#ffe27a', mint: '#a8f0c6', sky: '#a9dcff', rose: '#ffbfd0', lilac: '#dccbff', sand: '#f3dcae' };
 const USER_KEY = 'pcUser';
@@ -206,8 +206,11 @@ function userFromRoom(room) {
 
 async function refreshUser() {
   try {
+    const sent = Date.now();
     const res = await apiFetch('/api/me', { cache: 'no-store' });
+    const received = Date.now();
     const data = await res.json();
+    serverClock.sync(Number(data.now), sent, received);
     app.user = data.user;
     app.slackApp = data.slackApp || null;
     if (!data.user) clearToken();   // expired or revoked
@@ -228,7 +231,7 @@ function zonedToDate(date, hhmm, timeZone) {
 }
 
 /** Has the Opening Session (program.conference.opening, in the conference time zone) started? */
-function conferenceOpen(now = Date.now()) {
+function conferenceOpen(now = serverClock.now()) {
   const opening = hall.program?.conference?.opening;
   if (!opening?.date || !opening?.start) return false;
   return now >= zonedToDate(opening.date, opening.start, hall.program.conference.timezone).getTime();

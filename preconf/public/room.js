@@ -7,7 +7,7 @@
 //   - Posting, editing, deleting, dropping: shown here at once (optimistic), then confirmed by
 //     the server's echo, or rolled back if the server refuses (rate limit, permissions, offline).
 
-import { wsUrl, wsProtocols } from './api.js';
+import { wsUrl, wsProtocols, serverClock } from './api.js';
 
 const PING_MS = 30_000;
 
@@ -122,7 +122,7 @@ export class Room {
   applyLocally(msg) {
     const keep = n => { if (!this.backup.has(n.id)) this.backup.set(n.id, { ...n }); };
     if (msg.t === 'create') {
-      const t = Date.now(), id = 'pending-' + msg.cid;
+      const t = serverClock.now(), id = 'pending-' + msg.cid;
       const note = {
         id, board: msg.board, text: msg.text, color: msg.color, x: msg.x, y: msg.y,
         ...(msg.wx !== undefined ? { wx: msg.wx, wy: msg.wy } : {}),
@@ -141,7 +141,7 @@ export class Room {
       keep(n);
       if (msg.text !== undefined) n.text = msg.text;
       if (msg.color !== undefined) n.color = msg.color;
-      n.updated = Date.now();
+      n.updated = serverClock.now();
       this.emit({ type: 'upsert', note: n, fresh: false });
     } else if (msg.t === 'delete') {
       keep(n);

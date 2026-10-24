@@ -73,6 +73,20 @@ export function onSessionChange(onChange) {
 }
 export const apiUrl = path => API + path;
 
+/**
+ * The server's clock (from /api/me, see app.js refreshUser). Times the page decides on (has the
+ * conference opened, how long ago a note was written) use it, never the visitor's own clock,
+ * which may be set wrong. Until the server answers, the visitor's clock stands in.
+ */
+export const serverClock = {
+  offset: 0,
+  now() { return Date.now() + this.offset; },
+  /** The server said `serverMs` between `sent` and `received` (this computer's clock). */
+  sync(serverMs, sent, received) {
+    if (Number.isFinite(serverMs) && Number.isFinite(sent) && Number.isFinite(received)) this.offset = serverMs - (sent + received) / 2;
+  },
+};
+
 export function apiFetch(path, opts = {}) {
   const token = readToken();
   const headers = { ...(opts.headers || {}) };

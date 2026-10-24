@@ -148,7 +148,7 @@ async function buildHistoryPrompt(state) {
     .map(compactHistoryEventForPrompt);
   const snapshot = {
     conference: display.conference || {},
-    generatedAt: new Date().toISOString(),
+    generatedAt: new Date(serverNow()).toISOString(),
     serverNow: display.serverNow || display.updatedAt || null,
     completedEventCount: history.length,
     completedEvents: history,
