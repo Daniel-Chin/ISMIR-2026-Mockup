@@ -11,6 +11,7 @@ from pathlib import Path
 import csv
 from collections.abc import Callable
 import time
+import json
 
 import pandas as pd
 import slack_sdk
@@ -37,7 +38,7 @@ def configure_clients(is_mockup: bool = False) -> None:
     Missing tokens stay empty, allowing local-only actions without credentials.
     Mockup mode never falls back to live tokens.
     """
-    global client_bot, client_user, _user_maps, _channel_maps, _workspace_url
+    global client_bot, client_user, _user_maps, _channel_maps, _workspace_url, ADD_HISTORY_PATH
     prefix = "MOCKUP_" if is_mockup else ""
     client_bot = slack_sdk.WebClient(
         token=os.environ.get(f"{prefix}SLACK_BOT_TOKEN", ""), ssl=ssl_context
@@ -50,6 +51,7 @@ def configure_clients(is_mockup: bool = False) -> None:
     _user_maps = None
     _channel_maps = None
     _workspace_url = None
+    ADD_HISTORY_PATH = Path(f"tmp/channel_add_history{'_mockup' if is_mockup else ''}.json")
 
 
 configure_clients()
@@ -526,12 +528,45 @@ def isUserAlreadyInWorkspace(user_email):
 def memberEmailsAlreadyInChannel(channelName):
     channel_id = getChannelID(channelName)
     assert channel_id is not None, "Channel ID should not be None"
+    members = [getUserEmail(user_id) for user_id in memberIDsInChannel(channel_id)]
+    return members
+
+
+def _load_add_history() -> dict[str, list[str]]:
+    """channel ID -> user IDs this script has ever added to it or found in it"""
+    if not ADD_HISTORY_PATH.exists():
+        return {}
+    return json.loads(ADD_HISTORY_PATH.read_text(encoding="utf-8"))
+
+
+def addMemberIDsToChannel(channelName, userIDs):
+    """Adds the users who aren't members yet, and returns them. Raises LookupError for an unknown channel.
+
+    Users already handled for this channel in an earlier run (see ADD_HISTORY_PATH) are skipped, so whoever
+    leaves a channel stays out.
+    """
+    channel_id = getChannelID(channelName)
+    if channel_id is None:
+        raise LookupError(f"Channel {channelName} not found")
+    history = _load_add_history()
+    handled = set(history.get(channel_id, []))
+    members = set(memberIDsInChannel(channel_id))
+    new = sorted(set(userIDs) - members - handled)
+    if new:
+        # force: still add the valid users if some of them can't be added
+        client_bot.conversations_invite(channel=channel_id, users=",".join(new), force=True)
+    history[channel_id] = sorted(handled | (set(userIDs) & members) | set(new))
+    ADD_HISTORY_PATH.parent.mkdir(exist_ok=True)
+    ADD_HISTORY_PATH.write_text(json.dumps(history, indent=1), encoding="utf-8")
+    return new
+
+
+def memberIDsInChannel(channel_id):
     # Paginate: conversations.members returns at most one page per call
     member_ids = []
     for page in client_bot.conversations_members(channel=channel_id, limit=PAGE_LIMIT):
         member_ids.extend(page["members"])
-    members = [getUserEmail(user_id) for user_id in member_ids]
-    return members
+    return member_ids
 
 
 # Checks if a user already exists in a channel

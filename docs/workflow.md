@@ -104,15 +104,13 @@ never requested twice. It copies the needed files into `static/paper_images/`. I
 | Action | What it does |
 |--------|----------------|
 | `setup-papers-create-channels` | Creates public Slack channels from `slack_channel` column |
-| `setup-papers-invite-authors` | Invites authors (from `author_emails`) into their paper channels |
+| `invite-authors-to-channels` | Invites authors (from CMT, registration, and Slack profiles) into their paper and LBD channels |
 | `setup-papers-set-desc` | Sets paper channel topic/purpose with paper metadata and the matching poster-session Slack link |
 | `set-event-channel-desc` | Sets description for event rows, including `Poster Session - N`, with the event Zoom/live URL and schedule context |
 | `setup-lbd` | LBD poster channels (`lp-*` / `lv-*` naming) |
 | `setup-music` | Music performance channels |
 | `setup-tutorial-channels` | Generate channel names for Tutorials rows only |
 | `create-tutorial-channels` | Create private channels for Tutorials rows with a nonblank `slack_channel`, and write their URLs |
-| `setup-tutorials-invite-attendees` | Add active/pending invited registrants to their selected tutorial channels |
-| `setup-tutorials` | Compatibility action: create private tutorial channels, then assign attendees |
 | `setup-sponsors` | Industry/sponsor channels + invite registered emails |
 | `prepare-calendar` | Converts schedule CSV → downloadable ICS |
 | `remove-author-email` | Strips private contact info before publishing |
@@ -262,18 +260,18 @@ SLACK_BOT_TOKEN=xoxb-...
 DUMMY_EMAIL=you@your-workspace-email.com   # must be a real user in your test workspace
 
 python miniconf_prep.py --action setup-papers-create-channels
-python miniconf_prep.py --action setup-papers-invite-authors
+python miniconf_prep.py --action invite-authors-to-channels
 python miniconf_prep.py --action setup-papers-set-desc
 python miniconf_prep.py --action set-event-channel-desc
 ```
 
 Notes for dummy Slack runs:
 
-- `author_emails` is empty in committed `papers.csv` — invite step only works with `DUMMY_EMAIL` unless you add emails.
+- Without `--prod`, the invite step only adds `DUMMY_EMAIL`; real invites need the CMT author export (`--cmt-csv`).
 - Existing `channel_url` values target ISMIR 2025; clear them (or use a trimmed CSV) when testing in a new workspace.
 - Slack caps channel creation at ~90 per run; 111 papers may need two runs.
-- `setup-tutorials-invite-attendees` / `setup-tutorials` / `setup-sponsors`
-  need a registration CSV supplied with `--registration-csv`; the legacy 2022
+- `setup-sponsors`
+  needs a registration CSV supplied with `--registration-csv`; the legacy 2022
   filename under the selected site data directory remains the fallback.
 
 

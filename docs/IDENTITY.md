@@ -75,5 +75,8 @@ counts.
   uv run python -m scripts.less_generalizable.presenter_registration
   ```
 
-Tests: `uv run --extra dev python -m pytest tests/test_identity.py`. Use made-up names in tests, since
+- [`modules/author_channels.py`](../modules/author_channels.py) (`--action invite-authors-to-channels`)
+  adds authors to their paper and LBD channels, see [SLACK.md](SLACK.md).
+
+Tests: `uv run --extra dev python -m pytest tests/test_identity.py tests/test_author_channels.py`. Use made-up names in tests, since
 real attendee data stays in the gitignored `local/`.

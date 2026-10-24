@@ -4,56 +4,15 @@ uv run python -m scripts.less_generalizable.presenter_registration
 '''
 import argparse
 import csv
-import re
-from dataclasses import dataclass
 from pathlib import Path
 
-from utils.identity import Person, ambiguous_tokens, match_evidence, names_match, share_name_token
+from utils.identity import (
+    Person, Registrant, ambiguous_tokens, load_cmt_authors, load_registrants, match_evidence, names_match,
+    share_name_token,
+)
 
 STRONG_EVIDENCE = ('email', 'name')
 ROOT = Path(__file__).resolve().parents[2]
-PAPER_NUMBER_HEADERS = (
-    'Please enter your paper number - 1st accepted submission',
-    'Please enter your paper number - 2nd accepted submission',
-)
-
-
-@dataclass(frozen=True)
-class Registrant:
-    name: str
-    person: Person
-    claimed_papers: frozenset[str]  # CMT IDs, as typed into the registration form
-    amount_due: float
-
-
-def read_csv(path: Path) -> list[dict[str, str]]:
-    with path.open(newline='', encoding='utf-8-sig') as f:
-        return list(csv.DictReader(f))
-
-
-def load_cmt_authors(path: Path) -> dict[str, list[tuple[str, str]]]:
-    """CMT ID -> [(name, email)]. 'Author Names' looks like 'Ann Lee (Uni A)*; Bo Park (Uni B; Lab C)'."""
-    authors = {}
-    for row in read_csv(path):
-        names = [n.split('(')[0].strip(' *') for n in re.split(r';(?![^()]*\))', row['Author Names'])]
-        emails = [e.strip() for e in row['Author Emails'].split(';')]
-        if len(names) != len(emails):
-            raise ValueError(f'CMT {row["Paper ID"]}: {len(names)} names but {len(emails)} emails')
-        authors[row['Paper ID']] = list(zip(names, emails))
-    return authors
-
-
-def load_registrants(path: Path) -> list[Registrant]:
-    return [
-        Registrant(
-            name=row['Full Name'],
-            person=Person.of([row['Full Name']], [row['Email Address']]),
-            # Every number counts, e.g. 'P12-7 (322)' claims 12, 7 and 322: an extra claim only adds weak evidence
-            claimed_papers=frozenset(n.lstrip('0') for h in PAPER_NUMBER_HEADERS for n in re.findall(r'\d+', row[h])),
-            amount_due=float(row['Amount Due'] or 0),
-        )
-        for row in read_csv(path)
-    ]
 
 
 def resolve_presenter(presenter: str, authors: list[tuple[str, str]]) -> tuple[Person, bool]:
@@ -71,7 +30,8 @@ def main() -> None:
     parser.add_argument('--sitedata', type=Path, default=ROOT / 'sitedata')
     args = parser.parse_args()
 
-    papers = read_csv(args.sitedata / 'papers.csv')
+    with (args.sitedata / 'papers.csv').open(newline='', encoding='utf-8') as f:
+        papers = list(csv.DictReader(f))
     cmt = load_cmt_authors(args.cmt)
     registrants = load_registrants(args.registration)
 

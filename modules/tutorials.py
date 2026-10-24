@@ -2,9 +2,16 @@ import os
 
 import pandas as pd
 
-MORNING_TUTORIAL_COL = "Select the morning session tutorial you wish to attend"
-AFTERNOON_TUTORIAL_COL = "Select the afternoon session tutorial you wish to attend"
-ATTENDEE_EMAIL = "Attendee Email"
+from utils.identity import normalize_email, slack_members
+
+REGISTRATION_EMAIL = "Email Address"
+# One flag per fee variant; any nonzero one admits the registrant to every tutorial
+TUTORIAL_FEE_COLUMNS = (
+    "Virtual Tutorials (Full Day)",
+    "Virtual Tutorials (Full Day) - Students",
+    "Tutorials (Full Day)",
+    "Tutorials (Full Day) - Students",
+)
 
 
 def getCleanTitle(incoming):
@@ -14,9 +21,11 @@ def getCleanTitle(incoming):
 class Tutorials:
     """Provision tutorial Slack channels and assign registered attendees."""
 
-    def __init__(self, eventsCsvFile, townscriptCsvFile, useDummyValues):
+    def __init__(self, eventsCsvFile, registrationCsvFile, useDummyValues, preferredEmails=None):
+        """preferredEmails: normalized registration email -> other emails, see utils.identity.load_preferred_emails"""
         self.eventsCsvFile = eventsCsvFile
-        self.townscriptCsvFile = townscriptCsvFile
+        self.registrationCsvFile = registrationCsvFile
+        self.preferredEmails = preferredEmails or {}
         self.useDummyValues = useDummyValues
 
     def _read_events(self):
@@ -53,13 +62,7 @@ class Tutorials:
 
     def addAdminsToChannels(self, slackUtils):
         """Add each entered Slack member to every tutorial channel."""
-        _, _, tutorials = self._read_events()
-        channels = list(dict.fromkeys(
-            str(name).strip().lstrip("#") for name in tutorials["slack_channel"]
-        ))
-        if any(not channel for channel in channels):
-            raise ValueError("every tutorial needs a slack_channel value")
-
+        channels = self._channels()
         while True:
             email = input("Admin email (empty to finish): ").strip()
             if not email:
@@ -68,67 +71,54 @@ class Tutorials:
                 print(f"Adding admin {email} to channel {channel}")
                 slackUtils.inviteUserToChannel(email, channel)
 
-    def _attendees_by_channel(self, tutorials):
-        if self.townscriptCsvFile is None:
-            raise ValueError("registration CSV is required for attendee assignment")
+    def _channels(self):
+        _, _, tutorials = self._read_events()
+        channels = list(dict.fromkeys(
+            str(name).strip().lstrip("#") for name in tutorials["slack_channel"]
+        ))
+        if any(not channel for channel in channels):
+            raise ValueError("every tutorial needs a slack_channel value")
+        return channels
 
-        registration = pd.read_csv(self.townscriptCsvFile)
-        required = {
-            MORNING_TUTORIAL_COL,
-            AFTERNOON_TUTORIAL_COL,
-            ATTENDEE_EMAIL,
-        }
-        missing = required.difference(registration.columns)
+    def _fee_payer_emails(self):
+        """Registration emails of everyone who registered with the tutorial fee, payment status aside"""
+        if self.registrationCsvFile is None:
+            raise ValueError("registration CSV is required for attendee assignment")
+        registration = pd.read_csv(self.registrationCsvFile, dtype=str, encoding="utf-8-sig").fillna("")
+        missing = {REGISTRATION_EMAIL, *TUTORIAL_FEE_COLUMNS}.difference(registration.columns)
         if missing:
             raise ValueError(
-                "registration CSV is missing required columns: "
-                + ", ".join(sorted(missing))
+                "registration CSV is missing required columns: " + ", ".join(sorted(missing))
             )
+        flags = registration[list(TUTORIAL_FEE_COLUMNS)].apply(lambda column: pd.to_numeric(column).fillna(0))
+        return [email.strip() for email in registration.loc[(flags > 0).any(axis=1), REGISTRATION_EMAIL] if email.strip()]
 
-        title_to_channel = {
-            getCleanTitle(row["title"]): str(row["slack_channel"]).lstrip("#")
-            for _, row in tutorials.iterrows()
-        }
-        attendees = {channel: set() for channel in title_to_channel.values()}
-        titles_not_found = set()
+    def addRegistrantsToChannels(self, slackUtils):
+        """Add everyone who registered with the tutorial fee to every tutorial channel; never removes anyone."""
+        channels = self._channels()
+        by_email = {email: member.user_id for member in slack_members() for email in member.person.emails}
+        registrants = self._fee_payer_emails()
 
-        for _, row in registration.iterrows():
-            email = str(row[ATTENDEE_EMAIL]).strip()
-            if not email or email.lower() == "nan":
-                continue
-            for column in (MORNING_TUTORIAL_COL, AFTERNOON_TUTORIAL_COL):
-                title = getCleanTitle(row[column])
-                if not title or title == "nan":
-                    continue
-                channel = title_to_channel.get(title)
-                if channel is None:
-                    titles_not_found.add(title)
-                else:
-                    attendees[channel].add(email)
-
-        if titles_not_found:
-            print("Registration tutorial titles not found:", sorted(titles_not_found))
-        return attendees
-
-    def inviteAttendeesToChannels(self, slackUtils):
-        """Assign active or pending invited attendees to tutorial channels."""
-
-        _, _, tutorials = self._read_events()
-        attendees = self._attendees_by_channel(tutorials)
+        user_ids, not_in_slack = set(), []
+        for email in registrants:
+            emails = [normalize_email(email), *map(normalize_email, self.preferredEmails.get(normalize_email(email), []))]
+            found = {by_email[e] for e in emails if e in by_email}
+            if not found:
+                not_in_slack.append(email)
+            user_ids |= found
+        print(f"{len(registrants)} registered with the tutorial fee; {len(user_ids)} Slack members to add.")
+        if not_in_slack:
+            print(f"Not in Slack yet ({len(not_in_slack)}): {', '.join(sorted(not_in_slack))}")
 
         if self.useDummyValues:
-            dummy_email = os.environ.get(
-                "DUMMY_EMAIL", "default_dummy_email@example.com"
-            )
-            attendees = {channel: {dummy_email} for channel in attendees}
+            dummy_email = normalize_email(os.environ.get("DUMMY_EMAIL", "default_dummy_email@example.com"))
+            if dummy_email not in by_email:
+                raise LookupError(f"DUMMY_EMAIL {dummy_email} is not a member of the workspace")
+            user_ids = {by_email[dummy_email]}
+            print(f"Not --prod: only {dummy_email} is added instead.")
 
-        for channel, emails in attendees.items():
-            for email in sorted(emails):
-                print(f"Adding user {email} to channel {channel}")
-                slackUtils.inviteUserToChannel(email, channel)
-
-    def setupSlackChannels(self, slackUtils):
-        """Compatibility action: create private channels, then assign attendees."""
-
-        self.createSlackChannels(slackUtils)
-        self.inviteAttendeesToChannels(slackUtils)
+        if input(f"Add {len(user_ids)} members to {len(channels)} tutorial channels? [y/N] ").strip().lower() != "y":
+            return
+        for channel in channels:
+            added = slackUtils.addMemberIDsToChannel(channel, user_ids)
+            print(f"{channel}: added {len(added)}")

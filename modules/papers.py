@@ -106,36 +106,6 @@ class Papers:
             remind_to_paste_to_sheet=True,
         )
 
-    def inviteAuthorsToChannels(self):
-        if self.papersCsvFile is None:
-            raise Exception("self.papersCsvFile passed in contructor is null")
-        # Reading the papers data.
-        csv_data = pd.read_csv(self.papersCsvFile, dtype={"uid": str})
-        slack_channel_column = "slack_channel"
-        # Adding the authors to the papers channel.
-        user_details = {}
-        for index, data in csv_data.iterrows():
-            # print("Row is: ", data)
-            user_details[data[slack_channel_column]] = (
-                str(data["author_emails"]).replace(" ", "").replace("*", "").split(";")
-            )
-
-        if self.useDummyValues:
-            print("Have to use dummy values!!!")
-            for key in user_details:
-                user_details[key] = [
-                    os.environ.get("DUMMY_EMAIL", "default_dummy_email@example.com")
-                ]
-
-        # Sending invites to users.
-        print("The user details are: ", user_details)
-
-        # Finally sending invites.
-        for key, emails in user_details.items():
-            for email in emails:
-                print("Sending email for ", key, " to ", email)
-                slackUtils.inviteUserToChannel(email, key)
-
     def setSlackChannelDescription(self):
         if self.papersCsvFile is None:
             raise Exception("self.papersCsvFile passed in contructor is null")
