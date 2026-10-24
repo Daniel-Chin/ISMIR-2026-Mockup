@@ -161,9 +161,16 @@ endif %}
       target="_blank" rel="noopener noreferrer">Zoom for Poster Session</a>
     {% endif %}
     {# This paper's board in the Warm-up Discussion (preconf/, lounge.html), in the Paper Hall view. #}
-    <a href="lounge.html#hall&paper={{paper.id}}" class="btn btn-outline-primary"
-      target="_blank" rel="noopener">Discussion</a>
+    {# Hidden once the conference opens (the first "Opening" event starts). #}
+    <a id="warmup-link" href="lounge.html#hall&paper={{paper.id}}" class="btn btn-outline-primary"
+      target="_blank" rel="noopener" data-hide-from="{{opening_start_utc}}">Warm-up Discussion</a>
   </div>
+  <script>
+    (function () {
+      const el = document.getElementById('warmup-link');
+      if (el.dataset.hideFrom && new Date() >= new Date(el.dataset.hideFrom)) el.remove();
+    })();
+  </script>
 </div>
 <div class="poster-content">
   <div id="details" class="pp-card m-3 collapse">
