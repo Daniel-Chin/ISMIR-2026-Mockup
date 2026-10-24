@@ -16,9 +16,20 @@
     return url.origin === base.origin && url.pathname === base.pathname;
   }
 
+  // extra-events.json "zoomDirect": the backend sends the meeting link without its passcode (the
+  // full link is in the event's Slack channel). Kept as is, but only a passcode-free Zoom link.
+  function directZoomUrl(link) {
+    try {
+      const url = new URL(link);
+      if (url.protocol !== 'https:' || !/(^|\.)(zoom\.us|zoom\.com|zoomgov\.com)$/.test(url.hostname)) return '';
+      url.search = ''; url.hash = '';
+      return url.href;
+    } catch (_) { return ''; }
+  }
+
   function localizeState(state) {
     for (const event of state?.events || []) {
-      if (event.links?.zoom) event.links.zoom = zoomRedirectUrl(event);
+      if (event.links?.zoom) event.links.zoom = (event.zoomDirect && directZoomUrl(event.links.zoom)) || zoomRedirectUrl(event);
       for (const paper of event.papers || []) if (paper.links) delete paper.links.zoom;
     }
     return state;
