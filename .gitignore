@@ -12,6 +12,7 @@ static/calendar/*.ics
 sheet_export/
 
 tmp/
+local/
 
 .vscode/
 
