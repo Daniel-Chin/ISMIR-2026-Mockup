@@ -1,12 +1,9 @@
 import pandas as pd
 import pytest
 
-from modules.tutorials import (
-    AFTERNOON_TUTORIAL_COL,
-    ATTENDEE_EMAIL,
-    MORNING_TUTORIAL_COL,
-    Tutorials,
-)
+from modules import tutorials as tutorials_module
+from modules.tutorials import REGISTRATION_EMAIL, TUTORIAL_FEE_COLUMNS, Tutorials
+from utils.identity import Person, SlackMember
 
 
 class FakeSlack:
@@ -65,25 +62,38 @@ def write_events(path):
 
 
 def write_registration(path):
+    virtual, virtual_student, onsite, onsite_student = TUTORIAL_FEE_COLUMNS
+    flags = {column: "0" for column in TUTORIAL_FEE_COLUMNS}
     pd.DataFrame(
         [
-            {
-                ATTENDEE_EMAIL: "one@example.com",
-                MORNING_TUTORIAL_COL: "Morning Tutorial",
-                AFTERNOON_TUTORIAL_COL: "Afternoon Tutorial",
-            },
-            {
-                ATTENDEE_EMAIL: "two@example.com",
-                MORNING_TUTORIAL_COL: '"=Morning Tutorial"',
-                AFTERNOON_TUTORIAL_COL: "",
-            },
-            {
-                ATTENDEE_EMAIL: "one@example.com",
-                MORNING_TUTORIAL_COL: "Morning Tutorial",
-                AFTERNOON_TUTORIAL_COL: "Unknown Tutorial",
-            },
+            {REGISTRATION_EMAIL: "virtual@example.com", **flags, virtual: "1"},
+            {REGISTRATION_EMAIL: "Student@Example.com", **flags, onsite_student: "1"},
+            {REGISTRATION_EMAIL: "preferred.elsewhere@example.com", **flags, onsite: "1"},
+            {REGISTRATION_EMAIL: "no-slack@example.com", **flags, virtual_student: "1"},
+            {REGISTRATION_EMAIL: "no-fee@example.com", **flags},
         ]
     ).to_csv(path, index=False)
+
+
+class FakeInviteSlack:
+    def __init__(self):
+        self.added = []
+
+    def addMemberIDsToChannel(self, channel, user_ids):
+        self.added.append((channel, sorted(user_ids)))
+        return sorted(user_ids)
+
+
+def fake_members():
+    def member(user_id, email):
+        return SlackMember(user_id, Person.of(["Someone"], [email]))
+    return (
+        member("U1", "virtual@example.com"),
+        member("U2", "student@example.com"),
+        member("U3", "preferred@home.example"),
+        member("U4", "no-fee@example.com"),
+        member("U9", "dummy@example.com"),
+    )
 
 
 def test_create_tutorial_channels_private_and_write_links(tmp_path):
@@ -105,41 +115,37 @@ def test_create_tutorial_channels_private_and_write_links(tmp_path):
     assert events.loc[2, "channel_url"] == "keep-me"
 
 
-def test_invite_tutorial_attendees_is_separate_and_deduplicated(tmp_path):
+def test_fee_payers_are_added_to_every_tutorial(tmp_path, monkeypatch):
     events_path = tmp_path / "events.csv"
     registration_path = tmp_path / "registration.csv"
     write_events(events_path)
     write_registration(registration_path)
-    slack = FakeSlack()
+    monkeypatch.setattr(tutorials_module, "slack_members", fake_members)
+    monkeypatch.setattr("builtins.input", lambda prompt: "y")
+    slack = FakeInviteSlack()
 
-    Tutorials(
-        events_path, registration_path, useDummyValues=False
-    ).inviteAttendeesToChannels(slack)
+    preferred = {"preferred.elsewhere@example.com": ["preferred@home.example"]}
+    Tutorials(events_path, registration_path, False, preferred).addRegistrantsToChannels(slack)
 
-    assert slack.created_public == []
-    assert slack.invites == [
-        ("one@example.com", "tutorial-morning"),
-        ("two@example.com", "tutorial-morning"),
-        ("one@example.com", "tutorial-afternoon"),
+    assert slack.added == [
+        ("tutorial-morning", ["U1", "U2", "U3"]),
+        ("tutorial-afternoon", ["U1", "U2", "U3"]),
     ]
 
 
-def test_dummy_mode_uses_configured_dummy_email(tmp_path, monkeypatch):
+def test_dummy_mode_adds_only_dummy_email(tmp_path, monkeypatch):
     events_path = tmp_path / "events.csv"
     registration_path = tmp_path / "registration.csv"
     write_events(events_path)
     write_registration(registration_path)
     monkeypatch.setenv("DUMMY_EMAIL", "dummy@example.com")
-    slack = FakeSlack()
+    monkeypatch.setattr(tutorials_module, "slack_members", fake_members)
+    monkeypatch.setattr("builtins.input", lambda prompt: "y")
+    slack = FakeInviteSlack()
 
-    Tutorials(
-        events_path, registration_path, useDummyValues=True
-    ).inviteAttendeesToChannels(slack)
+    Tutorials(events_path, registration_path, useDummyValues=True).addRegistrantsToChannels(slack)
 
-    assert slack.invites == [
-        ("dummy@example.com", "tutorial-morning"),
-        ("dummy@example.com", "tutorial-afternoon"),
-    ]
+    assert slack.added == [("tutorial-morning", ["U9"]), ("tutorial-afternoon", ["U9"])]
 
 
 def test_setup_names_preserves_other_category(tmp_path):
@@ -278,7 +284,7 @@ def test_add_admins_cli_selects_mock_workspace(monkeypatch):
     monkeypatch.setattr(slack, "configure_clients", lambda **kwargs: calls.append(kwargs))
     monkeypatch.setattr(
         Tutorials, "addAdminsToChannels",
-        lambda self, client: calls.append((self.eventsCsvFile, self.townscriptCsvFile, client)),
+        lambda self, client: calls.append((self.eventsCsvFile, self.registrationCsvFile, client)),
     )
     runpy.run_path(str(Path(__file__).resolve().parents[1] / "miniconf_prep.py"), run_name="__main__")
     assert calls == [{"is_mockup": True}, ("sitedata_mock/events.csv", None, slack)]

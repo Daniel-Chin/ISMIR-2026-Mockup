@@ -36,8 +36,8 @@ export SLACK_USER_TOKEN=...
 python miniconf_prep.py --action setup-papers-create-channels
 
 # the following two orders don't matter
-# invite primary authors to their corresponding channel
-python miniconf_prep.py --action setup-papers-invite-authors
+# invite authors to their paper and LBD channels
+python miniconf_prep.py --action invite-authors-to-channels
 
 # add paper-channel metadata, including the poster-session Slack link and miniconf link
 python miniconf_prep.py --action setup-papers-set-desc

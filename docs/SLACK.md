@@ -93,40 +93,39 @@ the workspace (workspace admin, or an app-approval flow).
 .venv/bin/python miniconf_prep.py --mockup --action create-event-channels
 .venv/bin/python miniconf_prep.py --mockup --action setup-papers-create-channels
 
-# 3. invite authors into their channels (non-prod → invites DUMMY_EMAIL instead)
-.venv/bin/python miniconf_prep.py --mockup --action setup-papers-invite-authors
-# Real conference: paper and LBD channels from CMT + registration + Slack profiles, see below
-.venv/bin/python miniconf_prep.py --action invite-authors-to-channels --prod true \
-    [--preferred-emails-csv <csv>] [--registration-csv <csv>] [--cmt-csv local/cmt_authors.csv]
-
-# 4. set paper channel topic + purpose (title, authors, program-site URL, poster-session Slack link)
+# 3. set paper channel topic + purpose (title, authors, program-site URL, poster-session Slack link)
 #    Run setup-zoom first: this step requires each poster session's live_url. See ./ZOOM.md
 .venv/bin/python miniconf_prep.py --mockup --action setup-papers-set-desc
 
-# 5. set event channel purpose for all event rows
+# 4. set event channel purpose for all event rows
 #    Run setup-zoom first: this step requires each event's live_url. See ./ZOOM.md
 .venv/bin/python miniconf_prep.py --mockup --action set-event-channel-desc
 # This command needs to be run again each time event uid changes (e.g. from adjustment of conference schedule)
 
-# 6. Tutorials.
+# 5. Tutorials.
 .venv/bin/python miniconf_prep.py --mockup --action setup-tutorial-channels
 .venv/bin/python miniconf_prep.py --mockup --action create-tutorial-channels
 # It's normal to not be able to see the channels at this stage --- they are private even to admins. So run the next step:  
 .venv/bin/python miniconf_prep.py --mockup --action add-admins-to-tutorials
 .venv/bin/python miniconf_prep.py --mockup --action add-registrants-to-tutorials
 
-# 7. LBDs: name channels lbd{uid}-{first-3-title-words} into lbds.csv slack_channel, then create them and write channel_url
+# 6. LBDs: name channels lbd{uid}-{first-3-title-words} into lbds.csv slack_channel, then create them and write channel_url
 .venv/bin/python miniconf_prep.py --mockup --action setup-lbd-channels
 .venv/bin/python miniconf_prep.py --mockup --action create-lbd-channels
+
+# 7. invite authors into their paper and LBD channels (non-prod → invites DUMMY_EMAIL instead)
+#    Authors from CMT + registration + Slack profiles, see below
+.venv/bin/python miniconf_prep.py --action invite-authors-to-channels --prod true \
+    [--preferred-emails-csv <csv>] [--registration-csv <csv>] [--cmt-csv local/cmt_authors.csv]
 ```
 
 Omit `--mockup` for the real conference data and add `--prod true` for
-step 3 to invite the real `author_emails`. Steps 3, 4, and 5 can run in any
-order after step 2.
+step 7 to invite the real authors. Steps 3 and 4 can run in any order after
+step 2; step 7 needs the paper and LBD channels from steps 2 and 6.
 
 After scripts, manual setup include: setting the correct channels to be default; setting channel description.
 
-`SLACK_BOT_TOKEN` is needed for every step that talks to Slack (2–5). Importing
+`SLACK_BOT_TOKEN` is needed for every step that talks to Slack (2–7). Importing
 `utils/slack.py` without a token is safe — no API calls are made until needed and the
 first actual API call just fails with `invalid_auth` — so step 1
 (`setup-channels`), which only rewrites the CSV, runs without credentials.
@@ -149,17 +148,6 @@ channel; then writes `https://<workspace>.slack.com/archives/<id>` into the
 `channel_url` column for every row whose channel exists (the workspace URL comes
 from `auth.test`). The CSV is rewritten in place.
 
-**`invite-authors`**: splits each row's `author_emails` on `;`, resolves each
-email to a workspace user ID, and invites them to the row's channel (skipping
-users already in it). Without `--prod`, every channel gets `DUMMY_EMAIL`
-instead. **Emails resolve only for active or pending invited members known to
-the workspace** — the Web API cannot invite someone *to the workspace* on a
-non-Enterprise plan. Unknown emails are printed and skipped. Send workspace
-invites first (Slack admin UI or shared invite link), then run this step; an
-author can be assigned to a paper channel while their workspace invitation is
-still pending. The email in `author_emails` must exactly match the address used
-for the workspace invitation.
-
 **`invite-authors-to-channels`**: for every paper and LBD channel (by `uid` = CMT ID in `papers.csv` and
 `lbds.csv`), adds the Slack members who are its authors and tries to make them channel managers. Authors
 are found, in order, by: the paper numbers typed into the registration form; registrants matched to the
@@ -169,7 +157,8 @@ registrant reaches Slack through their registration email or their preferred ema
 (`--preferred-emails-csv`, columns `registration_email`, `preferred_email`). The plan is written to
 `tmp/author_channel_invites.csv`, with the evidence for each invite. Registered authors who aren't in
 Slack yet are printed, and you're asked to confirm before anything changes. The step only adds people,
-so you can re-run it as more people join. Channel managers go through `admin.roles.addAssignments`
+so you can re-run it as more people join. Someone who leaves a channel isn't added back (see
+[Channel add history](#channel-add-history)). Channel managers go through `admin.roles.addAssignments`
 (role `Rl0A`), which probably needs Enterprise Grid. After the first failure the step stops trying and
 says so, and you can set managers by hand from the plan file. Without `--prod`, every channel gets only
 `DUMMY_EMAIL`.
@@ -204,6 +193,25 @@ Tutorial channels are created private by `create-tutorial-channels`.
    tutorial channels out of this list; their members will be assigned by script.
 
 ### Tutorial invitation workflow
+
+`add-registrants-to-tutorials` adds everyone who registered with the tutorial fee to **every** tutorial
+channel. A registrant counts if any of the four fee columns of the registration export (`Virtual Tutorials
+(Full Day)`, `Virtual Tutorials (Full Day) - Students`, `Tutorials (Full Day)`, `Tutorials (Full Day) -
+Students`) is nonzero. The "Which Tutorial(s) are you planning to attend?" answer and payment status are
+ignored. A registrant is found in Slack by their registration email or their preferred email
+(`--preferred-emails-csv`), never by name, because these channels are paid. The default export is
+`local/registration/Registrant Details - latest.csv` (`--registration-csv` to override). The step prints
+registrants not in Slack yet, asks for confirmation, and only adds people, so you can re-run it as people
+join; someone who leaves a tutorial channel isn't added back (see [Channel add history](#channel-add-history)).
+Without `--prod`, only `DUMMY_EMAIL` is added. `process-new-users` runs this step too.
+
+### Channel add history
+
+`invite-authors-to-channels` and `add-registrants-to-tutorials` record, per channel ID, every user they added
+or found already in the channel, in `tmp/channel_add_history.json` (`tmp/channel_add_history_mockup.json` with
+`--mockup`). Later runs skip those users, so attendees who quit a channel stay out. To add someone again, add
+them by hand in Slack, or delete their ID from the file. Deleting the file resets the history, and the next run
+adds everyone again.
 
 ### CLI stages
 
@@ -248,7 +256,7 @@ title or session/position change in the sheet produces a *new* name, and
 `create-channels` then creates a second channel; the old one must be archived
 by hand. Once channels exist, treat `slack_channel` as frozen.
 
-`invite-authors` and `set-desc` are also safe to re-run: invites skip existing
+`invite-authors-to-channels` and `set-desc` are also safe to re-run: invites skip existing
 members, and topic/purpose are simply overwritten.
 
 ## Live and mockup credentials
@@ -306,7 +314,8 @@ restarts.
 - Channel and user listings use cursor pagination with Slack's recommended
   page size of 200.
 - Channel assignments require the target to be an active or pending invited
-  workspace member (see `invite-authors` above).
+  workspace member; the Web API cannot invite someone *to the workspace* on a
+  non-Enterprise plan, so send workspace invites first.
 - The bot can only see private channels it is a member of; `isChannel` may
   report false for a private channel created by someone else, and creation
   then fails with `name_taken`.
@@ -346,7 +355,7 @@ end to end without touching real authors.
 | `missing_scope` | a bot scope from the setup list wasn't added, or the app wasn't **reinstalled** after adding scopes |
 | `name_taken` on create | channel already exists **archived**, or is a private channel the bot can't see |
 | `invalid_name` | uppercase/punctuation in `slack_channel` — regenerate with `setup-channels` |
-| `User <email> does not exist in the workspace.` | author not yet a workspace member — workspace invites are manual, then re-run `invite-authors` |
+| `User <email> does not exist in the workspace.` | author not yet a workspace member — workspace invites are manual, then re-run `invite-authors-to-channels` |
 | `Rate limit exceeded. Retrying...` loops | expected on bulk runs; Slack caps ~90 channel creations per run |
 | `channel_url` empty after the data pull | expected — re-run `setup-papers-create-channels` to backfill |
 | `[SSL: CERTIFICATE_VERIFY_FAILED]` | handled — the client pins `certifi`'s CA bundle (`utils/slack.py` top) |

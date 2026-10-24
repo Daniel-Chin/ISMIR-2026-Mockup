@@ -48,8 +48,6 @@ PDF_DIR = os.path.join(ROOT, "static", "mock")
 CONF_DATE = "2026-08-18"
 YT_PLACEHOLDER = "aqz-KE-bpKQ"  # Big Buck Bunny (CC) - stand-in video
 DUMMY_EMAILS = "mock.author1@example.com;mock.author2@example.com"
-MORNING_TUTORIAL_COL = "Select the morning session tutorial you wish to attend"
-AFTERNOON_TUTORIAL_COL = "Select the afternoon session tutorial you wish to attend"
 MOCK_TUTORIAL_TITLE = "Mock Tutorial: Building a Reproducible MIR Baseline"
 
 
@@ -270,17 +268,12 @@ def make_events():
 
 
 def make_tutorial_registration():
-    header = [
-        "Attendee Email",
-        MORNING_TUTORIAL_COL,
-        AFTERNOON_TUTORIAL_COL,
-    ]
+    from modules.tutorials import REGISTRATION_EMAIL, TUTORIAL_FEE_COLUMNS
+
+    header = [REGISTRATION_EMAIL, *TUTORIAL_FEE_COLUMNS]
     rows = [
-        {
-            "Attendee Email": "mock.attendee@example.com",
-            MORNING_TUTORIAL_COL: MOCK_TUTORIAL_TITLE,
-            AFTERNOON_TUTORIAL_COL: "",
-        }
+        {REGISTRATION_EMAIL: "mock.attendee@example.com", **{c: "0" for c in TUTORIAL_FEE_COLUMNS},
+         TUTORIAL_FEE_COLUMNS[0]: "1"}
     ]
     path = os.path.join(MOCK_INPUT_DIR, "tutorial_registration.csv")
     with open(path, "w", newline="") as f:

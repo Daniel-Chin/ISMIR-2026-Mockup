@@ -1,5 +1,6 @@
 import argparse
 import os
+from pathlib import Path
 
 # module imports live inside the setup functions below: several modules pull in
 # utils.slack; deferring imports keeps unrelated integrations out of
@@ -11,6 +12,8 @@ import os
 # 3. Add/Remove tut_X.md files as necessary. Make sure they are consecutive in number
 
 useDummyValues = True
+# ConferenceCatalysts "Registrant Details" export, used by author and tutorial channel assignment
+REGISTRATION_EXPORT_CSV = "local/registration/Registrant Details - latest.csv"
 DEFAULT_REGISTRATION_CSV = (
     "__23rd_International_Society_for_Music_Information_Retrieval_Conference_"
     "(ISMIR_2022)__Registration_Data.csv"
@@ -51,7 +54,7 @@ def parse_arguments():
 
     parser.add_argument(
         "--preferred-emails-csv",
-        help="CSV with columns registration_email, preferred_email, used by invite-authors-to-channels",
+        help="CSV with columns registration_email, preferred_email, used by invite-authors-to-channels and add-registrants-to-tutorials",
     )
 
     #### Possible actions ####
@@ -59,8 +62,7 @@ def parse_arguments():
     # setup-tutorial-channels
     # create-tutorial-channels
     # add-admins-to-tutorials
-    # setup-tutorials-invite-attendees
-    # setup-tutorials (compatibility: runs both stages)
+    # add-registrants-to-tutorials
     # setup-papers-setup-channels
     # setup-papers-create-channels
     # setup-papers-set-desc
@@ -78,7 +80,7 @@ def parse_arguments():
 
     parser.add_argument(
         "--action",
-        help="action to run (for example setup-zoom, setup-tutorial-channels, create-tutorial-channels, add-admins-to-tutorials, setup-tutorials-invite-attendees, setup-papers-create-channels, setup-papers-set-desc, setup-event-channels, create-event-channels, set-event-channel-desc)",
+        help="action to run (for example setup-zoom, setup-tutorial-channels, create-tutorial-channels, add-admins-to-tutorials, add-registrants-to-tutorials, setup-papers-create-channels, setup-papers-set-desc, setup-event-channels, create-event-channels, set-event-channel-desc)",
         required=True,
     )
 
@@ -97,20 +99,20 @@ def setupZoom(eventsCsvFile, papersCsvFile=None, passcode=None, is_mockup=False)
     zoomCreator.setupZoomCalls(zoomUtils, passcode=passcode)
 
 
-def setupTutorials(eventsCsvFile, registrationDataCsvFile, followup_action):
+def setupTutorials(eventsCsvFile, registrationDataCsvFile, followup_action, preferredEmailsCsvFile=None):
     from modules.tutorials import Tutorials
+    from utils.identity import load_preferred_emails
 
-    tutObj = Tutorials(eventsCsvFile, registrationDataCsvFile, useDummyValues)
+    preferred = load_preferred_emails(Path(preferredEmailsCsvFile)) if preferredEmailsCsvFile else None
+    tutObj = Tutorials(eventsCsvFile, registrationDataCsvFile, useDummyValues, preferred)
     if followup_action == "setup-channels":
         tutObj.setupChannelNames()
     elif followup_action == "create-channels":
         tutObj.createSlackChannels(slackUtils)
     elif followup_action == "add-admins":
         tutObj.addAdminsToChannels(slackUtils)
-    elif followup_action == "invite-attendees":
-        tutObj.inviteAttendeesToChannels(slackUtils)
-    elif followup_action == "all":
-        tutObj.setupSlackChannels(slackUtils)
+    elif followup_action == "add-registrants":
+        tutObj.addRegistrantsToChannels(slackUtils)
     else:
         raise ValueError(f"Unknown tutorial action: {followup_action}")
 
@@ -123,15 +125,13 @@ def setupPapers(data_path, papersCsvFile, eventsCsvFile, followup_action):
         paperObj.setupSlackChannels()
     elif followup_action == "create-channels":
         paperObj.createSlackChannels()
-    elif followup_action == "invite-authors":
-        paperObj.inviteAuthorsToChannels()
     elif followup_action == "set-desc":
         paperObj.setSlackChannelDescription()
     else:
         raise Exception(
             "Invalid followup action for papers: "
             + followup_action
-            + ". Possible values are setup-channels, create-channels, invite-authors"
+            + ". Possible values are setup-channels, create-channels, set-desc"
         )
 
 
@@ -199,12 +199,12 @@ if __name__ == "__main__":
         raise Exception(
             "--action is missing. See --help for available actions, including "
             "create-tutorial-channels and "
-            "setup-tutorials-invite-attendees."
+            "add-registrants-to-tutorials."
         )
 
     if "setup" in action or "process" in action or action in {
         "create-event-channels", "create-tutorial-channels", "create-lbd-channels", "set-event-channel-desc",
-        "add-admins-to-tutorials", "invite-authors-to-channels",
+        "add-admins-to-tutorials", "add-registrants-to-tutorials", "invite-authors-to-channels",
     }:
         if action == "setup-zoom":
             # zoom creds are only checked on first API call, so this import is
@@ -236,18 +236,12 @@ if __name__ == "__main__":
     elif action == "add-admins-to-tutorials":
         setupTutorials(os.path.join(data_path, "events.csv"), None, "add-admins")
 
-    elif action == "setup-tutorials-invite-attendees":
+    elif action == "add-registrants-to-tutorials":
         setupTutorials(
             os.path.join(data_path, "events.csv"),
-            registration_csv,
-            "invite-attendees",
-        )
-
-    elif action == "setup-tutorials":
-        setupTutorials(
-            os.path.join(data_path, "events.csv"),
-            registration_csv,
-            "all",
+            args.registration_csv or REGISTRATION_EXPORT_CSV,
+            "add-registrants",
+            args.preferred_emails_csv,
         )
 
     elif action.startswith("setup-papers-"):
@@ -280,7 +274,7 @@ if __name__ == "__main__":
         invite_authors_to_channels(
             data_path,
             args.cmt_csv,
-            args.registration_csv or "local/registration/Registrant Details - latest.csv",
+            args.registration_csv or REGISTRATION_EXPORT_CSV,
             args.preferred_emails_csv,
             useDummyValues,
         )
@@ -298,8 +292,9 @@ if __name__ == "__main__":
         # First setup tutorials.
         setupTutorials(
             os.path.join(data_path, "events.csv"),
-            registration_csv,
-            "invite-attendees",
+            args.registration_csv or REGISTRATION_EXPORT_CSV,
+            "add-registrants",
+            args.preferred_emails_csv,
         )
         # Next setup sponsors.
         setupSponsors(

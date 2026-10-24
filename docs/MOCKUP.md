@@ -66,8 +66,8 @@ Produces:
 
   Days 2–5 get one filler event each because `main.py:group_by_days` hard-requires
   days 1–5.
-- `mock_inputs/tutorial_registration.csv` — one fake attendee selection for
-  testing tutorial attendee assignment. It deliberately lives outside
+- `mock_inputs/tutorial_registration.csv` — one fake registrant with the tutorial fee, for
+  testing tutorial attendee assignment (`--registration-csv`). It deliberately lives outside
   `sitedata_mock/` so Flask does not publish attendee data as JSON.
 - `sitedata_mock/lbds.csv` (2), `music.csv` (1, includes the `bb_id` column that
   `format_music` needs), `industry.csv` (2 sponsors).
@@ -135,7 +135,7 @@ Create and populate the paper channels:
 
 ```bash
 python miniconf_prep.py --mockup --action setup-papers-create-channels
-python miniconf_prep.py --mockup --action setup-papers-invite-authors     # non-prod → invites DUMMY_EMAIL
+python miniconf_prep.py --mockup --action invite-authors-to-channels      # non-prod → invites DUMMY_EMAIL
 python miniconf_prep.py --mockup --action setup-papers-set-desc
 python miniconf_prep.py --mockup --action set-event-channel-desc
 ```

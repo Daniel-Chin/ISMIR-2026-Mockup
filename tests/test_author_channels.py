@@ -50,7 +50,8 @@ class FakeClient:
             raise SlackApiError("no", {"error": self.manager_error})
 
 
-def test_apply_invites_adds_only_new_members_and_stops_manager_attempts(monkeypatch):
+def test_apply_invites_adds_only_new_members_and_stops_manager_attempts(monkeypatch, tmp_path):
+    monkeypatch.setattr(author_channels.slackUtils, "ADD_HISTORY_PATH", tmp_path / "history.json")
     bot, user = FakeClient(), FakeClient(manager_error="not_allowed_token_type")
     monkeypatch.setattr(author_channels.slackUtils, "client_bot", bot)
     monkeypatch.setattr(author_channels.slackUtils, "client_user", user)
@@ -62,3 +63,17 @@ def test_apply_invites_adds_only_new_members_and_stops_manager_attempts(monkeypa
     ])
     assert bot.invited == [("Ca", "U2")]
     assert user.manager_calls == [{"role_id": "Rl0A", "entity_ids": ["Ca"], "user_ids": ["U1", "U2"]}]
+
+
+def test_add_history_keeps_out_whoever_left(monkeypatch, tmp_path):
+    bot = FakeClient()
+    members = {"U1"}
+    monkeypatch.setattr(author_channels.slackUtils, "ADD_HISTORY_PATH", tmp_path / "history.json")
+    monkeypatch.setattr(author_channels.slackUtils, "client_bot", bot)
+    monkeypatch.setattr(author_channels.slackUtils, "getChannelID", lambda name: "C" + name)
+    monkeypatch.setattr(author_channels.slackUtils, "memberIDsInChannel", lambda channel_id: sorted(members))
+    add = author_channels.slackUtils.addMemberIDsToChannel
+    assert add("a", {"U1", "U2"}) == ["U2"]
+    members.clear()  # both quit: U1 was already in, U2 was added by us
+    assert add("a", {"U1", "U2", "U3"}) == ["U3"]
+    assert bot.invited == [("Ca", "U2"), ("Ca", "U3")]

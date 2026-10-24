@@ -105,18 +105,14 @@ def apply_invites(invites: list[Invite]) -> None:
         by_channel[i.channel].add(i.member.user_id)
     can_assign_managers = True
     for channel, user_ids in by_channel.items():
-        channel_id = slackUtils.getChannelID(channel)
-        if channel_id is None:
-            print(f"{channel}: channel not found, skipped")
+        try:
+            print(f"{channel}: added {len(slackUtils.addMemberIDsToChannel(channel, user_ids))}")
+        except LookupError as e:
+            print(f"{e}, skipped")
             continue
-        new = sorted(user_ids - set(slackUtils.memberIDsInChannel(channel_id)))
-        if new:
-            try:
-                # force: still add the valid users if some of them can't be added
-                slackUtils.client_bot.conversations_invite(channel=channel_id, users=",".join(new), force=True)
-                print(f"{channel}: added {len(new)}")
-            except SlackApiError as e:
-                print(f"{channel}: adding {new} failed: {e.response['error']}")
+        except SlackApiError as e:
+            print(f"{channel}: adding members failed: {e.response['error']}")
+        channel_id = slackUtils.getChannelID(channel)
         if can_assign_managers:
             try:
                 slackUtils.client_user.api_call("admin.roles.addAssignments", json={
