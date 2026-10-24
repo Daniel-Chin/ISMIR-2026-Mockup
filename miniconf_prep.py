@@ -43,6 +43,17 @@ def parse_arguments():
         help="registration CSV used by tutorial/sponsor attendee assignment",
     )
 
+    parser.add_argument(
+        "--cmt-csv",
+        default="local/cmt_authors.csv",
+        help="CMT author export (Paper ID, Author Names, Author Emails) used by invite-authors-to-channels",
+    )
+
+    parser.add_argument(
+        "--preferred-emails-csv",
+        help="CSV with columns registration_email, preferred_email, used by invite-authors-to-channels",
+    )
+
     #### Possible actions ####
     # setup-zoom
     # setup-tutorial-channels
@@ -58,6 +69,7 @@ def parse_arguments():
     # set-event-channel-desc
     # setup-lbd-channels
     # create-lbd-channels
+    # invite-authors-to-channels
     # setup-music
     # setup-sponsors
     # remove-author-email
@@ -192,7 +204,7 @@ if __name__ == "__main__":
 
     if "setup" in action or "process" in action or action in {
         "create-event-channels", "create-tutorial-channels", "create-lbd-channels", "set-event-channel-desc",
-        "add-admins-to-tutorials",
+        "add-admins-to-tutorials", "invite-authors-to-channels",
     }:
         if action == "setup-zoom":
             # zoom creds are only checked on first API call, so this import is
@@ -261,6 +273,17 @@ if __name__ == "__main__":
 
     elif action == "create-lbd-channels":
         createLbdChannels(os.path.join(data_path, "lbds.csv"))
+
+    elif action == "invite-authors-to-channels":
+        from modules.author_channels import invite_authors_to_channels
+
+        invite_authors_to_channels(
+            data_path,
+            args.cmt_csv,
+            args.registration_csv or "local/registration/Registrant Details - latest.csv",
+            args.preferred_emails_csv,
+            useDummyValues,
+        )
 
     elif action == "setup-music":
         setupMusic(os.path.join(data_path, "music.csv"))

@@ -526,12 +526,16 @@ def isUserAlreadyInWorkspace(user_email):
 def memberEmailsAlreadyInChannel(channelName):
     channel_id = getChannelID(channelName)
     assert channel_id is not None, "Channel ID should not be None"
+    members = [getUserEmail(user_id) for user_id in memberIDsInChannel(channel_id)]
+    return members
+
+
+def memberIDsInChannel(channel_id):
     # Paginate: conversations.members returns at most one page per call
     member_ids = []
     for page in client_bot.conversations_members(channel=channel_id, limit=PAGE_LIMIT):
         member_ids.extend(page["members"])
-    members = [getUserEmail(user_id) for user_id in member_ids]
-    return members
+    return member_ids
 
 
 # Checks if a user already exists in a channel

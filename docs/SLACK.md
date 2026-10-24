@@ -95,6 +95,9 @@ the workspace (workspace admin, or an app-approval flow).
 
 # 3. invite authors into their channels (non-prod → invites DUMMY_EMAIL instead)
 .venv/bin/python miniconf_prep.py --mockup --action setup-papers-invite-authors
+# Real conference: paper and LBD channels from CMT + registration + Slack profiles, see below
+.venv/bin/python miniconf_prep.py --action invite-authors-to-channels --prod true \
+    [--preferred-emails-csv <csv>] [--registration-csv <csv>] [--cmt-csv local/cmt_authors.csv]
 
 # 4. set paper channel topic + purpose (title, authors, program-site URL, poster-session Slack link)
 #    Run setup-zoom first: this step requires each poster session's live_url. See ./ZOOM.md
@@ -156,6 +159,20 @@ invites first (Slack admin UI or shared invite link), then run this step; an
 author can be assigned to a paper channel while their workspace invitation is
 still pending. The email in `author_emails` must exactly match the address used
 for the workspace invitation.
+
+**`invite-authors-to-channels`**: for every paper and LBD channel (by `uid` = CMT ID in `papers.csv` and
+`lbds.csv`), adds the Slack members who are its authors and tries to make them channel managers. Authors
+are found, in order, by: the paper numbers typed into the registration form; registrants matched to the
+paper's CMT authors; and Slack profiles matched to the CMT authors directly. Matching uses
+[`utils/identity.py`](../utils/identity.py), weak evidence included (see [IDENTITY.md](IDENTITY.md)). A
+registrant reaches Slack through their registration email or their preferred email
+(`--preferred-emails-csv`, columns `registration_email`, `preferred_email`). The plan is written to
+`tmp/author_channel_invites.csv`, with the evidence for each invite. Registered authors who aren't in
+Slack yet are printed, and you're asked to confirm before anything changes. The step only adds people,
+so you can re-run it as more people join. Channel managers go through `admin.roles.addAssignments`
+(role `Rl0A`), which probably needs Enterprise Grid. After the first failure the step stops trying and
+says so, and you can set managers by hand from the plan file. Without `--prod`, every channel gets only
+`DUMMY_EMAIL`.
 
 **`setup-papers-set-desc`**: uses the session number from `session_assignment.csv`
 to find the matching oral and poster channels in `events.csv`. Writes the paper

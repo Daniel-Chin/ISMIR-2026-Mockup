@@ -2,6 +2,7 @@
 Deciding whether records from different sources (CMT, the registration export, Slack) are the same person.
 The rules are name-agnostic and err towards false positives: a wrong match costs less than a missed one.
 '''
+import csv
 import functools
 import itertools
 import re
@@ -9,6 +10,7 @@ import unicodedata
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
+from pathlib import Path
 
 # Letters that NFKD does not decompose into ASCII
 _FOLD = str.maketrans({'ı': 'i', 'ł': 'l', 'ø': 'o', 'đ': 'd', 'ð': 'd', 'þ': 'th', 'ß': 'ss', 'æ': 'ae', 'œ': 'oe'})
@@ -181,6 +183,64 @@ def match_evidence(a: Person, b: Person, related: bool = False, ambiguous: froze
     if any(similar_emails(x, y) for x in a.emails for y in b.emails):
         return 'similar email'
     return None
+
+
+# Sources
+
+def _read_csv(path: Path) -> list[dict[str, str]]:
+    with path.open(newline='', encoding='utf-8-sig') as f:
+        return list(csv.DictReader(f))
+
+
+def load_cmt_authors(path: Path) -> dict[str, list[tuple[str, str]]]:
+    """CMT ID -> [(name, email)]. 'Author Names' looks like 'Ann Lee (Uni A)*; Bo Park (Uni B; Lab C)'."""
+    authors = {}
+    for row in _read_csv(path):
+        names = [n.split('(')[0].strip(' *') for n in re.split(r';(?![^()]*\))', row['Author Names'])]
+        emails = [e.strip() for e in row['Author Emails'].split(';')]
+        if len(names) != len(emails):
+            raise ValueError(f'CMT {row["Paper ID"]}: {len(names)} names but {len(emails)} emails')
+        authors[row['Paper ID']] = list(zip(names, emails))
+    return authors
+
+
+_PAPER_NUMBER_HEADERS = (
+    'Please enter your paper number - 1st accepted submission',
+    'Please enter your paper number - 2nd accepted submission',
+)
+
+
+@dataclass(frozen=True)
+class Registrant:
+    name: str
+    person: Person  # registration email, plus preferred emails if given
+    claimed_papers: frozenset[str]  # CMT IDs, as typed into the registration form
+    amount_due: float
+
+
+def load_registrants(path: Path, preferred_emails: dict[str, list[str]] | None = None) -> list[Registrant]:
+    """Rows of the registration export. preferred_emails: normalized registration email -> other emails to use."""
+    preferred_emails = preferred_emails or {}
+    return [
+        Registrant(
+            name=row['Full Name'],
+            person=Person.of([row['Full Name']],
+                             [row['Email Address'], *preferred_emails.get(normalize_email(row['Email Address']), [])]),
+            # Every number counts, e.g. 'P12-7 (322)' claims 12, 7 and 322: an extra claim only adds weak evidence
+            claimed_papers=frozenset(n.lstrip('0') for h in _PAPER_NUMBER_HEADERS for n in re.findall(r'\d+', row[h])),
+            amount_due=float(row['Amount Due'] or 0),
+        )
+        for row in _read_csv(path)
+    ]
+
+
+def load_preferred_emails(path: Path) -> dict[str, list[str]]:
+    """CSV with columns registration_email, preferred_email -> normalized registration email -> preferred emails."""
+    preferred: dict[str, list[str]] = {}
+    for row in _read_csv(path):
+        if row['preferred_email'].strip():
+            preferred.setdefault(normalize_email(row['registration_email']), []).append(row['preferred_email'])
+    return preferred
 
 
 @dataclass(frozen=True)
