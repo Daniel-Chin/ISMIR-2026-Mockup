@@ -388,11 +388,6 @@ function liveOngoingMeta(e) {
   return `<div class="live-ongoing-meta"><strong>Ongoing</strong><span aria-hidden="true"> · </span><time datetime="${esc(e.startsAt)}">${fmtTime(e.startsAt)}</time><span aria-hidden="true">–</span><time datetime="${esc(e.endsAt)}">${(e.endTimeTBD ? 'TBD' : fmtTime(e.endsAt))}</time><span class="live-event-timezone">· ${esc(fmtUtcOffset(e.startsAt))}</span></div>`;
 }
 
-/** A webinar that tracks its speakers (extra-events.json "speakers": true), where that feature is on. */
-function showsWebinarSpeakers(e) {
-  return e?.type !== 'poster' && e?.speakers === true && ismirFeature('webinarSpeakers');
-}
-
 function renderEventCard(e, opts = {}) {
   const zoomLinked = Boolean(e?.links?.zoom);
   const cardClass = opts.spotlight ? 'spotlight-card' : 'event-card';
@@ -408,7 +403,6 @@ function renderEventCard(e, opts = {}) {
         </div>
         ${badge ? `<div class="live-event-status-stack">${badge}</div>` : ''}
       </div>
-      ${showsWebinarSpeakers(e) ? `<div class="live-webinar-speaker">${renderSpeakerBlock(e)}</div>` : ''}
       <div class="live-event-actions live-session-actions">
         ${linkRow(e.links, { showInfo: false })}
         ${hasPapers ? `<button class="link-button live-session-paper-toggle" type="button" data-live-session-paper-toggle="${esc(e.id)}" aria-expanded="${papersExpanded ? 'true' : 'false'}"><span aria-hidden="true">${papersExpanded ? '−' : '+'}</span> ${esc(paperToggleText(e, papersExpanded))}</button>` : ''}
@@ -777,7 +771,6 @@ function updateEventCard(event) {
   if (event.status === 'live') updateZoomBadgeByKey(`event:${event.id}`, event.headcounts);
   if (event.status === 'history') updatePeakBadgeByKey(`event:${event.id}`, event.metrics);
   const card = findByAttr(document, 'data-event-id', event.id);
-  if (card && showsWebinarSpeakers(event)) updateSpeakerBlock(card, event);
   const lobby = card?.querySelector('[data-lobby-count]');
   if (lobby) lobby.innerHTML = lobbyCountHtml(event);
   const total = card?.querySelector('[data-total-count]');

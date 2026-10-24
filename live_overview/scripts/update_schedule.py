@@ -53,7 +53,6 @@ def extra_events(conf,problem,path=EXTRA_EVENTS):
         event={'id':'event-'+key,'sourceEventId':key,'title':title,'type':typ,'category':category,'track':'main','startsAt':start.isoformat(),'endsAt':end.isoformat(),
                'links':links,'day':start.strftime('%A'),'dayNumber':None,'topic':helper.topic_from_event(typ,category),'summary':helper.clean_text(item.get('summary')),'organiser':''}
         if tbd:event['endTimeTBD']=True
-        if item.get('speakers') is True:event['speakers']=True   # its webinar observer reports speakers too
         if item.get('debugOnly') is True:event['debugOnly']=True # on live-debug.html only (organisers' tests)
         out.append(event)
     return out

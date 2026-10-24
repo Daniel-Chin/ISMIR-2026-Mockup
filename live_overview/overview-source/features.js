@@ -14,8 +14,7 @@
  */
 (function () {
   const FEATURES = Object.freeze({
-    // Who is speaking in a webinar that tracks its speakers (extra-events.json "speakers": true).
-    webinarSpeakers: 'debug',
+    // name: 'debug' | 'live', e.g. newPanel: 'debug'. Nothing is under test right now.
   });
   const channel = document.documentElement.dataset.channel === 'debug' ? 'debug' : 'live';
   window.ISMIRChannel = channel;
