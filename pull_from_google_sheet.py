@@ -16,6 +16,11 @@ REAL_SHEETS = {
     "lbds": "LBDS_SHEET_URL",
     "session_assignment": "SESSION_ASSIGNMENT_SHEET_URL",
 }
+# Downloaded when set, skipped silently otherwise (no prompt, so CI never waits on them).
+# lbds_grouping: group_id, theme, channel_url; the LBDs' group_id (lbds.csv) points here.
+OPTIONAL_SHEETS = {
+    "lbds_grouping": "LBDS_GROUPING",
+}
 
 MOCK_SHEETS = {
     "papers"  : "https://docs.google.com/spreadsheets/d/1hak92WcsA16PaXI3TY563NSuCHoe2_PkcWcly9hBTTI/export?format=csv",
@@ -85,6 +90,9 @@ def get_sheet_mapping(mockup: bool) -> dict[str, str]:
             input('Continue anyway? Enter...')
             continue
         mapping[name] = build_csv_export_url_from_sheet_url(env_var)
+    for name, env_name in OPTIONAL_SHEETS.items():
+        if os.getenv(env_name):
+            mapping[name] = build_csv_export_url_from_sheet_url(os.getenv(env_name))
     return mapping
 
 def build_csv_export_url_from_sheet_url(sheet_url: str) -> str:

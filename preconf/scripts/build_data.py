@@ -163,6 +163,42 @@ def lbd_presenter_mode(row):
     return {"lp": "onsite", "lv": "online"}.get((row.get("channel_name") or "").strip().lower()[:2], "")
 
 
+def lbd_theme(text):
+    """'A, B, and C' -> 'A, B, C': a group's topics as a plain list, without the 'and'."""
+    return re.sub(r",?\s+and\s+", ", ", (text or "").strip())
+
+
+def read_lbd_groups(sd, lbds):
+    """The LBDs' groups (lbds_grouping.csv: group_id, theme, channel_url), each with its LBDs.
+
+    [] without the file or without any group_id: the hall then lists every LBD at once. A group
+    named in lbds.csv but missing from the file is still shown, titled "Group <id>".
+    """
+    path = sd / "lbds_grouping.csv"
+    if not path.is_file() or not any(l.get("group") for l in lbds):
+        return []
+    with open(path, encoding="utf-8", newline="") as f:
+        info = {(r.get("group_id") or "").strip(): r for r in csv.DictReader(f)}
+    ids = sorted({l.get("group", "") for l in lbds}, key=lambda g: (g == "", int(g) if g.isdigit() else 10**9, g))
+    groups = []
+    for gid in ids:
+        row = info.get(gid, {})
+        channel = (row.get("channel_url") or "").strip()
+        groups.append({
+            "id": gid or "other",
+            "theme": lbd_theme(row.get("theme")) or (f"Group {gid}" if gid else "Other LBDs"),
+            "channelUrl": channel if channel.startswith("https://") else "",
+            "lbds": [l["uid"] for l in lbds if l.get("group", "") == gid],
+        })
+    # An LBD without its own Slack channel uses its group's.
+    by_id = {g["id"]: g for g in groups}
+    for l in lbds:
+        group = by_id.get(l.get("group") or "other")
+        if group and not l["channelUrl"]:
+            l["channelUrl"] = group["channelUrl"]
+    return groups
+
+
 def read_lbds(sd, miniconf):
     """All LBDs, in programme order (position, else CMT id). They share one session, so they are not grouped.
 
@@ -294,6 +330,7 @@ def main():
         days[-1]["sessions"].append(s["id"])
     days.sort(key=lambda d: (d["date"] or "9999", day_order.get(d["day"], 99)))
 
+    lbds = read_lbds(sd, miniconf)
     program = {
         "conference": {
             "name": config.get("name", "ISMIR"),
@@ -311,7 +348,9 @@ def main():
         "papers": papers,
         # One session for every LBD: its time, and the LBDs in programme order.
         "lbdSession": {"id": "LBD", "slots": [lbd_slot] if lbd_slot else []},
-        "lbds": read_lbds(sd, miniconf),
+        "lbds": lbds,
+        # The LBDs' groups (one theme each), in group order; [] lists them all at once.
+        "lbdGroups": read_lbd_groups(sd, lbds),
     }
 
     out_json = ROOT / "public" / "data" / "program.json"

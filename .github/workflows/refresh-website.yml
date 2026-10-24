@@ -27,6 +27,8 @@ on:
         required: false
       LBDS_SHEET_URL:
         required: false
+      LBDS_GROUPING:
+        required: false
       LIVE_OVERVIEW_ADMIN_KEY:
         required: false
 
@@ -49,6 +51,7 @@ jobs:
       INDUSTRY_SHEET_URL: ${{ secrets.INDUSTRY_SHEET_URL}}
       MUSIC_SHEET_URL: ${{ secrets.MUSIC_SHEET_URL}}
       LBDS_SHEET_URL: ${{ secrets.LBDS_SHEET_URL}}
+      LBDS_GROUPING: ${{ secrets.LBDS_GROUPING}}
 
     steps:
       - name: Check out repository

@@ -389,14 +389,12 @@ const paperWallSpec = program => ({
   prefix: 'paper', rows: 2,
   groups: program.days.flatMap(day => day.sessions.map(sid => ({ id: sid, day: day.day, uids: program.sessions[sid]?.papers || [] }))),
 });
-const lbdWallSpec = program => {
-  const groups = new Map();
-  for (const l of program.lbds) {
-    const g = l.group || '';
-    (groups.get(g) || groups.set(g, []).get(g)).push(l.uid);
-  }
-  return { prefix: 'lbd', rows: 'fit', groups: [...groups].map(([group, uids]) => ({ id: group ? 'LBD-' + group : 'LBD', group, uids })) };
-};
+const lbdWallSpec = program => ({
+  prefix: 'lbd', rows: 'fit',
+  groups: program.lbdGroups?.length
+    ? program.lbdGroups.map(g => ({ id: 'LBD-' + g.id, group: g.id, theme: g.theme, uids: g.lbds }))
+    : [{ id: 'LBD', group: '', uids: program.lbds.map(l => l.uid) }],
+});
 
 // match: the uids a search shows (null: no search). See initSearch.
 const papers = { view: 'hall', wall: null, layout: null, match: null, search: null, results: null };
@@ -537,7 +535,13 @@ function wallRegionHead(region, s = hall.program.sessions[region.id], name = `${
 function lbdRegionHead(region) {
   const s = hall.program.lbdSession, date = s.slots[0]?.date;
   const day = date ? new Date(date + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }) + ' · ' : '';
-  return wallRegionHead(region, s, day + (region.group ? `LBD · ${region.group}` : 'Late-Breaking Demos'));
+  if (!region.theme) return wallRegionHead(region, s, day + 'Late-Breaking Demos');
+  // A group: its theme only. Every group has the same time, shown once above the hall.
+  const head = el('div', 'pc-wall-region-themed');
+  head.setAttribute('role', 'button');
+  head.tabIndex = 0;
+  head.append(el('span', 'pc-wall-region-name', region.theme));
+  return head;
 }
 
 /** A link to a paper (or LBD) the search hides: show everything again first. */
@@ -968,10 +972,12 @@ async function refreshCounts() {
 }
 
 // ---------- LBD hall ----------
-// Every LBD shares one session, so they are not grouped: one grid of cards, one room ("lbd",
-// boards "lbd:<CMT id>"). Boards are made as their cards come near the view, so a long list
-// costs nothing until it is scrolled through.
-const lbdHall = { grid: null, cards: new Map(), boards: [] };
+// Every LBD shares one session (one time, one room "lbd", boards "lbd:<CMT id>"), so the hall
+// has one card per group (program.lbdGroups: its theme, its count; no time, it is the same for
+// all), and opening one shows its LBDs. Without groups, or while searching, every LBD shown is in
+// one grid. Boards are made as their cards come near the view, so a long list costs nothing
+// until it is scrolled through.
+const lbdHall = { grid: null, cards: new Map(), boards: [], groups: [], open: null, match: null };
 const lbdTag = n => (n.board?.startsWith('lbd:') ? 'LBD-' + n.board.slice(4) : '');
 const noteCountText = n => `${n} note${n === 1 ? '' : 's'}`;
 
@@ -985,7 +991,7 @@ function renderLbdHall() {
   const head = el('div', 'pc-lbd-head');
   const sub = el('div', 'pc-sub');
   const total = el('span', 'pc-stat', noteCountText(0));
-  lbdHall.filter = uids => { for (const [uid, card] of lbdHall.cards) card.hidden = !!uids && !uids.has(uid); };
+  lbdHall.filter = uids => { lbdHall.match = uids; showLbds(); };
   sub.append(timeBlock(lbdSession, 'pc-panel-time'), el('span', 'pc-stat-sep', '·'),
     el('span', 'pc-stat', `${lbds.length} LBD${lbds.length === 1 ? '' : 's'}`), el('span', 'pc-stat-sep', '·'), total);
   // Shares the overview's card styles with an open session's grid (see build_data.py).
@@ -994,6 +1000,26 @@ function renderLbdHall() {
   const tools = el('div', 'pc-head-actions');
   tools.append(el('span', 'pc-seg-label', 'Per row'), perRowControl(grid, LBD_COLS_KEY, 'LBDs per row', () => lbdHall.boards));
   head.append(sub, tools);
+
+  // One card per group: its theme, how many LBDs, how many notes.
+  const groupCards = el('div', 'pc-session-grid pc-lbd-groups');
+  const groupOf = new Map();
+  lbdHall.groups = (hall.program.lbdGroups || []).map(g => {
+    const card = el('button', 'pc-session-card pc-lbd-group');
+    card.type = 'button';
+    card.dataset.group = g.id;
+    card.setAttribute('aria-expanded', 'false');
+    card.setAttribute('aria-controls', 'lbd-grid');
+    const notes = el('span', 'pc-stat', noteCountText(0));
+    const stats = el('span', 'pc-session-stats');
+    stats.append(el('span', 'pc-stat', `${g.lbds.length} LBD${g.lbds.length === 1 ? '' : 's'}`), el('span', 'pc-stat-sep', '·'), notes);
+    card.append(el('span', 'pc-lbd-theme', g.theme), stats);
+    card.addEventListener('click', () => openLbdGroup(lbdHall.open === g.id ? null : g.id, { scroll: true }));
+    groupCards.append(card);
+    for (const uid of g.lbds) groupOf.set(uid, g.id);
+    return { ...g, card, notes };
+  });
+  lbdHall.groupOf = groupOf;
 
   const counters = new Map();
   const near = new IntersectionObserver(entries => {
@@ -1019,7 +1045,8 @@ function renderLbdHall() {
     counters.set('lbd:' + l.uid, card.querySelector('[data-count]'));
     near.observe(card);
   }
-  root.replaceChildren(head, grid);
+  root.replaceChildren(...(lbdHall.groups.length ? [head, groupCards, grid] : [head, grid]));
+  showLbds();
 
   const updateCounts = () => {
     let sum = 0;
@@ -1029,12 +1056,40 @@ function renderLbdHall() {
       node.textContent = noteCountText(n);
     }
     total.textContent = noteCountText(sum);
+    for (const g of lbdHall.groups) g.notes.textContent = noteCountText(g.lbds.reduce((n, uid) => n + room.countFor('lbd:' + uid), 0));
   };
   room.subscribe(ev => {
     if (ev.type === 'error') handleRoomError(ev);
     if (['reset', 'upsert', 'remove'].includes(ev.type)) updateCounts();
   });
   if (room.ready) updateCounts();
+}
+
+/**
+ * Which LBD cards the hall shows: what a search found (the group cards step aside, as the Paper
+ * Hall's sessions do), else the open group's, else none until a group is opened. Without groups,
+ * every LBD.
+ */
+function showLbds() {
+  const { match, open, groups, grid } = lbdHall;
+  const grouped = groups.length > 0;
+  for (const g of groups) {
+    g.card.setAttribute('aria-expanded', String(!match && open === g.id));
+    g.card.hidden = !!match;
+  }
+  grid.closest('#lbd-hall')?.querySelector('.pc-lbd-groups')?.toggleAttribute('hidden', !!match);
+  for (const [uid, card] of lbdHall.cards) {
+    card.hidden = match ? !match.has(uid) : grouped && lbdHall.groupOf.get(uid) !== open;
+  }
+  grid.hidden = !match && grouped && !open;
+  requestAnimationFrame(() => syncAuthorOverflow(grid));
+}
+
+/** Open one group's LBDs in the hall (null: close it). */
+function openLbdGroup(id, { scroll = false } = {}) {
+  lbdHall.open = id;
+  showLbds();
+  if (scroll && id) requestAnimationFrame(() => lbdHall.grid.scrollIntoView({ behavior: 'smooth', block: 'start' }));
 }
 
 /** Switch the LBD section between the wall (default) and the hall (one grid of cards). */
@@ -1078,6 +1133,8 @@ function openLbd(uid) {
   }
   const card = lbdHall.cards.get(uid);
   if (!card) { keepInView(document.getElementById('lbd')); return; }
+  const group = lbdHall.groupOf?.get(uid);
+  if (!lbdHall.match && group && lbdHall.open !== group) openLbdGroup(group);
   focusCard(card);
 }
 

@@ -323,6 +323,11 @@ html:not([data-theme="light"]) .pc-session-panel-head button.pc-fs-btn:not(.deta
   border: 9px solid transparent; border-top-color: var(--good);
 }
 .pc-session-id { font-size: 1.3rem; font-weight: 900; color: var(--pc-title); letter-spacing: .02em; }
+/* LBD groups (app.js renderLbdHall): the theme takes the place of the session id and time. */
+.pc-lbd-groups { margin-top: 16px; }
+.pc-lbd-groups[hidden] { display: none; }
+.pc-lbd-theme { font-size: .98rem; font-weight: 900; line-height: 1.3; color: var(--pc-title); }
+#lbd-grid[hidden] { display: none; }
 /* Oral / Poster lines share one grid so the labels, dots and times line up in columns. */
 .pc-session-time, .pc-panel-time {
   display: inline-grid; grid-template-columns: max-content max-content max-content; column-gap: 6px; row-gap: 2px;
@@ -507,6 +512,8 @@ html .pc-search button.pc-search-clear:hover { color: var(--ink); }
 .pc-wall-region-name { display: block; font-size: 120px; font-weight: 900; line-height: 1; letter-spacing: -.02em; }
 .pc-wall-region-time { display: flex; gap: 60px; margin-top: 22px; font-size: 44px; font-weight: 700; color: var(--muted); }
 .pc-wall-region-time .pc-time-venue { display: none; }
+/* An LBD group's theme (several words): smaller, up to three lines in the title band. */
+.pc-wall-region-themed .pc-wall-region-name { font-size: 64px; line-height: 1.1; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .pc-wall-region-time .pc-time-sep { margin: 0 .3em; }
 :root { --pc-wall-line: rgba(78, 230, 255, .2); --pc-wall-region: rgba(78, 230, 255, .035); }
 html[data-theme="light"] { --pc-wall-line: rgba(16, 42, 82, .16); --pc-wall-region: rgba(16, 42, 82, .025); }
