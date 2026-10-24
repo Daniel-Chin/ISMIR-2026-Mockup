@@ -3,6 +3,8 @@
 
 Owned outputs (see integration.md):
   build/live.html   the page; miniconf's nav links here directly (no iframe wrapper)
+  build/live-debug.html   the same page for testing (debug_page): features under test and the
+                    organisers' test clock apply there only. Not linked from anywhere.
   build/live_overview/     assets, config and the frozen schedule snapshot
 Nothing else under build/ is written or removed.
 """
@@ -28,6 +30,7 @@ import update_schedule  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 REPO = ROOT.parent
 PAGE = 'live.html'
+DEBUG_PAGE = 'live-debug.html'
 ASSET_DIR = 'live_overview'
 
 
@@ -75,7 +78,15 @@ def load_schedule(data_path, conf):
     except (ValueError, KeyError, OSError) as error:
         # Unreadable sheets: still ship the page (live data comes from the backend), without a snapshot.
         problems.append(f'schedule not built: {error}')
-        schedule, notes = {'conference': {}, 'events': []}, []
+        return {'conference': {}, 'events': []}, [], problems
+    # Events only on the Live Overview (extra-events.json), never on the miniconf.
+    taken = {e['id'] for e in schedule['events']}
+    for event in update_schedule.extra_events(conf, problems.append):
+        if event['id'] in taken:
+            problems.append(f"extra-events.json: {event['id']} is also in events.csv")
+            continue
+        schedule['events'].append(event)
+    schedule['events'].sort(key=lambda e: (e['startsAt'], e['id']))
     return schedule, notes, problems
 
 
@@ -106,6 +117,20 @@ def sync_backend(schedule, api_origin, key):
     print(f"Live Overview: backend schedule updated ({result.get('events')} events)")
 
 
+def debug_page(page):
+    """live.html -> live-debug.html: the same page, marked as the debug channel (features.js).
+
+    These three edits are the only differences; test/test_debug_page.py checks it, so a feature
+    tested here behaves the same on live.html once features.js ships it.
+    """
+    marked = page.replace('<html lang="en"', '<html lang="en" data-channel="debug"', 1)
+    marked = re.sub(r'<title>', '<title>[DEBUG] ', marked, count=1)
+    marked = marked.replace('<meta charset="utf-8" />', '<meta charset="utf-8" />\n  <meta name="robots" content="noindex" />', 1)
+    if marked.count('data-channel="debug"') != 1 or '[DEBUG] ' not in marked or 'name="robots"' not in marked:
+        raise ValueError('live-debug.html: index.html no longer has the expected <html lang="en">, <title> or charset tag')
+    return marked
+
+
 def write_site(out, api_origin, conf, schedule):
     out.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='live-overview-', dir=out.parent) as tmp:
@@ -125,13 +150,17 @@ def write_site(out, api_origin, conf, schedule):
         version = content_version(texts)
         for name, text in texts.items():
             if name == 'index.html':
-                (stage / PAGE).write_text(render_page(text, ASSET_DIR + '/', '', version), encoding='utf-8')
+                page = render_page(text, ASSET_DIR + '/', '', version)
+                (stage / PAGE).write_text(page, encoding='utf-8')
+                (stage / DEBUG_PAGE).write_text(debug_page(page), encoding='utf-8')
             else:
                 (assets / name).write_text(render_page(text, './', '../' + PAGE, version) if name.endswith('.html') else text, encoding='utf-8')
 
         (out / PAGE).unlink(missing_ok=True)
+        (out / DEBUG_PAGE).unlink(missing_ok=True)
         shutil.rmtree(out / ASSET_DIR, ignore_errors=True)
         shutil.move(str(stage / PAGE), out / PAGE)
+        shutil.move(str(stage / DEBUG_PAGE), out / DEBUG_PAGE)
         shutil.move(str(assets), out / ASSET_DIR)
 
 

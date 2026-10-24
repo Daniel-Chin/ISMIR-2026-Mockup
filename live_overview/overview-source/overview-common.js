@@ -10,13 +10,18 @@ function displayTimeZone() {
   })();
 }
 
+/** The organisers' test clock (admin.html) applies on live-debug.html only (features.js). */
+function testClockApplies(state) {
+  return window.ISMIRChannel === 'debug' && Boolean(state?.debugClock?.enabled);
+}
+
 /**
- * "Now" for the conference: the backend's test clock when an organiser has set one (admin.html),
- * otherwise the server's time. Every page shows the same moment.
+ * "Now" for the conference: on live-debug.html, the backend's test clock when an organiser has
+ * set one; otherwise, and always on live.html and history.html, the server's real time.
  */
 function conferenceNow(state) {
   const clock = state?.debugClock || {};
-  if (clock.enabled) {
+  if (testClockApplies(state)) {
     const baseFake = Date.parse(clock.baseFakeIso || '');
     const baseReal = Date.parse(clock.baseRealIso || '');
     const speed = Number.isFinite(Number(clock.speed)) ? Number(clock.speed) : 1;
@@ -30,6 +35,7 @@ function conferenceNow(state) {
 
 /** Changes whenever the test clock is set, reset or re-timed: then every status must be redone. */
 function clockSignature(state) {
+  if (window.ISMIRChannel !== 'debug') return '';   // the test clock never reaches live.html
   const clock = state?.debugClock || {};
   return JSON.stringify([Number(clock.revision || 0), Boolean(clock.enabled), clock.baseFakeIso || '', clock.baseRealIso || '', clock.speed ?? 1]);
 }
@@ -48,7 +54,7 @@ function stateAtConferenceTime(state) {
   if (!state) return state;
   const now = conferenceNow(state);
   const events = (state.events || [])
-    .filter(e => !e?.debugOnly)   // organisers' test events never show on public pages
+    .filter(e => !e?.debugOnly || window.ISMIRChannel === 'debug')   // organisers' test events: live-debug.html only
     .map(e => {
       const status = eventStatusAt(e, now);
       if (status === e.status && !(e.papers || []).some(p => p?.status !== status)) return e;

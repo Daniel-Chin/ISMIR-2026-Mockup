@@ -20,6 +20,7 @@ How Live Overview fits into the miniconf build. In this document `.` is the repo
 ## Build outputs
 Live Overview owns only:
 - `./live_overview/build/live.html`: the page.
+- `./live_overview/build/live-debug.html`: the same page for testing (see *Testing features* below). Not linked from anywhere.
 - `./live_overview/build/live_overview/`:
   - JS/CSS assets.
   - `public-site-config.js`: build-time settings for the page. It holds the two backend URLs, the conference info copied from `config.yml`, and the location of `schedule-snapshot.json`.
@@ -53,8 +54,15 @@ Data refresh (`git pull`, `uv run python pull_from_google_sheet.py`) is the call
 - The caller runs, in order: `pull_from_google_sheet.py` → `install.sh`/`build.sh` → merge `./live_overview/build` into `./build`.
 - Miniconf build path: `./live_overview/scripts/build_miniconf.py` (entry point), `./live_overview/scripts/update_schedule.py:convert`, `./live_overview/scripts/csv_helpers.py`, and `./live_overview/scripts/site_files.py` (what ships, the snapshot, the version hash).
 - Page code (`overview-source/`): `app.js` (live page), `history.js` (history page), `overview-common.js` (what both use), `public-connection.js` (data from the backend), `egg-account.js` (sign-in for the egg). From `./shared/` (also used by the Warm-up Discussion): `site-chrome.js` (theme and menu button), `timezone-preference.js`, `canon-egg.js`.
+- `extra-events.json`: events shown only on the Live Overview (not in `events.csv`, so not on the miniconf). Their Zoom links are set on the backend's admin page, never here (the repository is public).
 - Kept but not in the build path: the standalone GitHub Pages exporter (`build_public_site.py`) and the CLI half of `update_schedule.py`.
 
 ## Behaviour notes
 - The timezone isn't saved; it always defaults to the system timezone, the same as miniconf. The light/dark theme *is* saved (`localStorage`).
 - URL params: the page doesn't use the query string. Hash anchors (`#live-events`, …) are used for in-page navigation.
+
+## Testing features
+- `live-debug.html` is built from the same `index.html` as `live.html`; the build only adds `data-channel="debug"`, a `[DEBUG]` title and `noindex` (`build_miniconf.debug_page`, checked by `test/test_debug_page.py`).
+- Features under test are listed in `overview-source/features.js` with stage `'debug'` and asked for in code as `ismirFeature('name')`. They are on in `live-debug.html` only.
+- Shipping one to `live.html`: change its stage to `'live'` in `features.js`. Both pages run the same code, so nothing is copied and nothing can be missed. Once it has been live for a while, the check and the entry can be removed together (`test/features.test.cjs` fails while either is left alone).
+- The organisers' test clock (`admin.html`) applies to `live-debug.html` only. `live.html` and `history.html` always show real time, and the backend's public statuses follow real time; while the test clock is on, sessions live at the test time also accept observers and serve their Zoom links, so they can be tested.

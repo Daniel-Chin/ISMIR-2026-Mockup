@@ -1,0 +1,27 @@
+{
+  "_comment": "Events shown only on the Live Overview: not in events.csv, so not on the miniconf. Times are local to the conference time zone; an empty end shows 'TBD'. Never put Zoom links here (this repository is public): set them on the backend's admin page, 'Test meeting link'. \"speakers\": true also reports who is speaking (webinar observers; shown where the webinarSpeakers feature is on, see overview-source/features.js). \"debugOnly\": true shows the event on live-debug.html only (a test meeting with its own Zoom link); \"end_date\" lets an event span several days.",
+  "events": [
+    {
+      "id": "pre-conference",
+      "title": "Pre-Conference",
+      "category": "Special",
+      "date": "2026-10-25",
+      "start": "19:00",
+      "end": "",
+      "slack": "https://ismir2026.slack.com/archives/C0C498S6X5X",
+      "speakers": true
+    },
+    {
+      "id": "pre-conference-test",
+      "title": "Pre-Conference (test)",
+      "category": "Special",
+      "date": "2026-10-24",
+      "start": "00:00",
+      "end_date": "2026-10-26",
+      "end": "00:00",
+      "slack": "https://ismir2026.slack.com/archives/C0C498S6X5X",
+      "speakers": true,
+      "debugOnly": true
+    }
+  ]
+}

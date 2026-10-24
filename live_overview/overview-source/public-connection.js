@@ -4,10 +4,12 @@
 })(typeof window === 'undefined' ? globalThis : window, function (env) {
   'use strict';
   const copy = value => JSON.parse(JSON.stringify(value));
+  // The organisers' test clock only applies on live-debug.html (features.js sets the channel).
+  const testClock = state => env.ISMIRChannel === 'debug' && Boolean(state?.debugClock?.enabled);
   function offline(state, now, snapshot = false) {
     const next = copy(state);
     next.offline = true;
-    if (snapshot || !next.debugClock?.enabled) next.serverNow = new Date(now).toISOString();
+    if (snapshot || !testClock(next)) next.serverNow = new Date(now).toISOString();
     if (snapshot) next.debugClock = { enabled: false, revision: 0 };
     for (const event of next.events || []) {
       for (const item of [event, ...(event.papers || [])]) {
@@ -131,7 +133,7 @@
         retry = env.setTimeout(connect, retryMs); retryMs = Math.min(retryMs * 2, 30000);
       }
       // A saved schedule can still cross a session boundary during an outage.
-      if (offlineShown && lastState && !lastState.debugClock?.enabled) {
+      if (offlineShown && lastState && !testClock(lastState)) {
         lastState.serverNow = new Date(now()).toISOString(); onState(lastState);
       }
     }

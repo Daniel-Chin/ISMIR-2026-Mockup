@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SHARED = ROOT.parent / 'shared'   # used by the Warm-up Discussion (preconf/) too
 
 # Page files, from overview-source/ unless listed in SHARED_FILES.
-ASSETS = ('index.html', 'history.html', 'styles.css', 'llm-prompts.json',
+ASSETS = ('index.html', 'history.html', 'styles.css', 'llm-prompts.json', 'features.js',
           'site-integration.js', 'public-connection.js', 'prompt-config.js', 'overview-common.js',
           'app.js', 'history.js', 'cursor-avatars.js', 'egg-account.js',
           'site-chrome.js', 'timezone-preference.js', 'canon-egg.js')
@@ -15,7 +15,7 @@ SHARED_FILES = {'site-chrome.js', 'timezone-preference.js', 'canon-egg.js'}
 
 # The offline fallback (schedule-snapshot.json) keeps schedule metadata only: no links, no live data.
 EVENT_FIELDS = ('id', 'type', 'title', 'topic', 'summary', 'organiser', 'startsAt', 'endsAt', 'day',
-                'dayNumber', 'track', 'category', 'spotlight', 'sessionNumber', 'posterSessionNumber', 'paperRange', 'endTimeTBD', 'detailUrl')
+                'dayNumber', 'track', 'category', 'spotlight', 'sessionNumber', 'posterSessionNumber', 'paperRange', 'endTimeTBD', 'detailUrl', 'speakers')
 PAPER_FIELDS = ('id', 'displayId', 'sourcePaperId', 'detailUrl', 'title', 'authors', 'primaryAuthor', 'abstract', 'subjects', 'isTismir', 'longPresentation',
                 'presenterMode', 'funFact', 'sessionId', 'sessionNumber', 'posterSessionNumber', 'sessionPaperNumber')
 CONF_FIELDS = ('name', 'location', 'theme', 'timeZone', 'startsOn', 'endsOn', 'pageTitle', 'subtitle')

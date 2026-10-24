@@ -5725,3 +5725,12 @@ a.canon-egg-paper-link::after { content: none !important; }
 html:not([data-theme="light"]) .canon-egg-board li { background: rgba(255, 255, 255, .06); }
 .canon-egg-board li.is-me { color: var(--egg-link); border-color: currentColor; }
 .canon-egg-board li.canon-egg-gap { border: 0; background: none; padding: 3px 2px; opacity: .55; }
+
+/* live-debug.html only (features.js): never mistaken for the public page. */
+.debug-channel-banner {
+  position: sticky; top: 0; z-index: 1000; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;
+  padding: 7px 16px; background: #b3261e; color: #fff; font: 700 .8rem/1.3 "Courier New", ui-monospace, monospace; letter-spacing: .03em;
+}
+.debug-channel-banner strong { letter-spacing: .12em; }
+.debug-channel-banner a { color: #fff; text-decoration: underline; margin-left: auto; }
+.live-webinar-speaker { margin: 10px 0 2px; }

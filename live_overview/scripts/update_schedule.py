@@ -25,6 +25,39 @@ def find_csv(folder,stem):
     if len(found)!=1:raise ValueError(f'请在 {folder} 放入唯一的 {stem}.csv（也支持下载时的括号编号）。')
     return found[0]
 
+EXTRA_EVENTS=ROOT/'extra-events.json'
+
+def extra_events(conf,problem,path=EXTRA_EVENTS):
+    """Events only on the Live Overview (extra-events.json), shaped like the CSV's.
+
+    Their Zoom link is set on the backend's admin page, which later imports keep (same id,
+    title and type), so headcounts work as for any other session.
+    """
+    if not path.exists():return []
+    out=[]
+    for item in json.loads(path.read_text(encoding='utf-8')).get('events',[]):
+        key=helper.clean_text(item.get('id'));title=helper.clean_text(item.get('title'));category=helper.clean_text(item.get('category'))
+        if not re.fullmatch(r'[a-z0-9-]{1,40}',key) or not title:problem(f'extra-events.json: missing id or title ({key!r})');continue
+        typ=helper.event_type(title,category)
+        if category.lower() in {'special','award nominee'}:typ='special'
+        if category.lower()=='tutorials':typ='tutorial'
+        tbd=not helper.clean_text(item.get('end'))
+        try:
+            start=helper.parse_local_datetime(item.get('date'),item.get('start'),conf['timezone'])
+            # end_date (optional): an event over several days, e.g. a test event left open.
+            end=(start+timedelta(days=1)).replace(hour=0,minute=0,second=0) if tbd else helper.parse_local_datetime(item.get('end_date') or item.get('date'),item.get('end'),conf['timezone'])
+            if end<=start:end+=timedelta(days=1)
+        except ValueError as error:
+            problem(f'extra-events.json: {title} 时间无效: {error}');continue
+        links={'slack':item['slack'].strip()} if urlsplit(item.get('slack','').strip()).scheme=='https' else {}
+        event={'id':'event-'+key,'sourceEventId':key,'title':title,'type':typ,'category':category,'track':'main','startsAt':start.isoformat(),'endsAt':end.isoformat(),
+               'links':links,'day':start.strftime('%A'),'dayNumber':None,'topic':helper.topic_from_event(typ,category),'summary':helper.clean_text(item.get('summary')),'organiser':''}
+        if tbd:event['endTimeTBD']=True
+        if item.get('speakers') is True:event['speakers']=True   # its webinar observer reports speakers too
+        if item.get('debugOnly') is True:event['debugOnly']=True # on live-debug.html only (organisers' tests)
+        out.append(event)
+    return out
+
 def convert(folder,conf,warnings=None):
     # conf: name/timezone/miniconf_url from config.yml (see build_miniconf.read_config).
     # warnings=None: any data problem aborts (manual upload). With a list, problems are

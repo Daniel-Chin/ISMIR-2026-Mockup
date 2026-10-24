@@ -388,6 +388,11 @@ function liveOngoingMeta(e) {
   return `<div class="live-ongoing-meta"><strong>Ongoing</strong><span aria-hidden="true"> · </span><time datetime="${esc(e.startsAt)}">${fmtTime(e.startsAt)}</time><span aria-hidden="true">–</span><time datetime="${esc(e.endsAt)}">${(e.endTimeTBD ? 'TBD' : fmtTime(e.endsAt))}</time><span class="live-event-timezone">· ${esc(fmtUtcOffset(e.startsAt))}</span></div>`;
 }
 
+/** A webinar that tracks its speakers (extra-events.json "speakers": true), where that feature is on. */
+function showsWebinarSpeakers(e) {
+  return e?.type !== 'poster' && e?.speakers === true && ismirFeature('webinarSpeakers');
+}
+
 function renderEventCard(e, opts = {}) {
   const zoomLinked = Boolean(e?.links?.zoom);
   const cardClass = opts.spotlight ? 'spotlight-card' : 'event-card';
@@ -403,6 +408,7 @@ function renderEventCard(e, opts = {}) {
         </div>
         ${badge ? `<div class="live-event-status-stack">${badge}</div>` : ''}
       </div>
+      ${showsWebinarSpeakers(e) ? `<div class="live-webinar-speaker">${renderSpeakerBlock(e)}</div>` : ''}
       <div class="live-event-actions live-session-actions">
         ${linkRow(e.links, { showInfo: false })}
         ${hasPapers ? `<button class="link-button live-session-paper-toggle" type="button" data-live-session-paper-toggle="${esc(e.id)}" aria-expanded="${papersExpanded ? 'true' : 'false'}"><span aria-hidden="true">${papersExpanded ? '−' : '+'}</span> ${esc(paperToggleText(e, papersExpanded))}</button>` : ''}
@@ -698,14 +704,29 @@ function renderUpcoming(state) {
     : '<article class="empty-card">No upcoming events remain.</article>';
 }
 
+/** The tab title; live-debug.html keeps its [DEBUG] mark. */
+function pageTitle(state) {
+  return (window.ISMIRChannel === 'debug' ? '[DEBUG] ' : '') + (state.conference?.pageTitle || 'What’s going on now');
+}
+
+/** live-debug.html's banner (features.js): the time this page is showing. */
+function showDebugClock(state) {
+  const node = document.querySelector('[data-debug-clock]');
+  if (!node) return;
+  node.textContent = testClockApplies(state)
+    ? `Test clock: ${new Date(conferenceNow(state)).toLocaleString('en-GB', { timeZone: displayTimeZone(), dateStyle: 'medium', timeStyle: 'short' })} (${displayTimeZone()})`
+    : 'Real time (no test clock set)';
+}
+
 function render(rawState) {
   if (!rawState) return;
   const state = stateAtConferenceTime(rawState);
   currentState = state;
   window.ISMIRTimeZone?.setReferenceDate?.(conferenceNow(state));
+  showDebugClock(state);
   lastTopologyKey = topologyKey(state);
   lastClockSignature = clockSignature(state);
-  document.title = state.conference?.pageTitle || 'What’s going on now';
+  document.title = pageTitle(state);
   renderDashboard(state);
   renderLive(state);
   renderUpcoming(state);
@@ -756,6 +777,7 @@ function updateEventCard(event) {
   if (event.status === 'live') updateZoomBadgeByKey(`event:${event.id}`, event.headcounts);
   if (event.status === 'history') updatePeakBadgeByKey(`event:${event.id}`, event.metrics);
   const card = findByAttr(document, 'data-event-id', event.id);
+  if (card && showsWebinarSpeakers(event)) updateSpeakerBlock(card, event);
   const lobby = card?.querySelector('[data-lobby-count]');
   if (lobby) lobby.innerHTML = lobbyCountHtml(event);
   const total = card?.querySelector('[data-total-count]');
@@ -780,7 +802,7 @@ function patchRealtimeState(nextRawState) {
   if (topologyKey(nextState) !== lastTopologyKey || clockSignature(nextState) !== lastClockSignature) return render(nextRawState);
   currentState = nextState;
   window.ISMIRTimeZone?.setReferenceDate?.(conferenceNow(nextState));
-  document.title = nextState.conference?.pageTitle || 'What’s going on now';
+  document.title = pageTitle(nextState);
   updateDashboard(nextState);
   for (const event of getLiveEvents(nextState)) updateEventCard(event);
   for (const paper of getAllPosterPapers(nextState)) updatePaperCard(paper);
