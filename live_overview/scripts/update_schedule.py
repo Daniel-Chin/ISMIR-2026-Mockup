@@ -54,6 +54,7 @@ def extra_events(conf,problem,path=EXTRA_EVENTS):
                'links':links,'day':start.strftime('%A'),'dayNumber':None,'topic':helper.topic_from_event(typ,category),'summary':helper.clean_text(item.get('summary')),'organiser':''}
         if tbd:event['endTimeTBD']=True
         if item.get('debugOnly') is True:event['debugOnly']=True # on live-debug.html only (organisers' tests)
+        if item.get('zoomDirect') is True:event['zoomDirect']=True # Zoom button: the meeting link without its passcode
         out.append(event)
     return out
 
