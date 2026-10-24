@@ -435,6 +435,7 @@ export class WallView extends BoardView {
     this.stopTour();
     if (!this.app.requireLogin('post a note')) return;
     const paper = this.opts.items[uid], board = `${this.wall.prefix}:${uid}`;
+    if (this.app.beforeNote && !(await this.app.beforeNote(board))) return;
     const result = await this.app.composer.open({ heading: 'New note', where: `${paper.displayId || '#' + uid} ${paper.title}`, max: this.room.limits.textMax });
     if (!result) return;
     const pin = this.wall.pins.get(uid);

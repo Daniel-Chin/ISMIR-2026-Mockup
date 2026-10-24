@@ -137,6 +137,18 @@
     <span>Be kind: notes are visible to every attendee. <a id="helpdesk-link" href="#" target="_blank" rel="noopener noreferrer">Helpdesk</a></span>
   </footer>
 
+  <!-- Once the conference has opened, before a note on a paper or LBD board (app.js beforeNote). -->
+  <dialog class="pc-composer pc-notice" id="slack-notice">
+    <form method="dialog">
+      <h3>The conference is in session</h3>
+      <p>We encourage you to discuss on Slack, where the conversation now happens. You can still leave a note here.</p>
+      <div class="pc-composer-foot">
+        <a class="pc-btn pc-btn-ghost" id="slack-notice-link" href="#" target="_blank" rel="noopener noreferrer" hidden>Open the Slack channel</a>
+        <button class="pc-btn pc-btn-primary" type="submit" id="slack-notice-close">Close</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog class="pc-composer" id="composer">
     <form method="dialog">
       <h3 id="composer-title">New note</h3>
