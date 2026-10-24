@@ -110,6 +110,7 @@ the workspace (workspace admin, or an app-approval flow).
 .venv/bin/python miniconf_prep.py --mockup --action create-tutorial-channels
 # It's normal to not be able to see the channels at this stage --- they are private even to admins. So run the next step:  
 .venv/bin/python miniconf_prep.py --mockup --action add-admins-to-tutorials
+.venv/bin/python miniconf_prep.py --mockup --action add-registrants-to-tutorials
 
 # 7. LBDs: name channels lbd{uid}-{first-3-title-words} into lbds.csv slack_channel, then create them and write channel_url
 .venv/bin/python miniconf_prep.py --mockup --action setup-lbd-channels
