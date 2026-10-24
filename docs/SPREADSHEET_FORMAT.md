@@ -57,7 +57,7 @@ review1, review2, review3, review4, meta_review, fun_facts
 | `long_presentation` | Unused |
 | `is_tismir`, `SpecialTrack`, `StudentAuthor`, `publish_reviews` | `TRUE`/`FALSE` flags |
 | `AwardNominee` | `No` or `A{X}-{Y}` where X is award session id and Y is the position in session, both counting from 1 |
-| `summary_of_updates_post_review` | free-text summary of author changes after peer review (stored in data; not displayed on pages yet) |
+| `summary_of_updates_post_review` | free-text summary of author changes after peer review (shown in the "Post-Review Updates" tab on the poster page when non-empty) |
 | `raw_pdf_path`, `raw_video`, `raw_captions`, `raw_poster_pdf`, `raw_thumbnail`, `raw_slides_pdf` | Google Drive `open?id=` links |
 | `video` | YouTube embed URL, or a repo-local `static/...` path |
 | ⚙️ `slack_channel` | generated: `p{session}-{position}-{first-3-title-words}` |
@@ -75,7 +75,7 @@ See [workflow.md](workflow.md#session-assignments) for numbering and the by-pape
 ## Tab `events` — one row per program slot (the schedule)
 
 ```
-uid, title, day, start_date, start_time, end_time, category, description, organiser,
+uid, title, day, start_date, start_time, end_time, category, organiser,
 organiser_affiliation, organiser_bio, image, web_link,
 slack_channel, channel_url, live_url, thumbnail_link, event_desc
 ```

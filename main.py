@@ -194,6 +194,10 @@ def main(site_data_path: str):
         if event["category"] == AWARD_NOMINEE_CATEGORY and session.isdigit():
             award_event_uids[int(session)] = str(event["uid"])
 
+    openings = [e for e in site_data.get("events", []) if e["category"] == "Opening"]
+    app.jinja_env.globals["opening_start_utc"] = (
+        min(map(_event_start, openings)).astimezone(pytz.UTC).isoformat() if openings else ""
+    )
     app.jinja_env.globals["helpdesk_url"] = load_helpdesk_url(site_data_path)
     app.jinja_env.globals["calendar_ics_path"] = calendar_ics_path(site_data_path)
 

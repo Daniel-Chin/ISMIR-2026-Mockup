@@ -1,5 +1,5 @@
 [project]
-name = "ismir2026-virtual-sim"
+name = "ismir2026-kit"
 version = "0.1.0"
 description = "ISMIR 2026 virtual platform creation"
 readme = "README.md"

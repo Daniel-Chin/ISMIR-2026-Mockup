@@ -138,6 +138,12 @@ endif %}
     </button>
     {% endif %}
     {% endif %}
+    {% if paper.content.summary_of_updates_post_review != '' %}
+    <button class="card-link btn btn-outline-primary" data-toggle="collapse"
+      type="button" data-target="#post-review-updates">
+      Post-Review Updates
+    </button>
+    {% endif %}
     <!-- {% if paper.content.code != blank %}
     <a href="{{paper.content.code}}" target="_blank" class="card-link">
       Code
@@ -147,17 +153,25 @@ endif %}
   <div class="btn-group ml-3 mb-3">
     {% if paper.content.channel_url %}
     <a href="{{paper.content.channel_url}}" class="btn btn-outline-primary"
-      target="_blank" rel="noopener noreferrer">{% include
-      'slack_svg.html' %} Slack Channel</a>
+      target="_blank" rel="noopener noreferrer">
+      <!-- {% include 'slack_svg.html' %}  -->
+      💬 Slack Channel</a>
     {% endif %}
     {% if paper.zoom_url %}
     <a href="{{paper.zoom_url}}" class="btn btn-outline-primary"
-      target="_blank" rel="noopener noreferrer">Zoom for Poster Session</a>
+      target="_blank" rel="noopener noreferrer">🗣 Zoom for Poster Session</a>
     {% endif %}
     {# This paper's board in the Warm-up Discussion (preconf/, lounge.html), in the Paper Hall view. #}
-    <a href="lounge.html#hall&paper={{paper.id}}" class="btn btn-outline-primary"
-      target="_blank" rel="noopener">Discussion</a>
+    {# Hidden once the conference opens (the first "Opening" event starts). #}
+    <a id="warmup-link" href="lounge.html#hall&paper={{paper.id}}" class="btn btn-outline-primary"
+      target="_blank" rel="noopener" data-hide-from="{{opening_start_utc}}">☕ Warm-up Discussion</a>
   </div>
+  <script>
+    (function () {
+      const el = document.getElementById('warmup-link');
+      if (el.dataset.hideFrom && new Date() >= new Date(el.dataset.hideFrom)) el.remove();
+    })();
+  </script>
 </div>
 <div class="poster-content">
   <div id="details" class="pp-card m-3 collapse">
@@ -221,8 +235,7 @@ endif %}
     <div class="card-body">
       <div class="card-text">
         <div class="paper-text">
-          <span class="font-weight-bold">Meta Review:</span>
-          <br>
+          <div class="font-weight-bold mb-3">Meta Review:</div>
           {{paper.reviews.meta_review | markdown | safe}}
         </div>
       </div>
@@ -232,8 +245,7 @@ endif %}
     <div class="card-body">
       <div class="card-text">
         <div class="paper-text">
-          <span class="font-weight-bold">Review 1:</span>
-          <br>
+          <div class="font-weight-bold mb-3">Review 1:</div>
           {{paper.reviews.review1 | markdown | safe}}
         </div>
       </div>
@@ -243,8 +255,7 @@ endif %}
     <div class="card-body">
       <div class="card-text">
         <div class="paper-text">
-          <span class="font-weight-bold">Review 2:</span>
-          <br>
+          <div class="font-weight-bold mb-3">Review 2:</div>
           {{paper.reviews.review2 | markdown | safe}}
         </div>
       </div>
@@ -255,8 +266,7 @@ endif %}
     <div class="card-body">
       <div class="card-text">
         <div class="paper-text">
-          <span class="font-weight-bold">Review 3:</span>
-          <br>
+          <div class="font-weight-bold mb-3">Review 3:</div>
           {{paper.reviews.review3 | markdown | safe}}
         </div>
       </div>
@@ -268,14 +278,25 @@ endif %}
     <div class="card-body">
       <div class="card-text">
         <div class="paper-text">
-          <span class="font-weight-bold">Review 4:</span>
-          <br>
+          <div class="font-weight-bold mb-3">Review 4:</div>
           {{paper.reviews.review4 | markdown | safe}}
         </div>
       </div>
     </div>
   </div>
   {% endif %}
+  {% endif %}
+  {% if paper.content.summary_of_updates_post_review != '' %}
+  <div id="post-review-updates" class="pp-card m-3 collapse">
+    <div class="card-body">
+      <div class="card-text">
+        <div class="paper-text">
+          <div class="font-weight-bold mb-3">Post-Review Updates:</div>
+          {{paper.content.summary_of_updates_post_review | markdown | safe}}
+        </div>
+      </div>
+    </div>
+  </div>
   {% endif %}
 </div>
 
