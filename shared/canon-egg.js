@@ -15,14 +15,33 @@
 // v8.84 hidden Canon-in-D piano easter egg. Deliberately no visible hint.
 const CANON_EGG_SEQUENCE = ['D', 'A', 'B', 'F', 'G', 'D', 'G', 'A'];
 const CANON_EGG_DEGREE_TO_KEY = { '1': 'D', '5': 'A', '6': 'B', '3': 'F', '4': 'G' };
-const CANON_EGG_CHORDS = {
-  D: { visual: ['D', 'F#', 'A'], midi: [62, 66, 69] },
-  A: { visual: ['C#', 'E', 'A'], midi: [57, 61, 64] },
-  B: { visual: ['D', 'F#', 'B'], midi: [59, 62, 66] }, // Bm
-  F: { visual: ['C#', 'F#', 'A'], midi: [54, 57, 61] }, // F#m
-  G: { visual: ['D', 'G', 'B'], midi: [55, 59, 62] },
-};
+// Pachelbel's Canon: D A Bm F#m G D G A (I V vi iii IV I IV V), one voicing per step. The root is
+// always in the bass (the Canon's bass line D2 A2 B2 F#2 G2 D2 G2 A2); the three upper voices hold
+// common tones or move against the bass, so there are no parallel fifths or octaves, the loop back
+// to D included. G has two voicings, by step. The piano lights the three upper voices, at their
+// octaves. MIDI 60 = C4.
+const CANON_EGG_VOICINGS = [
+  { bass: 38, midi: [54, 57, 62] }, // I    D    D2  | F#3 A3 D4
+  { bass: 45, midi: [52, 57, 61] }, // V    A    A2  | E3 A3 C#4
+  { bass: 47, midi: [50, 54, 59] }, // vi   Bm   B2  | D3 F#3 B3
+  { bass: 42, midi: [54, 57, 61] }, // iii  F#m  F#2 | F#3 A3 C#4
+  { bass: 43, midi: [50, 55, 59] }, // IV   G    G2  | D3 G3 B3
+  { bass: 38, midi: [54, 57, 62] }, // I    D    D2  | F#3 A3 D4
+  { bass: 43, midi: [55, 59, 62] }, // IV   G    G2  | G3 B3 D4
+  { bass: 45, midi: [52, 57, 61] }, // V    A    A2  | E3 A3 C#4
+];
+// A chord's voicing when played out of turn: that of its first step. B is Bm, F is F#m.
+const CANON_EGG_CHORDS = { D: CANON_EGG_VOICINGS[0], A: CANON_EGG_VOICINGS[1], B: CANON_EGG_VOICINGS[2], F: CANON_EGG_VOICINGS[3], G: CANON_EGG_VOICINGS[4] };
+/** The voicing for `key` now: the next step's, if `key` is the chord that step expects. */
+function canonEggVoicing(key) {
+  return CANON_EGG_SEQUENCE[canonEggProgress] === key ? CANON_EGG_VOICINGS[canonEggProgress] : CANON_EGG_CHORDS[key];
+}
 const CANON_EGG_ROOT_NOTE_TO_KEY = { D: 'D', A: 'A', B: 'B', 'F#': 'F', G: 'G' };
+// The overlay covers two octaves of the drawn keyboard, 3 (C3-B3) and 4 (C4-B4) around the
+// middle, where the chords' upper voices lie. Clicking a root in either octave plays its chord.
+const CANON_EGG_OCTAVES = [3, 4];
+const CANON_EGG_NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const canonEggNoteName = (midi) => CANON_EGG_NOTE_NAMES[midi % 12] + (Math.floor(midi / 12) - 1);   // 62 -> 'D4'
 const CANON_EGG_NOTE_GEOMETRY = {
   'C#': { x: 12, width: 8, height: 16, black: true },
   D: { x: 16, width: 15, height: 24, black: false },
@@ -40,7 +59,8 @@ let canonEggPianoOverlay = null;
 let canonEggPointerKey = '';
 let canonEggPointerId = null;
 let canonEggBinaryGroups = [];
-const canonEggHeldKeys = new Set();
+// Chords held down (key -> the upper voices played), so the keys lit are the very notes heard.
+const canonEggHeldKeys = new Map();
 
 function canonEggAudio() {
   const AudioCtor = window.AudioContext || window.webkitAudioContext;
@@ -101,13 +121,15 @@ function canonEggPianoNote(midi, when, duration = 1.05, velocity = 0.11) {
 
 function canonEggPlayChord(key, when = null, options = {}) {
   const ctx = canonEggAudio();
-  const chord = CANON_EGG_CHORDS[key];
+  const chord = CANON_EGG_CHORDS[key] && canonEggVoicing(key);
   if (!ctx || !chord) return;
   const start = when == null ? ctx.currentTime + .005 : when;
   const duration = options.duration || 1.05;
   const velocity = options.velocity || .105;
   const spread = options.spread == null ? .014 : options.spread;
-  chord.midi.forEach((midi, index) => canonEggPianoNote(midi, start + index * spread, duration, velocity * (index === 0 ? 1 : .88)));
+  // The root in the bass first, a touch softer and longer (as the success phrase plays it), then the right hand.
+  canonEggPianoNote(chord.bass, start, duration * 1.3, velocity * .8);
+  chord.midi.forEach((midi, index) => canonEggPianoNote(midi, start + (index + 1) * spread, duration, velocity * (index === 0 ? 1 : .88)));
 }
 
 function canonEggPlaySuccessPhrase() {
@@ -115,18 +137,16 @@ function canonEggPlaySuccessPhrase() {
   if (!ctx) return;
   const start = ctx.currentTime + .12;
   const beat = .42;
-  const bass = [50, 45, 47, 42, 43, 50, 43, 45];
-  const upper = [
-    [62,66,69], [61,64,69], [62,66,71], [61,66,69],
-    [62,67,71], [62,66,69], [62,67,71], [61,64,69],
-  ];
+  // The progression, step by step, the upper voices an octave higher to ring out.
+  const bass = CANON_EGG_VOICINGS.map((v) => v.bass);
+  const upper = CANON_EGG_VOICINGS.map((v) => v.midi);
   upper.forEach((notes, step) => {
     const t = start + step * beat;
     canonEggPianoNote(bass[step], t, beat * 1.5, .075);
     notes.forEach((midi, index) => canonEggPianoNote(midi + 12, t + index * (beat / 4), beat * .95, .072));
   });
   const resolve = start + upper.length * beat;
-  [50, 62, 66, 69, 74].forEach((midi, index) => canonEggPianoNote(midi, resolve + index * .04, 1.55, index === 0 ? .08 : .068));
+  [38, 62, 66, 69, 74].forEach((midi, index) => canonEggPianoNote(midi, resolve + index * .04, 1.55, index === 0 ? .08 : .068));
 }
 
 function canonEggCreatePianoOverlay() {
@@ -135,17 +155,17 @@ function canonEggCreatePianoOverlay() {
   const overlay = document.createElement('div');
   overlay.className = 'canon-egg-piano-overlay';
   overlay.setAttribute('aria-hidden', 'true');
-  Object.entries(CANON_EGG_NOTE_GEOMETRY).forEach(([note, geometry]) => {
+  CANON_EGG_OCTAVES.forEach((octave) => Object.entries(CANON_EGG_NOTE_GEOMETRY).forEach(([note, geometry]) => {
     const node = document.createElement('i');
     node.className = `canon-egg-piano-key ${geometry.black ? 'black' : 'white'}`;
-    node.dataset.canonNote = note;
+    node.dataset.canonNote = note + octave;   // 'D4', 'F#3', …
     const chordKey = CANON_EGG_ROOT_NOTE_TO_KEY[note];
     if (chordKey) {
       node.dataset.canonRoot = chordKey;
       node.classList.add('is-root-trigger');
     }
     overlay.appendChild(node);
-  });
+  }));
   hero.appendChild(overlay);
   canonEggPianoOverlay = overlay;
   canonEggLayoutPiano();
@@ -156,22 +176,23 @@ function canonEggLayoutPiano() {
   const width = canonEggPianoOverlay.clientWidth;
   if (!width) return;
   const octaveWidth = 112;
-  const maxStart = Math.max(0, width - octaveWidth);
-  let octaveStart = Math.round((width / 2 - octaveWidth / 2) / octaveWidth) * octaveWidth;
-  octaveStart = Math.max(0, Math.min(maxStart, octaveStart));
-  Object.entries(CANON_EGG_NOTE_GEOMETRY).forEach(([note, geometry]) => {
-    const node = canonEggPianoOverlay.querySelector(`[data-canon-note="${note}"]`);
+  // Octave 4 is the drawn octave nearest the middle, octave 3 the one left of it (both on screen).
+  const maxStart = Math.max(octaveWidth, width - octaveWidth);
+  let octave4 = Math.round((width / 2) / octaveWidth) * octaveWidth;
+  octave4 = Math.max(octaveWidth, Math.min(maxStart, octave4));
+  CANON_EGG_OCTAVES.forEach((octave) => Object.entries(CANON_EGG_NOTE_GEOMETRY).forEach(([note, geometry]) => {
+    const node = canonEggPianoOverlay.querySelector(`[data-canon-note="${note + octave}"]`);
     if (!node) return;
-    node.style.left = `${octaveStart + geometry.x}px`;
+    node.style.left = `${octave4 + (octave - 4) * octaveWidth + geometry.x}px`;
     node.style.width = `${geometry.width}px`;
     node.style.height = `${geometry.height}px`;
-  });
+  }));
 }
 
 function canonEggRenderPressedKeys() {
   if (!canonEggPianoOverlay) return;
   const activeNotes = new Set();
-  canonEggHeldKeys.forEach((key) => (CANON_EGG_CHORDS[key]?.visual || []).forEach((note) => activeNotes.add(note)));
+  canonEggHeldKeys.forEach((midi) => midi.forEach((m) => activeNotes.add(canonEggNoteName(m))));
   canonEggPianoOverlay.querySelectorAll('[data-canon-note]').forEach((node) => node.classList.toggle('is-pressed', activeNotes.has(node.dataset.canonNote)));
 }
 
@@ -418,7 +439,12 @@ function canonEggKeyDown(event) {
   if (event.isComposing || event.repeat || event.ctrlKey || event.metaKey || event.altKey || canonEggEditableTarget(event.target)) return;
   const key = canonEggKeyboardChord(event);
   if (!key) return;
-  canonEggHeldKeys.add(key);
+  canonEggPress(key);
+}
+
+/** A chord pressed (keyboard or piano): light its upper voices, play it, then score it. */
+function canonEggPress(key) {
+  canonEggHeldKeys.set(key, canonEggVoicing(key).midi);   // before advancing: this step's voicing
   canonEggRenderPressedKeys();
   canonEggPlayChord(key);
   canonEggAdvance(key);
@@ -441,10 +467,7 @@ function canonEggPointerDown(event) {
   canonEggPointerKey = key;
   canonEggPointerId = event.pointerId;
   try { root.setPointerCapture?.(event.pointerId); } catch (_) {}
-  canonEggHeldKeys.add(key);
-  canonEggRenderPressedKeys();
-  canonEggPlayChord(key);
-  canonEggAdvance(key);
+  canonEggPress(key);
 }
 
 function canonEggPointerUp(event) {
