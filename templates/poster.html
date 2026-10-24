@@ -153,17 +153,18 @@ endif %}
   <div class="btn-group ml-3 mb-3">
     {% if paper.content.channel_url %}
     <a href="{{paper.content.channel_url}}" class="btn btn-outline-primary"
-      target="_blank" rel="noopener noreferrer">{% include
-      'slack_svg.html' %} Slack Channel</a>
+      target="_blank" rel="noopener noreferrer">
+      <!-- {% include 'slack_svg.html' %}  -->
+      💬 Slack Channel</a>
     {% endif %}
     {% if paper.zoom_url %}
     <a href="{{paper.zoom_url}}" class="btn btn-outline-primary"
-      target="_blank" rel="noopener noreferrer">Zoom for Poster Session</a>
+      target="_blank" rel="noopener noreferrer">🗣 Zoom for Poster Session</a>
     {% endif %}
     {# This paper's board in the Warm-up Discussion (preconf/, lounge.html), in the Paper Hall view. #}
     {# Hidden once the conference opens (the first "Opening" event starts). #}
     <a id="warmup-link" href="lounge.html#hall&paper={{paper.id}}" class="btn btn-outline-primary"
-      target="_blank" rel="noopener" data-hide-from="{{opening_start_utc}}">Warm-up Discussion</a>
+      target="_blank" rel="noopener" data-hide-from="{{opening_start_utc}}">☕ Warm-up Discussion</a>
   </div>
   <script>
     (function () {
