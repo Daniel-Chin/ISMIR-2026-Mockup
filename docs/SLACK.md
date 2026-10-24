@@ -191,6 +191,7 @@ Tutorial channels are created private by `create-tutorial-channels`.
 7. Add `#general`, `#social`, `#random`, `#help`, and the opening session channel
    to Slack's **Default Channels** list as permanent defaults. Keep private
    tutorial channels out of this list; their members will be assigned by script.
+8. Disable "Email Display".
 
 ### Tutorial invitation workflow
 
