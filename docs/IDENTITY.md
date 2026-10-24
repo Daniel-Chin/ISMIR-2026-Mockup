@@ -22,6 +22,28 @@ emails) and returns the strongest evidence it finds, or `None`:
 Use `related=True` only when there is an independent link between the two records, for example a
 registrant who entered the presenter's paper number. A shared word alone is too weak.
 
+The checks run in the order of the table above, then the next table, and the first that holds is returned.
+Only `email` and `name` count as strong. Everything else is weak evidence. Use weak evidence where false
+positives are cheap, such as public paper channels, and ignore it where they aren't, such as paid tutorial
+channels:
+
+| Evidence | Rule | Example |
+|---|---|---|
+| `name variant` | `names_match(..., variants=True)`: as `name`, but words may also be short forms (both at least 3 letters) or differ by one letter or adjacent swap (both at least 5 letters). At least one word must still match exactly | `Chris Lee` ~ `Christopher Lee`, `Zoe Munroe` ~ `Zoe Murnoe` |
+| `email resembles name` | `email_from_name`: the email handle, ignoring digits and punctuation, is made of the starts of two or more name words, including one whole word of 3+ letters and at most one initial | `zlee99@`, `zoe.le@` for `Zoe Ann Lee`; not `zalee@` |
+| `similar email` | `similar_emails`: the same handle (5+ letters) at two providers, or handles that differ by one letter at the same provider | `zoelee@uni.example` ~ `zoelee@home.example` |
+
+## Slack members and caching
+
+`slack_members()` returns every active human member of the workspace chosen by
+`utils.slack.configure_clients`. Each member's `Person` holds their profile real name, display name and
+account email. It calls `users.list` once per workspace per process. Slack members go through the same
+checks as everyone else.
+
+The matching functions are cached in memory with `functools.cache` for the life of the process, so
+comparing everyone with everyone stays fast. `ambiguous_tokens` is not cached, because callers often pass
+it a generator.
+
 ### `names_match`
 
 Names are first reduced to lowercase ASCII words by `name_tokens`: accents are removed, letters such
@@ -47,7 +69,7 @@ counts.
 - [`scripts/less_generalizable/presenter_registration.py`](../scripts/less_generalizable/presenter_registration.py)
   reports papers whose presenter (`oral_session_presenter` in `papers.csv`) hasn't registered. It reads
   `local/cmt_authors.csv` and `local/registration/Registrant Details - latest.csv` by default (see
-  `--help`). Matches that rely only on `related + partial name` are listed for a manual check.
+  `--help`). Presenters matched only by weak evidence are listed for a manual check.
 
   ```bash
   uv run python -m scripts.less_generalizable.presenter_registration

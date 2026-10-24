@@ -10,6 +10,7 @@ from pathlib import Path
 
 from utils.identity import Person, ambiguous_tokens, match_evidence, names_match, share_name_token
 
+STRONG_EVIDENCE = ('email', 'name')
 ROOT = Path(__file__).resolve().parents[2]
 PAPER_NUMBER_HEADERS = (
     'Please enter your paper number - 1st accepted submission',
@@ -102,8 +103,10 @@ def main() -> None:
             missing_lines.append(f'  {uid:>4}  {presenter:<28} claimed by: {"; ".join(claimants) or "-"}'
                                  f' | registered authors: {", ".join(registered_authors(uid)) or "-"}')
             continue
-        weak_lines += [f'  {uid:>4}  {presenter:<28} <- {r.name} ({evidence})'
-                       for r, evidence in hits if evidence.startswith('related')]
+        if strong := [(r, evidence) for r, evidence in hits if evidence in STRONG_EVIDENCE]:
+            hits = strong
+        else:
+            weak_lines += [f'  {uid:>4}  {presenter:<28} <- {r.name} ({evidence})' for r, evidence in hits]
         due_lines += [f'  {uid:>4}  {presenter:<28} {r.amount_due:g}' for r, _ in hits if r.amount_due > 0]
 
     missing_uids = [line.split()[0] for line in missing_lines]
