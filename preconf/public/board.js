@@ -782,6 +782,7 @@ export class BoardView {
       x = (v.x0 + v.x1) / 2 - NOTE_W / 2 + (Math.random() - 0.5) * 2 * jx;
       y = (v.y0 + v.y1) / 2 - 70 + (Math.random() - 0.5) * 2 * jy;
     }
+    if (this.app.beforeNote && !(await this.app.beforeNote(this.board))) return;
     const result = await this.app.composer.open({ heading: 'New note', where: this.title, max: this.room.limits.textMax });
     if (!result) return;
     x = Math.min(Math.max(0, x), this.W - NOTE_W);

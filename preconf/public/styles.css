@@ -409,6 +409,8 @@ html:not([data-theme="light"]) dialog.pc-composer { background: #46536e; box-sha
 html:not([data-theme="light"]) .pc-composer .pc-where,
 html:not([data-theme="light"]) .pc-composer .pc-counter { color: #d3dbe8; }
 dialog.pc-composer::backdrop { background: rgba(4, 6, 12, .6); }
+.pc-notice p { margin: 0; line-height: 1.5; }
+.pc-notice .pc-composer-foot { justify-content: flex-end; gap: 10px; }
 .pc-composer form { display: grid; gap: 12px; padding: 16px; }
 .pc-composer h3 { margin: 0; color: var(--pc-title); font-size: 1.05rem; }
 .pc-where { margin-top: -6px; font-size: .72rem; color: var(--muted); }

@@ -129,6 +129,25 @@ const app = {
     }
     location.href = this.loginUrl();
   },
+  /**
+   * Before a new note (board.js, wall.js). Once the Opening Session has started, a note on a paper
+   * or LBD board first shows a notice pointing to Slack; closing it carries on to the note. The
+   * Welcome Reception never shows it. Resolves false only if the note should not be written.
+   */
+  beforeNote(board) {
+    if (board === 'welcome' || !conferenceOpen()) return Promise.resolve(true);
+    const d = $('#slack-notice'), link = $('#slack-notice-link');
+    const [kind, uid] = String(board).split(':');
+    const item = kind === 'lbd' ? hall.lbdById?.[uid] : hall.program?.papers[uid];
+    const channel = /^https:\/\//.test(item?.channelUrl || '') ? item.channelUrl : '';
+    link.hidden = !channel;
+    if (channel) link.href = channel;
+    return new Promise(resolve => {
+      d.onclose = () => { d.onclose = null; resolve(true); };   // Close, Esc or Open Slack: the note still opens
+      d.showModal();
+      $('#slack-notice-close').focus();
+    });
+  },
   /** Returns true when signed in; otherwise nudges toward Slack sign-in. */
   requireLogin(what) {
     if (this.user) return true;
@@ -206,6 +225,13 @@ function zonedToDate(date, hhmm, timeZone) {
     .formatToParts(guess).map(p => [p.type, p.value]));
   const asIfUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute);
   return new Date(guess.getTime() - (asIfUtc - guess.getTime()));
+}
+
+/** Has the Opening Session (program.conference.opening, in the conference time zone) started? */
+function conferenceOpen(now = Date.now()) {
+  const opening = hall.program?.conference?.opening;
+  if (!opening?.date || !opening?.start) return false;
+  return now >= zonedToDate(opening.date, opening.start, hall.program.conference.timezone).getTime();
 }
 
 const viewerZone = () => window.ISMIRTimeZone?.getTimeZone?.() || Intl.DateTimeFormat().resolvedOptions().timeZone;

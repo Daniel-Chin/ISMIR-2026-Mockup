@@ -228,9 +228,12 @@ def main():
 
     # "Oral Session - 1" / "Poster Session - 1" in events.csv: each session's papers get a short
     # oral slot and a poster slot. Same title match as live_overview/scripts/update_schedule.py.
-    slots, lbd_slot = {}, None
+    slots, lbd_slot, opening = {}, None, None
     with open(sd / "events.csv", encoding="utf-8", newline="") as f:
         for ev in csv.DictReader(f):
+            # The Opening Session: from then on, the page points paper discussion to Slack.
+            if (ev.get("category") or "").strip().lower() == "opening" and opening is None:
+                opening = {"date": ev["start_date"].strip(), "start": hhmm(ev["start_time"])}
             if (ev.get("category") or "").strip().upper() == "LBD" and lbd_slot is None:
                 lbd_slot = {"kind": "lbd", "date": ev["start_date"].strip(), "start": hhmm(ev["start_time"]), "end": hhmm(ev["end_time"])}
             m = re.fullmatch(r"(Poster|Oral)\s+Session\s*-?\s*(\d+)", (ev.get("title") or "").strip(), re.I)
@@ -301,6 +304,7 @@ def main():
             "helpdeskUrl": config.get("helpdesk_url", ""),
             "venueCity": config.get("venue_city", ""),
             "slackAppName": config.get("slack_app_name", ""),
+            "opening": opening,   # {date, start} in the conference time zone, or None
         },
         "days": days,
         "sessions": {s["id"]: s for s in sessions},
