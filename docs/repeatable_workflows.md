@@ -1,0 +1,22 @@
+# Repeatable jobs
+## Job: Digest new uploads of presentation materials.
+- cd to ismir2026-kit
+- `git pull`
+- Go to "Upload your presentation materials for ISMIR2026"
+- Download csv to any `$csv_path`
+- `uv run python parse_google_form_author_uploaded_materials.py --input $csv_path`
+- At the end, choose to copy, and paste the columns into the paper tab of Live Database.
+- `uv run python pull_from_google_sheet.py`
+- `uv run python scripts/download_and_rename_videos_and_captions.py`
+- If it says "downloaded 0 video 0 captions, skipped all, failed 0", that means nobody updated videos. EXIT this process!
+- If it said "failed >0", someone uploaded illegal videos. Check
+- So it downloaded some materials. Now,
+- `uv run python -m scripts.police_videos`
+- Is any video longer than 3:10? Notify authors.
+- `uv run python -m scripts.time_stretch_videos`
+- `uv run python -m scripts.decorate_youtube_videos`
+- Manually upload the videos to YouTube Studio. YouTube account: zoom.admin.ismir2026@gmail.com
+  - The scripts uses `dragon-drop` for linux. If it fails, just manually select the videos from File Explore to upload.
+- Again, `uv run python -m scripts.decorate_youtube_videos`
+- On YouTube studio, manually set each new video from "Draft" to "Unlisted".
+  - `sudo uv run python ./scripts/make_video_unlisted_bot_companion.py` may help, but it's an OS bot that needs tweaking on your computer.
