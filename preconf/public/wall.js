@@ -36,13 +36,13 @@ const SLOT_GAP = 20;
 function placeWall(spec, perRow, rows) {
   const regions = [], pins = new Map();
   const groups = spec.groups.filter(g => g.uids.length);
-  // Every area has the same number of columns (that of the largest, in `rows` rows), so areas
-  // line up; a smaller one just has a shorter last row.
-  const cols = Math.ceil(Math.max(1, ...groups.map(g => g.uids.length)) / rows);
+  // Every area has the same shape, columns and rows (those of the largest), so areas line up and
+  // match; a smaller one just has a shorter last row.
+  const most = Math.max(1, ...groups.map(g => g.uids.length));
+  const cols = Math.ceil(most / rows), r = Math.ceil(most / cols);
   let x = MARGIN, y = MARGIN, rowH = 0, width = 0;
   groups.forEach((g, n) => {
     if (n && n % perRow === 0) { y += rowH + GAP; x = MARGIN; rowH = 0; }
-    const r = Math.ceil(g.uids.length / cols);
     const head = spec.head || REGION_HEAD;
     const w = REGION_PAD * 2 + cols * CELL_W, h = REGION_PAD * 2 + head + r * CELL_H;
     regions.push({ ...g, x, y, w, h });

@@ -394,7 +394,7 @@ const paperWallSpec = program => ({
 });
 const lbdWallSpec = program => ({
   // A taller title band: a topic's whole theme, in large type, up to four lines.
-  prefix: 'lbd', rows: 'fit', head: program.lbdGroups?.length ? 420 : undefined,
+  prefix: 'lbd', rows: 'fit', head: program.lbdGroups?.length ? 460 : undefined,
   groups: program.lbdGroups?.length
     ? program.lbdGroups.map(g => ({ id: 'LBD-' + g.id, group: g.id, theme: g.theme, channelUrl: g.channelUrl, slackChannel: g.slackChannel, uids: g.lbds }))
     : [{ id: 'LBD', group: '', uids: program.lbds.map(l => l.uid) }],
@@ -549,23 +549,21 @@ function lbdRegionHead(region) {
   const head = el('div', 'pc-wall-region-themed');
   head.setAttribute('role', 'button');
   head.tabIndex = 0;
-  // As large as the area allows (up to 84px) with the whole theme in at most three lines; the
-  // Slack link on the right, or under the theme in a narrow area. Wall units; a character takes
-  // ~0.6em, ~0.8em once lines break between words.
-  const name = el('span', 'pc-wall-region-name', region.theme);
-  const button = region.channelUrl ? 380 : 0, text = region.w - 100;
-  const wide = text - button >= 1300;
-  name.style.fontSize = Math.max(36, Math.min(84, Math.floor(3 * (wide ? text - button : text) / (0.8 * region.theme.length)))) + 'px';
-  head.classList.toggle('is-stacked', !wide);
-  head.append(name);
-  // Its Slack channel, on the right. A link: the wall pans on drag but leaves links alone.
-  const slack = linkButton(region.channelUrl, 'Slack');
-  if (slack) {
-    slack.className = 'pc-wall-region-slack';
-    slack.title = region.slackChannel ? `#${region.slackChannel} on Slack` : 'This topic on Slack';
-    slack.addEventListener('click', e => e.stopPropagation());   // not "zoom to this area"
-    head.append(slack);
+  // One size for every topic: as large as the longest theme allows (up to 120px) in at most three
+  // lines. Wall units; a character takes ~0.6em, ~0.8em once lines break between words.
+  const longest = Math.max(...hall.program.lbdGroups.map(g => g.theme.length));
+  const size = Math.max(36, Math.min(120, Math.floor(3 * (region.w - 100) / (0.8 * longest))));
+  // The theme opens the topic's Slack channel (a link: the wall pans on drag but leaves links
+  // alone); the rest of the band still zooms to the area.
+  const link = /^https:\/\//.test(region.channelUrl || '');
+  const name = el(link ? 'a' : 'span', 'pc-wall-region-name' + (link ? ' pc-wall-region-link' : ''), region.theme);
+  name.style.fontSize = size + 'px';
+  if (link) {
+    name.href = region.channelUrl; name.target = '_blank'; name.rel = 'noopener noreferrer';
+    name.title = `Click to open ${region.slackChannel ? '#' + region.slackChannel : 'this topic'} on Slack`;
+    name.addEventListener('click', e => e.stopPropagation());   // not "zoom to this area"
   }
+  head.append(name);
   return head;
 }
 
