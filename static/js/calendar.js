@@ -58,13 +58,23 @@ function make_cal(name) {
 
 
     $.get('serve_config.json').then(config => {
-        $.get(name).then(events => {
+        $.get(name).then(utcEvents => {
             const all_cals = [];
             const timezoneName = current_tz;
 
-            const min_date = d3.min(events.map(e => e.start));
-            var min_hours = d3.min(events.map(e => moment(e.start).tz(timezoneName).hours())) -1;
-            var max_hours = d3.max(events.map(e => moment(e.end).tz(timezoneName).hours())) +1;
+            // tui.Calendar lays out days and hours in the browser's timezone, so hand it
+            // display-tz wall-clock times disguised as browser-local times.
+            const toWallClock = t => moment(moment(t).tz(timezoneName).format('YYYY-MM-DDTHH:mm:ss')).toDate();
+            const events = utcEvents.map(e => ({...e, start: toWallClock(e.start), end: toWallClock(e.end)}));
+            // Label the axis with the display tz without tui shifting it.
+            const timezones = [{
+                timezoneOffset: -d3.min(events, e => e.start).getTimezoneOffset(),
+                displayLabel: timezoneName,
+                tooltip: timezoneName,
+            }];
+
+            var min_hours = d3.min(events.map(e => e.start.getHours())) -1;
+            var max_hours = d3.max(events.map(e => e.end.getHours())) +1;
             if(min_hours < 0 || max_hours > 24) {
                 min_hours = 0;
                 max_hours = 24;
@@ -107,12 +117,7 @@ function make_cal(name) {
                     hourEnd: max_hours,
                     // narrowWeekend: true,
                 },
-                timezones: [{
-                    timezoneOffset: -moment.tz.zone(timezoneName)
-                      .utcOffset(moment(min_date)),
-                    displayLabel: timezoneName,
-                    tooltip: timezoneName
-                }],
+                timezones,
                 theme: {
                   'week.dayname.height': '42px',
                   'week.timegridOneHour.height': '68px',
@@ -134,9 +139,7 @@ function make_cal(name) {
                       return hour + ':' + min;
                     },
                     time: function (schedule) {
-                        return '<strong>' + moment(schedule.start.getTime())
-                          .tz(timezoneName)
-                          .format('HH:mm') + '</strong> ' + eventTitle(schedule);
+                        return '<strong>' + moment(schedule.start.getTime()).format('HH:mm') + '</strong> ' + eventTitle(schedule);
                     },
                     milestone: function (schedule) {
                         return '<span class="calendar-font-icon ic-milestone-b"></span> <span style="background-color: ' + schedule.bgColor + '"> M: ' + schedule.title + '</span>';
@@ -183,8 +186,7 @@ function make_cal(name) {
                     week: { hourStart: min_hours, hourEnd: max_hours },
                     template: {
                         time: function (schedule) {
-                            return '<strong>' + moment(schedule.start.getTime())
-                                .tz(timezoneName).format('HH:mm')
+                            return '<strong>' + moment(schedule.start.getTime()).format('HH:mm')
                                 + '</strong> ' + eventTitle(schedule);
                         },
                     },
@@ -194,12 +196,7 @@ function make_cal(name) {
                     scheduleView: ['time'],
                     usageStatistics: false,
 
-                    timezones: [{
-                        timezoneOffset: -moment.tz.zone(timezoneName)
-                          .utcOffset(moment(min_date)),
-                        displayLabel: timezoneName,
-                        tooltip: timezoneName
-                    }],
+                    timezones,
                 })
 
                 cal.setDate(day.toDate());
