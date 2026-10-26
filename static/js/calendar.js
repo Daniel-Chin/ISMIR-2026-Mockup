@@ -78,9 +78,9 @@ function make_cal(name) {
             }];
 
             // Hour ranges of the y axis: one range, or two around the largest empty stretch.
-            const hourRanges = (() => {
+            const hourRangesOf = evs => {
                 const covered = new Array(24).fill(false);
-                events.forEach(e => {
+                evs.forEach(e => {
                     const from = e.start.getHours();
                     const to = moment(e.end).diff(moment(e.start).startOf('day'), 'minutes') / 60;
                     for (let h = from; h < to; h++) covered[h] = true;
@@ -101,7 +101,7 @@ function make_cal(name) {
                     return [[Math.max(0, from - pad), Math.min(24, to + pad)]];
                 }
                 return [[0, gapStart + pad], [gapEnd - pad, 24]];
-            })();
+            };
 
             // Grow the container until the time grid fits, so only the page scrolls.
             // Skips hidden calendars (desktop on mobile and vice versa); resize refits.
@@ -130,8 +130,8 @@ function make_cal(name) {
                 + moment(schedule.raw.wallStart).format('HH:mm') + '</strong> ' + eventTitle(schedule);
 
             // One calendar instance per hour range, stacked with a zig-zag break between.
-            const addCalendars = (parent, id, options, setup) => {
-                hourRanges.forEach(([hourStart, hourEnd], i) => {
+            const addCalendars = (parent, id, evs, options, setup) => {
+                hourRangesOf(evs).forEach(([hourStart, hourEnd], i) => {
                     if (i > 0) parent.append('div').attr('class', 'calendar-break');
                     const container = `${id}-${i}`;
                     const opts = {...options, week: {...options.week, hourStart, hourEnd}};
@@ -153,7 +153,7 @@ function make_cal(name) {
                 });
             };
 
-            addCalendars(d3.select('#calendar'), '#calendar', {
+            addCalendars(d3.select('#calendar'), '#calendar', events, {
                 defaultView: 'week',
                 isReadOnly: true,
                 taskView: false,
@@ -191,7 +191,8 @@ function make_cal(name) {
             const c_sm = d3.select('#calendar_small');
             for (let i = 0; i < numDays; i++) {
                 const day = moment(firstDay).add(i, 'days').toDate();
-                addCalendars(c_sm.append('div').attr('class', 'calendar-day'), '#cal__' + i, {
+                const dayEvents = events.filter(e => moment(e.start).isSame(day, 'day'));
+                addCalendars(c_sm.append('div').attr('class', 'calendar-day'), '#cal__' + i, dayEvents, {
                     defaultView: 'day',
                     template: { time: timeTemplate },
                     isReadOnly: true,
