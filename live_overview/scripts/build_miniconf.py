@@ -48,11 +48,12 @@ def read_config(path):
     conf['live_overview_api'] = str(values.get('live_overview_api') or '').rstrip('/')
     conf['warmup_api'] = str(values.get('warmup_api') or '').rstrip('/')
     conf['slack_app_name'] = str(values.get('slack_app_name') or '')
+    conf['helpdesk_url'] = str(values.get('helpdesk_url') or '')   # the footer's Helpdesk link
     return conf
 
 
 def render_page(text, asset_prefix, home, version):
-    text = re.sub(r'(data-build-version>)[^<]*', lambda m: m.group(1) + 'UI ' + version, text)
+    text = re.sub(r'(name="build-version" content=")[^"]*', lambda m: m.group(1) + version, text)
     # Root-absolute links were written for a dedicated host; here pages live at
     # {prefix}/live.html and {prefix}/live_overview/*. ?v=: browsers cache GitHub Pages files for
     # 10 minutes, so a fresh page must not run against stale scripts.
@@ -141,7 +142,7 @@ def write_site(out, api_origin, conf, schedule):
         config = {
             'apiOrigin': api_origin,
             'loungeOrigin': os.environ.get('WARMUP_API_ORIGIN') or conf['warmup_api'],
-            'conference': {'name': conf['name'], 'date': conf['date'], 'timezone': conf['timezone'], 'miniconfUrl': conf['miniconf_url'], 'officialSiteUrl': conf['official_site_url'], 'slackAppName': conf['slack_app_name']},
+            'conference': {'name': conf['name'], 'date': conf['date'], 'timezone': conf['timezone'], 'miniconfUrl': conf['miniconf_url'], 'officialSiteUrl': conf['official_site_url'], 'slackAppName': conf['slack_app_name'], 'helpdeskUrl': conf.get('helpdesk_url', '')},
         }
         texts['public-site-config.js'] = ('window.ISMIR_PUBLIC_CONFIG = Object.assign(' + json.dumps(config, ensure_ascii=False)
                                           + ", { fallbackUrl: new URL('schedule-snapshot.json', document.currentScript.src).href });\n")

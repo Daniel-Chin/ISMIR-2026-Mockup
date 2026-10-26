@@ -40,7 +40,7 @@ def build(output, api_origin, schedule=None, domain=''):
         version = content_version(texts)
         for name, text in texts.items():
             if name.endswith('.html'):
-                text = re.sub(r'(data-build-version>)[^<]*', lambda m: m.group(1) + 'UI ' + version, text)
+                text = re.sub(r'(name="build-version" content=")[^"]*', lambda m: m.group(1) + version, text)
                 # Project Pages (/repository/) and a custom domain use the same files.
                 text = re.sub(r'(src|href)="/(?!/)([^"?#]*)(#[^"]*)?"',
                               lambda m: f'{m[1]}="./{m[2]}?v={version}{m[3] or ""}"' if m[2] else f'{m[1]}="./{m[3] or ""}"', text)
