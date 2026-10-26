@@ -19,12 +19,21 @@ function make_cal(name) {
         return `<span class="${className}">${schedule.title}</span>`;
     };
 
+    // POSIX inverts the sign: Etc/GMT+1 is UTC-1.
+    const tzLabel = name => {
+        const m = name.match(/^Etc\/GMT([+-]\d+)$/);
+        if (!m) return name;
+        const offset = -Number(m[1]);
+        return `UTC${offset > 0 ? '+' : '-'}${Math.abs(offset)} (${name})`;
+    };
+
     const setupTZSelector = () => {
         const tzOptons = d3.select('#tzOptions')
         tzOptons.selectAll('option').data(tzNames)
           .join('option')
-          .attr('data-tokens', d => d.split("/").join(" "))
-          .text(d => d)
+          .attr('value', d => d)
+          .attr('data-tokens', d => tzLabel(d).split("/").join(" "))
+          .text(tzLabel)
         $('.selectpicker')
           .selectpicker('val', current_tz)
           .on('changed.bs.select',
@@ -69,7 +78,7 @@ function make_cal(name) {
             // Label the axis with the display tz without tui shifting it.
             const timezones = [{
                 timezoneOffset: -d3.min(events, e => e.start).getTimezoneOffset(),
-                displayLabel: timezoneName,
+                displayLabel: tzLabel(timezoneName),
                 tooltip: timezoneName,
             }];
 
