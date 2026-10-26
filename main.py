@@ -579,6 +579,16 @@ def format_paper(v):
     }
 
 
+def lbd_group_channel(v):
+    """The Slack channel of the LBD's topic group (lbds_grouping.csv: group_id, slack_channel, channel_url)."""
+    group = str(v.get("group_id", "")).strip()
+    row = next((r for r in site_data.get("lbds_grouping", []) if str(r.get("group_id", "")).strip() == group), None) if group else None
+    url = str((row or {}).get("channel_url", "")).strip()
+    if not url.startswith("https://"):
+        return "", ""
+    return str(row.get("slack_channel", "")).strip().lstrip("#"), url
+
+
 # The real LBD sheet's author columns, best first: the authors as printed in the PDF, then as
 # entered in CMT (LBDs without a PDF have only that), then the papers' column name.
 LBD_AUTHOR_COLUMNS = ("authors_and_affil_from_pdf", "authors_and_affil_from_cmt", "authors_and_affil")
@@ -633,6 +643,8 @@ def format_lbd(v):
             "youtube_id": convert_drive_link(youtube_id),
             "channel_url": v.get("channel_url", ""),
             "channel_name": v.get("slack_channel") or v.get("channel_name", ""),
+            "group_channel_name": lbd_group_channel(v)[0],
+            "group_channel_url": lbd_group_channel(v)[1],
             # As the papers' paper_presentation: "Virtual" / "In-person", '' when not known yet.
             "presentation_mode": "" if v.get("presentation_mode", "").strip() == "[Not Answered]"
             else v.get("presentation_mode", "").strip().replace("In-Person", "In-person"),

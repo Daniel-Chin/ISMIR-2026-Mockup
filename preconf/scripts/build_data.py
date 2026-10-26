@@ -188,6 +188,7 @@ def read_lbd_groups(sd, lbds):
             "id": gid or "other",
             "theme": lbd_theme(row.get("theme")) or (f"Group {gid}" if gid else "Other LBDs"),
             "channelUrl": channel if channel.startswith("https://") else "",
+            "slackChannel": (row.get("slack_channel") or "").strip().lstrip("#"),
             "lbds": [l["uid"] for l in lbds if l.get("group", "") == gid],
         })
     # An LBD without its own Slack channel uses its group's.

@@ -102,6 +102,12 @@ endif %}
         target="_blank" rel="noopener noreferrer">{% include
         'slack_svg.html' %} {{lbd.content.channel_name}}</a>
       {% endif %}
+      {# The channel of the LBD's topic group (lbds_grouping.csv), shared by every LBD in it. #}
+      {% if lbd.content.group_channel_url and config.lbd_day_release >= lbd.content.day | int %}
+      <a href="{{lbd.content.group_channel_url}}" class="btn btn-primary"
+        target="_blank" rel="noopener noreferrer">{% include
+        'slack_svg.html' %} {{lbd.content.group_channel_name}}</a>
+      {% endif %}
       {# This LBD's board in the Warm-up Discussion (preconf/, lounge.html), in the LBD Hall view. #}
       <a href="lounge.html#lbdhall&lbd={{lbd.id}}" class="btn btn-outline-primary"
         target="_blank" rel="noopener">Discussion</a>

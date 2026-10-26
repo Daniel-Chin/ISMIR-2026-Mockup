@@ -25,6 +25,7 @@ const SLOT_GAP = 20;
  *   prefix  the notes' board prefix: 'paper' (boards paper:<uid>) or 'lbd' (lbd:<uid>)
  *   groups  its areas in order: { id, uids, ...anything regionHead needs }, e.g. one per session
  *   rows    rows of papers in each area: a number, or 'fit' for whatever fills the screen best
+ *   head    optional: the height of each area's title band (default REGION_HEAD)
  */
 
 /**
@@ -42,10 +43,11 @@ function placeWall(spec, perRow, rows) {
   groups.forEach((g, n) => {
     if (n && n % perRow === 0) { y += rowH + GAP; x = MARGIN; rowH = 0; }
     const r = Math.ceil(g.uids.length / cols);
-    const w = REGION_PAD * 2 + cols * CELL_W, h = REGION_PAD * 2 + REGION_HEAD + r * CELL_H;
+    const head = spec.head || REGION_HEAD;
+    const w = REGION_PAD * 2 + cols * CELL_W, h = REGION_PAD * 2 + head + r * CELL_H;
     regions.push({ ...g, x, y, w, h });
     g.uids.forEach((uid, i) => {
-      const cell = { x: x + REGION_PAD + (i % cols) * CELL_W, y: y + REGION_PAD + REGION_HEAD + Math.floor(i / cols) * CELL_H, w: CELL_W, h: CELL_H };
+      const cell = { x: x + REGION_PAD + (i % cols) * CELL_W, y: y + REGION_PAD + head + Math.floor(i / cols) * CELL_H, w: CELL_W, h: CELL_H };
       pins.set(String(uid), { uid: String(uid), group: g.id, x: cell.x + PIN_IN_CELL.x, y: cell.y + PIN_IN_CELL.y, w: PIN_W, h: PIN_H, cell });
     });
     x += w + GAP;

@@ -71,7 +71,10 @@ def parse_arguments():
     # set-event-channel-desc
     # setup-lbd-channels
     # create-lbd-channels
+    # setup-lbd-group-channels
+    # create-lbd-group-channels
     # invite-authors-to-channels
+    # invite-authors-to-lbd-group-channels
     # setup-music
     # setup-sponsors
     # remove-author-email
@@ -166,6 +169,18 @@ def createLbdChannels(lbdCsvFile):
     Lbds(lbdCsvFile).createSlackChannels()
 
 
+def setupLbdGroupChannels(groupingCsvFile):
+    from modules.lbds import LbdGroups
+
+    LbdGroups(groupingCsvFile).setupSlackChannels()
+
+
+def createLbdGroupChannels(groupingCsvFile):
+    from modules.lbds import LbdGroups
+
+    LbdGroups(groupingCsvFile).createSlackChannels()
+
+
 def setupMusic(musicCsvFile):
     from modules.music import Music
 
@@ -203,8 +218,10 @@ if __name__ == "__main__":
         )
 
     if "setup" in action or "process" in action or action in {
-        "create-event-channels", "create-tutorial-channels", "create-lbd-channels", "set-event-channel-desc",
+        "create-event-channels", "create-tutorial-channels", "create-lbd-channels", "create-lbd-group-channels",
+        "set-event-channel-desc",
         "add-admins-to-tutorials", "add-registrants-to-tutorials", "invite-authors-to-channels",
+        "invite-authors-to-lbd-group-channels",
     }:
         if action == "setup-zoom":
             # zoom creds are only checked on first API call, so this import is
@@ -268,7 +285,13 @@ if __name__ == "__main__":
     elif action == "create-lbd-channels":
         createLbdChannels(os.path.join(data_path, "lbds.csv"))
 
-    elif action == "invite-authors-to-channels":
+    elif action == "setup-lbd-group-channels":
+        setupLbdGroupChannels(os.path.join(data_path, "lbds_grouping.csv"))
+
+    elif action == "create-lbd-group-channels":
+        createLbdGroupChannels(os.path.join(data_path, "lbds_grouping.csv"))
+
+    elif action in ("invite-authors-to-channels", "invite-authors-to-lbd-group-channels"):
         from modules.author_channels import invite_authors_to_channels
 
         invite_authors_to_channels(
@@ -277,6 +300,7 @@ if __name__ == "__main__":
             args.registration_csv or REGISTRATION_EXPORT_CSV,
             args.preferred_emails_csv,
             useDummyValues,
+            lbd_groups=action == "invite-authors-to-lbd-group-channels",
         )
 
     elif action == "setup-music":

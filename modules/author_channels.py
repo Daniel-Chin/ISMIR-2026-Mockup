@@ -26,6 +26,17 @@ from utils.identity import (
 # Built-in role ID of channel managers in admin.roles.addAssignments
 CHANNEL_MANAGER_ROLE = "Rl0A"
 PLAN_PATH = Path("tmp/author_channel_invites.csv")
+GROUP_PLAN_PATH = Path("tmp/lbd_group_channel_invites.csv")
+# Matches checked by hand and found wrong (columns cmt_id, slack_user_id, note): never invited for that CMT ID.
+# local/ is gitignored, as these are people's names.
+EXCLUSIONS_PATH = Path("local/invite_exclusions.csv")
+
+
+def load_exclusions(path: Path = EXCLUSIONS_PATH) -> set[tuple[str, str]]:
+    if not path.exists():
+        return set()
+    with path.open(newline="", encoding="utf-8-sig") as f:
+        return {(r["cmt_id"].strip(), r["slack_user_id"].strip()) for r in csv.DictReader(f)}
 EVIDENCE_ORDER = ("email", "name", "related + partial name", "name variant", "email resembles name", "similar email")
 
 
@@ -47,6 +58,27 @@ def load_channels(data_path: str) -> dict[str, str]:
                     if row["uid"] in channels:
                         raise ValueError(f"CMT ID {row['uid']} has two channels")
                     channels[row["uid"]] = channel
+    return channels
+
+
+def load_lbd_group_channels(data_path: str) -> dict[str, str]:
+    """CMT ID -> its group's Slack channel, for every LBD in a group (lbds.csv group_id, lbds_grouping.csv)
+
+    Each LBD is in one group, so the same matching as for the LBD's own channel finds a group channel's
+    authors: everyone who is an author of any LBD in the group.
+    """
+    with open(os.path.join(data_path, "lbds_grouping.csv"), newline="", encoding="utf-8-sig") as f:
+        group_channels = {r["group_id"].strip(): r.get("slack_channel", "").strip().lstrip("#") for r in csv.DictReader(f)}
+    if not any(group_channels.values()):
+        raise LookupError("lbds_grouping.csv has no slack_channel: run setup-lbd-group-channels and create-lbd-group-channels first")
+    channels = {}
+    with open(os.path.join(data_path, "lbds.csv"), newline="", encoding="utf-8-sig") as f:
+        for row in csv.DictReader(f):
+            group = row.get("group_id", "").strip()
+            if channel := group_channels.get(group):
+                channels[row["uid"]] = channel
+            elif group:
+                print(f"Warning: LBD {row['uid']} is in group {group}, which has no channel")
     return channels
 
 
@@ -98,7 +130,7 @@ def write_plan(invites: list[Invite], path: Path = PLAN_PATH) -> None:
                              "; ".join(sorted(i.member.person.emails)), i.source])
 
 
-def apply_invites(invites: list[Invite]) -> None:
+def apply_invites(invites: list[Invite], plan_path: Path = PLAN_PATH) -> None:
     """Adds everyone to their channels (never removes) and tries to make them channel managers."""
     by_channel: dict[str, set[str]] = defaultdict(set)
     for i in invites:
@@ -119,7 +151,7 @@ def apply_invites(invites: list[Invite]) -> None:
                     "role_id": CHANNEL_MANAGER_ROLE, "entity_ids": [channel_id], "user_ids": sorted(user_ids)})
             except SlackApiError as e:
                 print(f"Channel managers can't be assigned through the API ({e.response['error']}); "
-                      f"set them by hand from {PLAN_PATH} if needed.")
+                      f"set them by hand from {plan_path} if needed.")
                 can_assign_managers = False
 
 
@@ -129,16 +161,23 @@ def invite_authors_to_channels(
     registration_csv: str,
     preferred_emails_csv: str | None,
     use_dummy_values: bool,
+    lbd_groups: bool = False,
 ) -> None:
-    channels = load_channels(data_path)
+    """lbd_groups: the LBD group channels (one per group, all its LBDs' authors) instead of the paper and LBD ones."""
+    channels = load_lbd_group_channels(data_path) if lbd_groups else load_channels(data_path)
+    plan_path = GROUP_PLAN_PATH if lbd_groups else PLAN_PATH
     preferred = load_preferred_emails(Path(preferred_emails_csv)) if preferred_emails_csv else None
     registrants = load_registrants(Path(registration_csv), preferred)
     members = slack_members()
     invites, not_in_slack = plan_invites(channels, load_cmt_authors(Path(cmt_csv)), registrants, members)
-    write_plan(invites)
+    if excluded := load_exclusions():
+        kept = [i for i in invites if (i.cmt_id, i.member.user_id) not in excluded]
+        print(f"Excluded {len(invites) - len(kept)} wrong matches listed in {EXCLUSIONS_PATH}")
+        invites = kept
+    write_plan(invites, plan_path)
 
-    print(f"{len(invites)} invites over {len({i.channel for i in invites})}/{len(channels)} channels; "
-          f"plan written to {PLAN_PATH}")
+    print(f"{len(invites)} invites over {len({i.channel for i in invites})}/{len(set(channels.values()))} channels; "
+          f"plan written to {plan_path}")
     for source, n in Counter(i.source.split(":")[0] for i in invites).most_common():
         print(f"  {n:>5}  {source}")
     if empty := sorted(set(channels.values()) - {i.channel for i in invites}):
@@ -157,4 +196,4 @@ def invite_authors_to_channels(
 
     if input(f"Add {len(invites)} members to channels and make them channel managers? [y/N] ").strip().lower() != "y":
         return
-    apply_invites(invites)
+    apply_invites(invites, plan_path)

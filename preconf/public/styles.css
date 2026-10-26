@@ -327,6 +327,11 @@ html:not([data-theme="light"]) .pc-session-panel-head button.pc-fs-btn:not(.deta
 .pc-lbd-groups { margin-top: 16px; }
 .pc-lbd-groups[hidden] { display: none; }
 .pc-lbd-theme { font-size: .98rem; font-weight: 900; line-height: 1.3; color: var(--pc-title); }
+/* A topic card and its Slack button (bottom right, over the card). */
+.pc-lbd-group-box { position: relative; display: grid; }
+.pc-lbd-group-box[hidden] { display: none; }
+.pc-lbd-group-box .pc-session-card { padding-bottom: 46px; }
+html .pc-lbd-group-box a.link-button.pc-lbd-group-slack { position: absolute; right: 14px; bottom: 12px; z-index: 1; }
 #lbd-grid[hidden] { display: none; }
 /* Oral / Poster lines share one grid so the labels, dots and times line up in columns. */
 .pc-session-time, .pc-panel-time {
@@ -517,7 +522,16 @@ html .pc-search button.pc-search-clear:hover { color: var(--ink); }
 .pc-wall-region-time { display: flex; gap: 60px; margin-top: 22px; font-size: 44px; font-weight: 700; color: var(--muted); }
 .pc-wall-region-time .pc-time-venue { display: none; }
 /* An LBD group's theme (several words): smaller, up to three lines in the title band. */
-.pc-wall-region-themed .pc-wall-region-name { font-size: 64px; line-height: 1.1; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.pc-wall-region-themed { display: flex; align-items: flex-start; justify-content: space-between; gap: 40px; }
+.pc-wall-region-themed.is-stacked { flex-direction: column; justify-content: flex-start; gap: 22px; }
+/* Size set per area (app.js lbdRegionHead) so the whole theme fits in three lines. */
+.pc-wall-region-themed .pc-wall-region-name { font-size: 84px; line-height: 1.08; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+/* The topic's Slack channel, right of its title (wall units: the wall is zoomed out). */
+.pc-wall-region-slack {
+  flex: 0 0 auto; margin-top: 6px; padding: 14px 30px; font-size: 44px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase;
+  color: #10233d; background: #e7f6fc; border: 5px solid #10233d; box-shadow: 8px 8px 0 rgba(0, 0, 0, .25); text-decoration: none; cursor: pointer;
+}
+.pc-wall-region-slack:hover, .pc-wall-region-slack:focus-visible { background: #c9ecf9; text-decoration: underline; text-underline-offset: 8px; }
 .pc-wall-region-time .pc-time-sep { margin: 0 .3em; }
 :root { --pc-wall-line: rgba(78, 230, 255, .2); --pc-wall-region: rgba(78, 230, 255, .035); }
 html[data-theme="light"] { --pc-wall-line: rgba(16, 42, 82, .16); --pc-wall-region: rgba(16, 42, 82, .025); }

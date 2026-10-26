@@ -393,9 +393,10 @@ const paperWallSpec = program => ({
   groups: program.days.flatMap(day => day.sessions.map(sid => ({ id: sid, day: day.day, uids: program.sessions[sid]?.papers || [] }))),
 });
 const lbdWallSpec = program => ({
-  prefix: 'lbd', rows: 'fit',
+  // A taller title band: a topic's whole theme, in large type, up to four lines.
+  prefix: 'lbd', rows: 'fit', head: program.lbdGroups?.length ? 420 : undefined,
   groups: program.lbdGroups?.length
-    ? program.lbdGroups.map(g => ({ id: 'LBD-' + g.id, group: g.id, theme: g.theme, uids: g.lbds }))
+    ? program.lbdGroups.map(g => ({ id: 'LBD-' + g.id, group: g.id, theme: g.theme, channelUrl: g.channelUrl, slackChannel: g.slackChannel, uids: g.lbds }))
     : [{ id: 'LBD', group: '', uids: program.lbds.map(l => l.uid) }],
 });
 
@@ -548,7 +549,23 @@ function lbdRegionHead(region) {
   const head = el('div', 'pc-wall-region-themed');
   head.setAttribute('role', 'button');
   head.tabIndex = 0;
-  head.append(el('span', 'pc-wall-region-name', region.theme));
+  // As large as the area allows (up to 84px) with the whole theme in at most three lines; the
+  // Slack link on the right, or under the theme in a narrow area. Wall units; a character takes
+  // ~0.6em, ~0.8em once lines break between words.
+  const name = el('span', 'pc-wall-region-name', region.theme);
+  const button = region.channelUrl ? 380 : 0, text = region.w - 100;
+  const wide = text - button >= 1300;
+  name.style.fontSize = Math.max(36, Math.min(84, Math.floor(3 * (wide ? text - button : text) / (0.8 * region.theme.length)))) + 'px';
+  head.classList.toggle('is-stacked', !wide);
+  head.append(name);
+  // Its Slack channel, on the right. A link: the wall pans on drag but leaves links alone.
+  const slack = linkButton(region.channelUrl, 'Slack');
+  if (slack) {
+    slack.className = 'pc-wall-region-slack';
+    slack.title = region.slackChannel ? `#${region.slackChannel} on Slack` : 'This topic on Slack';
+    slack.addEventListener('click', e => e.stopPropagation());   // not "zoom to this area"
+    head.append(slack);
+  }
   return head;
 }
 
@@ -1023,9 +1040,18 @@ function renderLbdHall() {
     stats.append(el('span', 'pc-stat', `${g.lbds.length} LBD${g.lbds.length === 1 ? '' : 's'}`), el('span', 'pc-stat-sep', '·'), notes);
     card.append(el('span', 'pc-lbd-theme', g.theme), stats);
     card.addEventListener('click', () => openLbdGroup(lbdHall.open === g.id ? null : g.id, { scroll: true }));
-    groupCards.append(card);
+    // The topic's Slack channel: a link laid over the card's corner (a link can't go inside a button).
+    const box = el('div', 'pc-lbd-group-box');
+    box.append(card);
+    const slack = linkButton(g.channelUrl, 'Slack');
+    if (slack) {
+      slack.classList.add('pc-lbd-group-slack');
+      slack.title = g.slackChannel ? `#${g.slackChannel} on Slack` : 'This topic on Slack';
+      box.append(slack);
+    }
+    groupCards.append(box);
     for (const uid of g.lbds) groupOf.set(uid, g.id);
-    return { ...g, card, notes };
+    return { ...g, card, box, notes };
   });
   lbdHall.groupOf = groupOf;
 
@@ -1083,7 +1109,7 @@ function showLbds() {
   const grouped = groups.length > 0;
   for (const g of groups) {
     g.card.setAttribute('aria-expanded', String(!match && open === g.id));
-    g.card.hidden = !!match;
+    g.box.hidden = !!match;
   }
   grid.closest('#lbd-hall')?.querySelector('.pc-lbd-groups')?.toggleAttribute('hidden', !!match);
   for (const [uid, card] of lbdHall.cards) {
