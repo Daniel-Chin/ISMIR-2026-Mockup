@@ -246,6 +246,3 @@ bot/shared/catalogue_schema.py
 .cache/
 static/paper_images/*
 !static/paper_images/.gitkeep
-
-# Year-specific and private inputs to utils/identity.py
-utils/identity_local.py

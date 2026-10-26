@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 try:
-    from utils import identity_local as _local  # gitignored: ALIASES, PAPER_NUMBER_HEADERS
+    from local import identity_local as _local  # local/ is gitignored: ALIASES, PAPER_NUMBER_HEADERS
 except ImportError:
     _local = None
 
@@ -235,7 +235,7 @@ class Registrant:
 def load_registrants(path: Path, preferred_emails: dict[str, list[str]] | None = None) -> list[Registrant]:
     """Rows of the registration export. preferred_emails: normalized registration email -> other emails to use."""
     if _local is None:
-        raise RuntimeError('utils/identity_local.py is missing: it names the registration form\'s paper number questions')
+        raise RuntimeError('local/identity_local.py is missing: it names the registration form\'s paper number questions')
     preferred_emails = preferred_emails or {}
     return [
         Registrant(
