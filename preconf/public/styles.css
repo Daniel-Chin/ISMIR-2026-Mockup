@@ -380,6 +380,10 @@ a.pc-permalink:hover { text-decoration: underline; text-underline-offset: 3px; }
 .pc-note-count { color: var(--pc-note-count); font-size: .74rem; font-weight: 900; letter-spacing: .04em; white-space: nowrap; }
 .pc-paper-board-head { display: flex; justify-content: flex-end; margin-top: 10px; }
 .pc-paper-board { margin-top: 8px; }
+/* Before its board is made (boards are made as their cards come near the view), the space it will
+   take: a 1000 x 620 board in a frame with a 2px border. Nothing below then moves when it appears,
+   which on phones and tablets (no scroll anchoring) made the page jump while scrolling. */
+.pc-paper-board:empty { height: 0; padding-top: calc((100% - 4px) * 620 / 1000 + 4px); }
 .pc-paper-board { --pc-board-bg: #ffffff; }
 html:not([data-theme="light"]) .pc-paper-board { --pc-board-bg: #4a5770; --pc-board-dot: rgba(255, 255, 255, .13); }
 

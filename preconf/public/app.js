@@ -477,8 +477,13 @@ function relayoutWall(state, spec, make) {
   make(rooms);
   if (expanded) state.wall.toggleFullscreen();
 }
-let wallResizeTimer = 0;
+// Only a change of width (rotating a tablet, resizing a window) can call for another arrangement.
+// On phones and tablets the address bar shows and hides as the page scrolls, changing only the
+// height: rebuilding the walls then made them jump while scrolling.
+let wallResizeTimer = 0, wallResizeWidth = window.innerWidth;
 window.addEventListener('resize', () => {
+  if (window.innerWidth === wallResizeWidth) return;
+  wallResizeWidth = window.innerWidth;
   clearTimeout(wallResizeTimer);
   wallResizeTimer = setTimeout(() => {
     if (!hall.program) return;
@@ -1337,7 +1342,10 @@ async function main() {
   initSearch();
   refreshSessionTimes();
   window.addEventListener('ismir-timezone-change', refreshSessionTimes);
+  let cardsWidth = window.innerWidth;   // the author lists only re-wrap when the width changes
   window.addEventListener('resize', () => {
+    if (window.innerWidth === cardsWidth) return;
+    cardsWidth = window.innerWidth;
     if (hall.open) syncAuthorOverflow(hall.open.panel);
     if (papers.results) syncAuthorOverflow(papers.results.panel);
     if (lbdHall.grid) syncAuthorOverflow(lbdHall.grid);
