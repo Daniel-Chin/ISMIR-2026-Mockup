@@ -12,6 +12,11 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+try:
+    from local import identity_local as _local  # local/ is gitignored: ALIASES, PAPER_NUMBER_HEADERS
+except ImportError:
+    _local = None
+
 # Letters that NFKD does not decompose into ASCII
 _FOLD = str.maketrans({'ı': 'i', 'ł': 'l', 'ø': 'o', 'đ': 'd', 'ð': 'd', 'þ': 'th', 'ß': 'ss', 'æ': 'ae', 'œ': 'oe'})
 _HONORIFICS = {'dr', 'prof', 'mr', 'mrs', 'ms', 'phd'}
@@ -159,7 +164,9 @@ class Person:
 
     @classmethod
     def of(cls, names: list[str], emails: list[str]) -> 'Person':
-        return cls(frozenset(n for n in names if n.strip()), frozenset(normalize_email(e) for e in emails if e.strip()))
+        names = [n for n in names if n.strip()]
+        aliases = [a for group in (_local.ALIASES if _local else []) if any(names_match(n, g) for n in names for g in group) for a in group]
+        return cls(frozenset(names + aliases), frozenset(normalize_email(e) for e in emails if e.strip()))
 
 
 @functools.cache
@@ -185,6 +192,19 @@ def match_evidence(a: Person, b: Person, related: bool = False, ambiguous: froze
     return None
 
 
+def find_person(person: Person, candidates: list[Person]) -> tuple[list[int], bool]:
+    """
+    Indices of candidates that are person, and whether the match is fuzzy. Strong evidence ('email', 'name')
+    may match several candidates; failing that, weak evidence counts only when it matches exactly one.
+    """
+    evidence = [match_evidence(person, c) for c in candidates]
+    strong = [i for i, e in enumerate(evidence) if e in ('email', 'name')]
+    if strong:
+        return strong, False
+    weak = [i for i, e in enumerate(evidence) if e]
+    return (weak, True) if len(weak) == 1 else ([], False)
+
+
 # Sources
 
 def _read_csv(path: Path) -> list[dict[str, str]]:
@@ -204,12 +224,6 @@ def load_cmt_authors(path: Path) -> dict[str, list[tuple[str, str]]]:
     return authors
 
 
-_PAPER_NUMBER_HEADERS = (
-    'Please enter your paper number - 1st accepted submission',
-    'Please enter your paper number - 2nd accepted submission',
-)
-
-
 @dataclass(frozen=True)
 class Registrant:
     name: str
@@ -220,6 +234,8 @@ class Registrant:
 
 def load_registrants(path: Path, preferred_emails: dict[str, list[str]] | None = None) -> list[Registrant]:
     """Rows of the registration export. preferred_emails: normalized registration email -> other emails to use."""
+    if _local is None:
+        raise RuntimeError('local/identity_local.py is missing: it names the registration form\'s paper number questions')
     preferred_emails = preferred_emails or {}
     return [
         Registrant(
@@ -227,7 +243,7 @@ def load_registrants(path: Path, preferred_emails: dict[str, list[str]] | None =
             person=Person.of([row['Full Name']],
                              [row['Email Address'], *preferred_emails.get(normalize_email(row['Email Address']), [])]),
             # Every number counts, e.g. 'P12-7 (322)' claims 12, 7 and 322: an extra claim only adds weak evidence
-            claimed_papers=frozenset(n.lstrip('0') for h in _PAPER_NUMBER_HEADERS for n in re.findall(r'\d+', row[h])),
+            claimed_papers=frozenset(n.lstrip('0') for h in _local.PAPER_NUMBER_HEADERS for n in re.findall(r'\d+', row[h])),
             amount_due=float(row['Amount Due'] or 0),
         )
         for row in _read_csv(path)

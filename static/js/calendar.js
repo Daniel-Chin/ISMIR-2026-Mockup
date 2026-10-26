@@ -19,57 +19,90 @@ function make_cal(name) {
         return `<span class="${className}">${schedule.title}</span>`;
     };
 
+    // POSIX inverts the sign: Etc/GMT+1 is UTC-1.
+    const tzLabel = name => {
+        const m = name.match(/^Etc\/GMT([+-]\d+)$/);
+        if (!m) return name;
+        const offset = -Number(m[1]);
+        return `UTC${offset > 0 ? '+' : '-'}${Math.abs(offset)} (${name})`;
+    };
+
     const setupTZSelector = () => {
         const tzOptons = d3.select('#tzOptions')
         tzOptons.selectAll('option').data(tzNames)
           .join('option')
-          .attr('data-tokens', d => d.split("/").join(" "))
-          .text(d => d)
+          .attr('value', d => d)
+          .attr('data-tokens', d => tzLabel(d).split("/").join(" "))
+          .text(tzLabel)
         $('.selectpicker')
           .selectpicker('val', current_tz)
           .on('changed.bs.select',
             function (e, clickedIndex, isSelected, previousValue) {
                 new_tz = tzNames[clickedIndex]
-                window.open(window.location.pathname+'?tz='+new_tz, '_self');
+                window.open(window.location.pathname+'?tz='+encodeURIComponent(new_tz), '_self');
             })
 
     }
 
     setupTZSelector();
 
-    // requires moments.js
-    const enumerateDaysBetweenDates = function (startDate, endDate) {
-        const dates = [];
-
-        // console.log(startDate, endDate, "--- startDate, endDate");
-
-        const currDate = moment(startDate);
-        const lastDate = moment(endDate);
-
-        dates.push(currDate.clone());
-        while (currDate.add(1, 'days').diff(lastDate) < 0) {
-            // console.log(currDate, "--- currDate");
-            dates.push(currDate.clone());
-        }
-
-        dates.push(lastDate);
-        return dates;
-    };
-
-
     $.get('serve_config.json').then(config => {
-        $.get(name).then(events => {
+        $.get(name).then(utcEvents => {
             const all_cals = [];
             const timezoneName = current_tz;
 
-            const min_date = d3.min(events.map(e => e.start));
-            var min_hours = d3.min(events.map(e => moment(e.start).tz(timezoneName).hours())) -1;
-            var max_hours = d3.max(events.map(e => moment(e.end).tz(timezoneName).hours())) +1;
-            if(min_hours < 0 || max_hours > 24) {
-                min_hours = 0;
-                max_hours = 24;
-            }
-            // console.log(min_hours, max_hours);
+            // tui.Calendar lays out days and hours in the browser's timezone, so hand it
+            // display-tz wall-clock times disguised as browser-local times.
+            const toWallClock = t => moment(moment(t).tz(timezoneName).format('YYYY-MM-DDTHH:mm:ss')).toDate();
+            // Split events at midnight so each piece sits in one day column.
+            const events = [];
+            utcEvents.forEach(e => {
+                const start = toWallClock(e.start);
+                const end = toWallClock(e.end);
+                const raw = {...e.raw, wallStart: start};
+                let pieceStart = start;
+                let i = 0;
+                while (pieceStart < end) {
+                    const midnight = moment(pieceStart).startOf('day').add(1, 'day').toDate();
+                    const pieceEnd = end < midnight ? end : midnight;
+                    events.push({...e, id: i ? `${e.id}-${i}` : e.id, start: pieceStart, end: pieceEnd, raw});
+                    pieceStart = pieceEnd;
+                    i++;
+                }
+            });
+            // Label the axis with the display tz without tui shifting it.
+            const timezones = [{
+                timezoneOffset: -d3.min(events, e => e.start).getTimezoneOffset(),
+                displayLabel: tzLabel(timezoneName),
+                tooltip: timezoneName,
+            }];
+
+            // Hour ranges of the y axis: one range, or two around the largest empty stretch.
+            const hourRangesOf = evs => {
+                const covered = new Array(24).fill(false);
+                evs.forEach(e => {
+                    const from = e.start.getHours();
+                    const to = moment(e.end).diff(moment(e.start).startOf('day'), 'minutes') / 60;
+                    for (let h = from; h < to; h++) covered[h] = true;
+                });
+                if (!covered.some(c => c)) return [[0, 24]];
+                let gapStart = 0, gapLen = 0;
+                for (let s = 0; s < 24; s++) {
+                    if (covered[s] || !covered[(s + 23) % 24]) continue;
+                    let len = 0;
+                    while (!covered[(s + len) % 24]) len++;
+                    if (len > gapLen) [gapStart, gapLen] = [s, len];
+                }
+                const pad = 1;
+                if (gapLen <= 2 * pad + 1) return [[0, 24]];
+                const gapEnd = gapStart + gapLen;
+                if (gapStart === 0 || gapEnd >= 24) {
+                    const from = gapEnd % 24, to = gapStart || 24;
+                    return [[Math.max(0, from - pad), Math.min(24, to + pad)]];
+                }
+                return [[0, gapStart + pad], [gapEnd - pad, 24]];
+            };
+
             // Grow the container until the time grid fits, so only the page scrolls.
             // Skips hidden calendars (desktop on mobile and vice versa); resize refits.
             const fitHeight = (cal, container) => {
@@ -83,132 +116,95 @@ function make_cal(name) {
                 cal.render(true);
             };
             const Calendar = tui.Calendar;
-            // tui.Calendar v1 weeks are always 7 days; show only the conference days.
-            const [firstDay, lastDay] = config.calendar_days.map(d => moment(d).toDate());
+            // tui.Calendar v1 weeks are always 7 days; show only the days with events.
+            const firstDay = moment(d3.min(events, e => e.start)).startOf('day').toDate();
+            const lastDay = moment(d3.max(events, e => e.end)).subtract(1, 'ms').startOf('day').toDate();
             const numDays = moment(lastDay).diff(moment(firstDay), 'days') + 1;
             const weekDayRange = Calendar.prototype._getWeekDayRange;
             Calendar.prototype._getWeekDayRange = function () {
                 const [start] = weekDayRange.call(this, firstDay, firstDay.getDay(), false);
                 return [start, new start.constructor(start).addDate(numDays - 1)];
             };
-            const calendar = new Calendar('#calendar', {
+
+            const timeTemplate = schedule => '<strong>'
+                + moment(schedule.raw.wallStart).format('HH:mm') + '</strong> ' + eventTitle(schedule);
+
+            // One calendar instance per hour range, stacked with a zig-zag break between.
+            const addCalendars = (parent, id, evs, options, setup) => {
+                hourRangesOf(evs).forEach(([hourStart, hourEnd], i) => {
+                    if (i > 0) parent.append('div').attr('class', 'calendar-break');
+                    const container = `${id}-${i}`;
+                    const opts = {...options, week: {...options.week, hourStart, hourEnd}};
+                    if (i > 0) opts.theme = {...opts.theme, 'week.dayname.height': '0px'};
+                    // Start at the grid's own height; fitHeight only grows, and skips a grid squeezed to 0.
+                    const theme = opts.theme || {};
+                    const px = (key, fallback) => parseInt(theme[key] || fallback);
+                    const height = px('week.dayname.height', '42px')
+                        + (hourEnd - hourStart) * px('week.timegridOneHour.height', '52px');
+                    parent.append('div').attr('id', container.slice(1))
+                        .attr('class', i > 0 ? 'calendar-continued' : null)
+                        .style('height', height + 'px');
+                    const cal = new Calendar(container, opts);
+                    setup(cal);
+                    cal.createSchedules(events);
+                    const cols = config.calendar.colors;
+                    if (cols) cal.setCalendars(Object.keys(cols).map(k => calendarStyle(k, cols[k])));
+                    all_cals.push([cal, container]);
+                });
+            };
+
+            addCalendars(d3.select('#calendar'), '#calendar', events, {
                 defaultView: 'week',
                 isReadOnly: true,
-                // useDetailPopup: true,
                 taskView: false,
                 scheduleView: ['time'],
                 usageStatistics: false,
-                // useDetailPopup: true,
                 week: {
-                    // workweek: !config.calendar["sunday_friday"],
                     daynames: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
                     startDayOfWeek: firstDay.getDay(),
-                    hourStart: min_hours,
-                    hourEnd: max_hours,
-                    // narrowWeekend: true,
                 },
-                timezones: [{
-                    timezoneOffset: -moment.tz.zone(timezoneName)
-                      .utcOffset(moment(min_date)),
-                    displayLabel: timezoneName,
-                    tooltip: timezoneName
-                }],
+                timezones,
                 theme: {
                   'week.dayname.height': '42px',
                   'week.timegridOneHour.height': '68px',
-                  // 'week.dayGridSchedule.height': '100px',
                 },
-                // timezones: [{
-                //     getTimezoneOffset: 540,
-                //     displayLabel: 'a',
-                //     tooltip: timezoneName
-                // }],
                 template: {
-                    monthDayname: function (dayname) {
-                        return '<span class="calendar-week-dayname-name">' + dayname.label + '</span>';
-                    },
                     timegridDisplayPrimaryTime: function (time) {
-                      // var meridiem = time.hour < 12 ? 'am' : 'pm';
                       var hour = time.hour < 10 ? `0${time.hour}` : time.hour;
                       var min = time.minutes === 0 ? '00' : time.minutes;
                       return hour + ':' + min;
                     },
-                    time: function (schedule) {
-                        return '<strong>' + moment(schedule.start.getTime())
-                          .tz(timezoneName)
-                          .format('HH:mm') + '</strong> ' + eventTitle(schedule);
-                    },
-                    milestone: function (schedule) {
-                        return '<span class="calendar-font-icon ic-milestone-b"></span> <span style="background-color: ' + schedule.bgColor + '"> M: ' + schedule.title + '</span>';
-                    },
+                    time: timeTemplate,
                     weekDayname: function (model) {
                         const date = moment(model.renderDate, 'YYYY-MM-DD').format('MMM D');
                         return '<span class="tui-full-calendar-dayname-name">' + date + ' (' + model.dayName + ')</span>';
                     },
                 },
-            });
-            calendar.setDate(firstDay);
-            calendar.createSchedules(events);
-            calendar.on({
-                'clickSchedule': function (e) {
+            }, cal => {
+                cal.setDate(firstDay);
+                cal.on('clickSchedule', e => {
                     const s = e.schedule;
-                    if (s.location.length > 0) {
-                        window.open(s.location, '_self');
-                    }
-                },
-            })
+                    if (s.location.length > 0) window.open(s.location, '_self');
+                });
+            });
 
-            all_cals.push([calendar, '#calendar']);
-
-            const cols = config.calendar.colors;
-            if (cols) {
-                const cals = [];
-                Object.keys(cols).forEach(k => cals.push(calendarStyle(k, cols[k])))
-
-                calendar.setCalendars(cals);
-
-            }
-
-
-            const week_dates = enumerateDaysBetweenDates(
-              calendar.getDateRangeStart().toDate(),
-              calendar.getDateRangeEnd().toDate())
-
-            const c_sm = d3.select('#calendar_small')
-            let i = 0
-            for (const day of week_dates) {
-                c_sm.append('div').attr('id', 'cal__' + i);
-                const cal = new Calendar('#cal__' + i, {
+            const c_sm = d3.select('#calendar_small');
+            for (let i = 0; i < numDays; i++) {
+                const day = moment(firstDay).add(i, 'days').toDate();
+                const dayEvents = events.filter(e => moment(e.start).isSame(day, 'day'));
+                addCalendars(c_sm.append('div').attr('class', 'calendar-day'), '#cal__' + i, dayEvents, {
                     defaultView: 'day',
-                    week: { hourStart: min_hours, hourEnd: max_hours },
-                    template: {
-                        time: function (schedule) {
-                            return '<strong>' + moment(schedule.start.getTime())
-                                .tz(timezoneName).format('HH:mm')
-                                + '</strong> ' + eventTitle(schedule);
-                        },
-                    },
+                    template: { time: timeTemplate },
                     isReadOnly: true,
-                    // useDetailPopup: true,
                     taskView: false,
                     scheduleView: ['time'],
                     usageStatistics: false,
-
-                    timezones: [{
-                        timezoneOffset: -moment.tz.zone(timezoneName)
-                          .utcOffset(moment(min_date)),
-                        displayLabel: timezoneName,
-                        tooltip: timezoneName
-                    }],
-                })
-
-                cal.setDate(day.toDate());
-                cal.createSchedules(events);
-                cal.on({
-                    'clickSchedule': function (e) {
+                    timezones,
+                }, cal => {
+                    cal.setDate(day);
+                    cal.on('clickSchedule', e => {
                         const s = e.schedule;
                         if (s.location.length > 0) {
-
                             if (s.location.split("-")[0] === 'tab') {
                               var location = s.location.split("|");
                               $('.nav-pills .nav-item .nav-link').eq(location[1]).trigger('click');
@@ -218,26 +214,9 @@ function make_cal(name) {
                               window.open(s.location, '_blanket');
                             }
                         }
-                    },
-                })
-
-                all_cals.push([cal, '#cal__' + i]);
-                const cols = config.calendar.colors;
-                if (cols) {
-                    const cals = [];
-                    Object.keys(cols).forEach(k => cals.push(calendarStyle(k, cols[k])))
-
-                    cal.setCalendars(cals);
-
-                }
-
-                i++;
-
-                // console.log(day.format(), "--- day");
+                    });
+                });
             }
-
-            // console.log(week_dates.map(d => d.format()), "--- week_dates ");
-
 
             const fitAll = () => all_cals.forEach(([c, container]) => fitHeight(c, container));
             fitAll();
@@ -246,7 +225,6 @@ function make_cal(name) {
                 fitAll();
                 window.scrollTo(window.scrollX, pageScroll);
             }, 100));
-            // d3.selectAll('.tui-full-calendar-vlayout-area').attr('style',null);
         })
 
     })
