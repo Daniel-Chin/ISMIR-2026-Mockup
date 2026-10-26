@@ -30,7 +30,7 @@ function make_cal(name) {
           .on('changed.bs.select',
             function (e, clickedIndex, isSelected, previousValue) {
                 new_tz = tzNames[clickedIndex]
-                window.open(window.location.pathname+'?tz='+new_tz, '_self');
+                window.open(window.location.pathname+'?tz='+encodeURIComponent(new_tz), '_self');
             })
 
     }
