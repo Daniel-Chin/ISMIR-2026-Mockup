@@ -3,6 +3,7 @@ Reads a CSV downloaded from the results of Google Form and fills papers.csv
 The implementation should change every year, unless they decided to standardize the Google Form.  
 '''
 
+import argparse
 import csv
 import io
 from dataclasses import dataclass, field, fields
@@ -194,4 +195,6 @@ def copy_column(headers: list[str], rows: list[list[str]], column: str) -> None:
     print(f'Copied. Paste into the {column} header cell.')
 
 if __name__ == '__main__':
-    write_into_sitedata(*parse_materials())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--input', type=Path, default=INPUT_PATH, help='Google Form results CSV path')
+    write_into_sitedata(*parse_materials(parser.parse_args().input))
