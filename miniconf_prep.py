@@ -54,7 +54,7 @@ def parse_arguments():
 
     parser.add_argument(
         "--preferred-emails-csv",
-        help="Google Form export (timestamp, preferred email, registration email), required by invite-authors-to-channels and add-registrants-to-tutorials",
+        help="Google Form export (timestamp, preferred email, registration email), required by add-registrants-to-tutorials, process-new-users, invite-authors-to-channels and invite-authors-to-lbd-group-channels",
     )
 
     #### Possible actions ####
