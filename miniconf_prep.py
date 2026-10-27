@@ -54,7 +54,7 @@ def parse_arguments():
 
     parser.add_argument(
         "--preferred-emails-csv",
-        help="CSV with columns registration_email, preferred_email, used by invite-authors-to-channels and add-registrants-to-tutorials",
+        help="Google Form export (timestamp, preferred email, registration email), required by invite-authors-to-channels and add-registrants-to-tutorials",
     )
 
     #### Possible actions ####
@@ -106,7 +106,7 @@ def setupTutorials(eventsCsvFile, registrationDataCsvFile, followup_action, pref
     from modules.tutorials import Tutorials
     from utils.identity import load_preferred_emails
 
-    preferred = load_preferred_emails(Path(preferredEmailsCsvFile)) if preferredEmailsCsvFile else None
+    preferred = load_preferred_emails(Path(preferredEmailsCsvFile), Path(registrationDataCsvFile)) if preferredEmailsCsvFile else None
     tutObj = Tutorials(eventsCsvFile, registrationDataCsvFile, useDummyValues, preferred)
     if followup_action == "setup-channels":
         tutObj.setupChannelNames()
@@ -216,6 +216,12 @@ if __name__ == "__main__":
             "create-tutorial-channels and "
             "add-registrants-to-tutorials."
         )
+
+    if action in {
+        "add-registrants-to-tutorials", "process-new-users",
+        "invite-authors-to-channels", "invite-authors-to-lbd-group-channels",
+    } and not args.preferred_emails_csv:
+        raise Exception(f"--preferred-emails-csv is required for {action}.")
 
     if "setup" in action or "process" in action or action in {
         "create-event-channels", "create-tutorial-channels", "create-lbd-channels", "create-lbd-group-channels",

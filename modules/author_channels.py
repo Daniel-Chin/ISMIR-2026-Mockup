@@ -159,14 +159,14 @@ def invite_authors_to_channels(
     data_path: str,
     cmt_csv: str,
     registration_csv: str,
-    preferred_emails_csv: str | None,
+    preferred_emails_csv: str,
     use_dummy_values: bool,
     lbd_groups: bool = False,
 ) -> None:
     """lbd_groups: the LBD group channels (one per group, all its LBDs' authors) instead of the paper and LBD ones."""
     channels = load_lbd_group_channels(data_path) if lbd_groups else load_channels(data_path)
     plan_path = GROUP_PLAN_PATH if lbd_groups else PLAN_PATH
-    preferred = load_preferred_emails(Path(preferred_emails_csv)) if preferred_emails_csv else None
+    preferred = load_preferred_emails(Path(preferred_emails_csv), Path(registration_csv))
     registrants = load_registrants(Path(registration_csv), preferred)
     members = slack_members()
     invites, not_in_slack = plan_invites(channels, load_cmt_authors(Path(cmt_csv)), registrants, members)

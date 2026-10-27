@@ -250,12 +250,30 @@ def load_registrants(path: Path, preferred_emails: dict[str, list[str]] | None =
     ]
 
 
-def load_preferred_emails(path: Path) -> dict[str, list[str]]:
-    """CSV with columns registration_email, preferred_email -> normalized registration email -> preferred emails."""
+def load_preferred_emails(path: Path, registration_csv: Path) -> dict[str, list[str]]:
+    """
+    Google Form export with columns timestamp, preferred email, registration email (headers are the long questions,
+    so ignored) -> normalized registration email -> [preferred email].
+    Checks that every registration email is in registration_csv and has at most one preferred email;
+    on any violation, reports them all and asks for confirmation before continuing.
+    """
+    with path.open(newline='', encoding='utf-8-sig') as f:
+        rows = list(csv.reader(f))[1:]
+    registered = {normalize_email(row['Email Address']) for row in _read_csv(registration_csv)}
     preferred: dict[str, list[str]] = {}
-    for row in _read_csv(path):
-        if row['preferred_email'].strip():
-            preferred.setdefault(normalize_email(row['registration_email']), []).append(row['preferred_email'])
+    violations = []
+    for line, (_, preferred_email, registration_email, *_) in enumerate(rows, start=2):
+        if not preferred_email.strip():
+            continue
+        key = normalize_email(registration_email)
+        if key not in registered:
+            violations.append(f'line {line}: registration email {registration_email!r} is not in {registration_csv}')
+        preferred.setdefault(key, []).append(preferred_email)
+    violations += [f'registration email {key!r} has {len(emails)} preferred emails: {emails}'
+                   for key, emails in preferred.items() if len({normalize_email(e) for e in emails}) > 1]
+    if violations:
+        print(*violations, sep='\n')
+        input(f'{path}: {len(violations)} violations, see above. Press Enter to continue anyway, Ctrl+C to abort...')
     return preferred
 
 
