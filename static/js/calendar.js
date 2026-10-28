@@ -103,17 +103,52 @@ function make_cal(name) {
                 return [[0, gapStart + pad], [gapEnd - pad, 24]];
             };
 
+            // In each day with SIDE_LANE events, they get a column of their own on the right, instead of
+            // halving whatever they overlap. The rest are laid out again in what is left: side by side
+            // only where they overlap one another (tui.Calendar counted the lane's events too).
+            const SIDE_LANE = 'Majlis', SIDE_LANE_WIDTH = 30;   // a calendarId (category); percent
+            const layOutSideLane = container => {
+                $(container + ' .tui-full-calendar-time-date').each((_, day) => {
+                    const blocks = [...day.querySelectorAll('.tui-full-calendar-time-date-schedule-block')];
+                    const inLane = b => b.querySelector(`[data-calendar-id="${SIDE_LANE}"]`);
+                    if (!blocks.some(inLane)) return;
+                    const rest = 100 - SIDE_LANE_WIDTH;
+                    const place = (b, left, width) => { b.style.left = left + '%'; b.style.width = width + '%'; };
+                    blocks.filter(inLane).forEach(b => place(b, rest, SIDE_LANE_WIDTH));
+                    const others = blocks.filter(b => !inLane(b)).map(b => ({ b, top: parseFloat(b.style.top), bottom: parseFloat(b.style.top) + parseFloat(b.style.height) }))
+                        .sort((x, y) => x.top - y.top);
+                    // Clusters of overlapping events; in each, every event takes the first free column.
+                    for (let i = 0; i < others.length;) {
+                        const cluster = [], columnEnds = [];
+                        let end = -Infinity;
+                        for (; i < others.length && (!cluster.length || others[i].top < end); i++) {
+                            const o = others[i];
+                            o.column = columnEnds.findIndex(e => e <= o.top);
+                            if (o.column < 0) o.column = columnEnds.length;
+                            columnEnds[o.column] = o.bottom;
+                            end = Math.max(end, o.bottom);
+                            cluster.push(o);
+                        }
+                        cluster.forEach(o => place(o.b, o.column * rest / columnEnds.length, rest / columnEnds.length));
+                    }
+                });
+            };
+            const render = (cal, container) => {
+                cal.render(true);
+                layOutSideLane(container);
+            };
+
             // Grow the container until the time grid fits, so only the page scrolls.
             // Skips hidden calendars (desktop on mobile and vice versa); resize refits.
             const fitHeight = (cal, container) => {
-                cal.render(true);
+                render(cal, container);
                 const grid = $(container + ' .tui-full-calendar-timegrid-container')[0];
                 if (!grid || !grid.clientHeight) return;
                 const overflow = grid.scrollHeight - grid.clientHeight;
                 if (overflow <= 0) return;
                 const el = $(container)[0];
                 el.style.height = (el.offsetHeight + overflow) + 'px';
-                cal.render(true);
+                render(cal, container);
             };
             const Calendar = tui.Calendar;
             // tui.Calendar v1 weeks are always 7 days; show only the days with events.
