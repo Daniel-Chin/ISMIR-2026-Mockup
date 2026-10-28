@@ -64,7 +64,40 @@
 </div>
 {% endif %}
 
-{% if event.event_desc or award_papers %}
+{% if sponsor_tiers %}
+<style>
+  .sponsor-tier {
+    font-family: Georgia, "Times New Roman", serif;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .sponsor-tier::before, .sponsor-tier::after {
+    content: "";
+    flex: 1;
+    border-top: 1px solid currentColor;
+    opacity: 0.4;
+  }
+</style>
+<div class="pp-card m-3">
+  <div class="card-body">
+    {% for tier in sponsor_tiers %}
+    <h4 class="sponsor-tier text-muted mt-2"{% if not loop.first %} style="margin-top: 5rem !important;"{% endif %}>{{tier.tier}} Sponsors</h4>
+    <div class="d-flex flex-wrap justify-content-center align-items-center">
+      {% for sponsor in tier.sponsors %}
+      <a href="{{sponsor.url}}" target="_blank" rel="noopener noreferrer"
+        class="m-3" title="{{sponsor.name}}">
+        <img src="sponsors/{{sponsor.logo}}" alt="{{sponsor.name}}"
+          style="max-height: 60px; max-width: 240px;">
+      </a>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if event.event_desc or award_papers or sponsor_tiers %}
 <div class="d-flex justify-content-center my-3">{% include 'event_nav.html' %}</div>
 {% endif %}
 

@@ -1,0 +1,20 @@
+# Sponsors shown on the Industry event page, by tier, in display order.
+# Source: https://ismir2026.ismir.net/meet-the-sponsors (strategic partners and donors excluded).
+# See docs/SPONSORS.md.
+- tier: Platinum
+  sponsors:
+    - {name: Moises, logo: moises.png, url: "https://moises.ai/"}
+- tier: Gold
+  sponsors:
+    - {name: Adobe, logo: adobe.png, url: "https://research.adobe.com/"}
+    - {name: Anghami, logo: anghami.png, url: "https://www.anghami.com/"}
+- tier: Silver
+  sponsors:
+    - {name: Google DeepMind, logo: google_deepmind.png, url: "https://deepmind.google/"}
+- tier: Bronze
+  sponsors:
+    - {name: ACRCloud, logo: acrcloud.png, url: "https://www.acrcloud.com/"}
+    - {name: Audible Magic, logo: audible_magic.png, url: "https://www.audiblemagic.com"}
+    - {name: ByteDance, logo: bytedance.jpg, url: "http://bytedance.com"}
+    - {name: Klang, logo: klang.png, url: "https://klang.io"}
+    - {name: Piascore, logo: piascore.png, url: "https://piascore.com"}
