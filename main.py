@@ -61,6 +61,7 @@ site_data = {}
 by_uid = {}
 timeline = []  # see _build_timeline
 award_event_uids = {}  # award session number -> uid of its "Award nominee" event
+sponsors = {"dir": "", "tiers": []}  # see docs/SPONSORS.md
 
 
 def paper_check(row):
@@ -137,6 +138,8 @@ def main(site_data_path: str):
     extra_files = ["README.md"]
     # Load all for your sitedata one time.
     for f in glob.glob(site_data_path + "/*"):
+        if os.path.isdir(f):
+            continue
         extra_files.append(f)
         name, typ = f.split("/")[-1].split(".")
         if name == "main_calendar":
@@ -171,6 +174,10 @@ def main(site_data_path: str):
         paper.update(day=str(assignment.day), session=str(assignment.session_index),
                      position=str(assignment.position))
 
+    # TBA: the music and industry sheets still hold ISMIR 2025 data.
+    site_data["music"] = []
+    site_data["industry"] = []
+
     for typ in ["papers", "industry", "music", "lbds", "events"]:
         by_uid[typ] = {}
         for p in site_data[typ]:
@@ -198,6 +205,18 @@ def main(site_data_path: str):
     app.jinja_env.globals["opening_start_utc"] = (
         min(map(_event_start, openings)).astimezone(pytz.UTC).isoformat() if openings else ""
     )
+    music_programs = [e for e in site_data.get("events", []) if e["category"] == "Music"]
+    assert len(music_programs) == 1, f"Expected one Music event, got {len(music_programs)}"
+    app.jinja_env.globals["music_program_url"] = event_link(music_programs[0])
+    industry_programs = [e for e in site_data.get("events", []) if e["category"] == "Industry"]
+    assert len(industry_programs) == 1, f"Expected one Industry event, got {len(industry_programs)}"
+    app.jinja_env.globals["industry_program_url"] = event_link(industry_programs[0])
+    sponsors["dir"] = os.path.abspath(os.path.join(site_data_path, "sponsors"))
+    sponsors_yml = os.path.join(sponsors["dir"], "sponsors.yml")
+    if os.path.exists(sponsors_yml):
+        extra_files.append(sponsors_yml)
+        with open(sponsors_yml, encoding="utf-8") as f:
+            sponsors["tiers"] = yaml.safe_load(f)
     app.jinja_env.globals["helpdesk_url"] = load_helpdesk_url(site_data_path)
     app.jinja_env.globals["calendar_ics_path"] = calendar_ics_path(site_data_path)
 
@@ -392,20 +411,6 @@ def tutorials():
     data = _data()
     data["tutorials"] = [t for t in site_data["events"] if t["category"] == "Tutorials"]
     return render_template("tutorials.html", **data)
-
-
-@app.route("/music.html")
-def musics():
-    data = _data()
-    data["music"] = site_data["music"]
-    return render_template("music.html", **data)
-
-
-@app.route("/industry.html")
-def industries():
-    data = _data()
-    data["industry"] = site_data["industry"]
-    return render_template("industry.html", **data)
 
 
 @app.route("/lbds.html")
@@ -771,6 +776,7 @@ def event(slug):
         (s for s, uid in award_event_uids.items() if uid == event), None
     )
     data["award_papers"] = _award_papers(award_session) if award_session else []
+    data["sponsor_tiers"] = sponsors["tiers"] if v["category"] == "Industry" else []
     data["start_label"] = start.strftime("%a, %b %-d, %H:%M")
     data["start_utc"] = start.astimezone(pytz.UTC).isoformat()
     data["timezone_name"] = _conference_timezone_name()
@@ -861,18 +867,6 @@ def paper_json():
     return jsonify(json)
 
 
-@app.route("/music.json")
-def music_json():
-    json = [*site_data["music"]]
-    return jsonify(json)
-
-
-@app.route("/industry.json")
-def industry_json():
-    json = [*site_data["industry"]]
-    return jsonify(json)
-
-
 @app.route("/lbds.json")
 def lbds_json():
     json = [format_lbd(v) for v in site_data["lbds"]]
@@ -884,6 +878,11 @@ def send_static(path):
     if "wo_num" in path:
         abort(404)
     return send_from_directory("static", path)
+
+
+@app.route("/sponsors/<path:path>")
+def send_sponsor_logo(path):
+    return send_from_directory(sponsors["dir"], path)
 
 
 @app.route("/serve_<path>.json")
@@ -919,6 +918,10 @@ def generator():
     for key in site_data:
         if key not in {"days", "events"}:
             yield "serve", {"path": key}
+
+    for tier in sponsors["tiers"]:
+        for sponsor in tier["sponsors"]:
+            yield "send_sponsor_logo", {"path": sponsor["logo"]}
 
     # Freeze explicit paths for the dynamic /static/<path:path> route.
     static_root = app.static_folder or "static"

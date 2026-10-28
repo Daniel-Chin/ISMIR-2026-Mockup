@@ -7,6 +7,7 @@ from icalendar import Calendar, Event
 
 from utils.shared import (
     calendar_ics_path,
+    event_link,
     load_conference_timezone_name,
     load_site_config,
 )
@@ -43,18 +44,20 @@ def toDescription(site_data_path, event):
         rel_link = f"papers.html?session={session_num}"
     elif event["category"] == "LBD":
         rel_link = "lbds.html"
-    elif event["category"] == "Industry":
-        rel_link = "industry.html?session=Platinum"
     elif event["category"] == "Tutorials":
         rel_link = "tutorials.html"
-    elif event["category"] == "Music":
-        rel_link = "music.html"
+    elif event["category"] in ["Industry", "Music"]:
+        rel_link = event_link(event)
     elif event["category"] == "Satellite":
         rel_link = event["web_link"]
     else:
         rel_link = ""
 
-    miniconf_des = (miniconf_prefix + miniconf_url + rel_link) if rel_link else ""
+    miniconf_des = (
+        miniconf_prefix + miniconf_url.rstrip("/") + "/" + rel_link
+        if rel_link
+        else ""
+    )
 
     slack_link = (
         f"Slack channel: {event['channel_url']}"
@@ -67,10 +70,7 @@ def toDescription(site_data_path, event):
         else ""
     )
 
-    return (
-        "\n".join(filter(None, [miniconf_des, slack_link, livestream_link])),
-        rel_link,
-    )
+    return "\n".join(filter(None, [miniconf_des, slack_link, livestream_link]))
 
 
 def calendar_csv2ics(in_csv="sitedata/events.csv", out_ics=None):
@@ -105,12 +105,13 @@ def calendar_csv2ics(in_csv="sitedata/events.csv", out_ics=None):
         # use current UTC time for dtstamp
         e_cal.add("dtstamp", datetime.now(pytz.UTC))
 
-        e_cal["description"], e_cal["location"] = toDescription(
+        # No LOCATION: the miniconf link is already in the description.
+        e_cal["description"] = toDescription(
             os.path.normpath(os.path.join(in_csv, "..")),
             event, 
         )
 
-        e_cal.add("summary", f"#{event['category'].replace(' ', '_')} {event['title']}")
+        e_cal.add("summary", " ".join(event["title"].split()))
         # build dtstart/dtend as UTC-aware datetimes
         e_cal.add(
             "dtstart",
