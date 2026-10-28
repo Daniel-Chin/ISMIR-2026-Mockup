@@ -404,20 +404,6 @@ def tutorials():
     return render_template("tutorials.html", **data)
 
 
-@app.route("/music.html")
-def musics():
-    data = _data()
-    data["music"] = site_data["music"]
-    return render_template("music.html", **data)
-
-
-@app.route("/industry.html")
-def industries():
-    data = _data()
-    data["industry"] = site_data["industry"]
-    return render_template("industry.html", **data)
-
-
 @app.route("/lbds.html")
 def lbds():
     data = _data()
@@ -868,18 +854,6 @@ def paper_json():
     json = []
     for v in site_data["papers"]:
         json.append(format_paper(v))
-    return jsonify(json)
-
-
-@app.route("/music.json")
-def music_json():
-    json = [*site_data["music"]]
-    return jsonify(json)
-
-
-@app.route("/industry.json")
-def industry_json():
-    json = [*site_data["industry"]]
     return jsonify(json)
 
 

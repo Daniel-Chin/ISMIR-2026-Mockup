@@ -7,6 +7,7 @@ from icalendar import Calendar, Event
 
 from utils.shared import (
     calendar_ics_path,
+    event_link,
     load_conference_timezone_name,
     load_site_config,
 )
@@ -43,12 +44,10 @@ def toDescription(site_data_path, event):
         rel_link = f"papers.html?session={session_num}"
     elif event["category"] == "LBD":
         rel_link = "lbds.html"
-    elif event["category"] == "Industry":
-        rel_link = "industry.html?session=Platinum"
     elif event["category"] == "Tutorials":
         rel_link = "tutorials.html"
-    elif event["category"] == "Music":
-        rel_link = "music.html"
+    elif event["category"] in ["Industry", "Music"]:
+        rel_link = event_link(event)
     elif event["category"] == "Satellite":
         rel_link = event["web_link"]
     else:
