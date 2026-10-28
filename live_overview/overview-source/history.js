@@ -6,8 +6,32 @@ const root = document.getElementById('history-events-root');
 const connection = document.getElementById('connection-status');
 const copyHistoryPromptButton = document.getElementById('copy-history-prompt');
 const historyCopyStatus = document.getElementById('history-copy-status');
+const archiveNote = document.getElementById('history-archive-note');
+const ONGOING_NOTE = 'The conference is ongoing now. Completed sessions are archived here.';
 let latestState = null;
 const expandedHistoryPaperEventIds = new Set();
+
+/**
+ * Before the conference's first event starts, a countdown to it; from then on, that the conference is
+ * ongoing. Events before its first day (the Pre-Conference) don't count.
+ */
+function renderArchiveNote() {
+  if (!archiveNote || !latestState) return;
+  const conference = latestState.conference || {};
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone: conference.timeZone || window.ISMIRSite.timeZone });
+  const starts = (latestState.events || []).map(e => Date.parse(e.startsAt))
+    .filter(t => Number.isFinite(t) && (!conference.startsOn || day.format(t) >= conference.startsOn));
+  const left = starts.length ? Math.min(...starts) - conferenceNow(latestState) : 0;
+  if (left <= 0) {
+    archiveNote.textContent = ONGOING_NOTE;
+    return;
+  }
+  const s = Math.ceil(left / 1000);
+  const days = Math.floor(s / 86400);
+  const clock = [Math.floor(s % 86400 / 3600), Math.floor(s % 3600 / 60), s % 60].map(n => String(n).padStart(2, '0')).join(':');
+  archiveNote.textContent = `The conference starts in ${days ? `${days}d ` : ''}${clock}. Completed sessions will be archived here.`;
+}
+setInterval(renderArchiveNote, 1000);
 
 function fmtTime(iso) { return iso ? new Intl.DateTimeFormat('en', { weekday: 'short', hour: '2-digit', minute: '2-digit', timeZone: displayTimeZone() }).format(new Date(iso)) : '—'; }
 function eventTitleHtml(e) {
@@ -88,6 +112,7 @@ function render(rawState) {
   if (!rawState) return;
   const state = stateAtConferenceTime(rawState);
   latestState = state;
+  renderArchiveNote();
   window.ISMIRTimeZone?.setReferenceDate?.(conferenceNow(state));
   const history = (state.events || []).filter(e => e.status === 'history').sort((a, b) => new Date(b.endsAt) - new Date(a.endsAt));
   root.innerHTML = history.length ? groupTutorialEvents(history).map(e => {
