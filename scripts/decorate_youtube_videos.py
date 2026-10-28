@@ -1,6 +1,10 @@
 """
-Sets the title. description, captions, and other metadata for YouTube videos.  
+Sets the title. description, captions, and other metadata for YouTube videos.
+With --upload, first uploads the local videos that YouTube lacks, after confirmation.
+Prints every planned YouTube change and applies them after confirmation; then, after another
+confirmation, writes the new video links into the Live Database papers tab.
 uv run python -m scripts.decorate_youtube_videos --dry-run
+uv run python -m scripts.decorate_youtube_videos --upload 13,139
 """
 
 from __future__ import annotations
@@ -20,9 +24,9 @@ from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, cast
 
-import pyperclip
 from tqdm import tqdm
 
+from utils.live_database import SHEETS_SCOPE, CellChange, google_credentials, update_papers_tab
 from utils.session_assignment import parse_file
 from utils.shared import load_site_config
 
@@ -425,6 +429,24 @@ def missing_videos(videos: Sequence[APIObject], papers: Mapping[str, PaperRow]) 
     return [uid for uid, row in papers.items() if row['raw_video'] and uid not in present]
 
 
+def upload_video(youtube: Resource, uid: str, path: Path) -> str:
+    """A fresh upload as fresh_paper_id() recognises one: titled by its paper uid, no description."""
+    from googleapiclient.http import MediaFileUpload
+
+    request = youtube.videos().insert(
+        part='snippet,status',
+        body={'snippet': {'title': uid, 'description': ''},
+              'status': {'privacyStatus': 'unlisted', 'selfDeclaredMadeForKids': False}},
+        media_body=MediaFileUpload(str(path), chunksize=16 * 2**20, resumable=True))
+    response = None
+    while response is None:
+        _, response = request.next_chunk()
+    video_id = identifier(response.get('id'), 'video ID')
+    if response.get('snippet', {}).get('title') != uid or response.get('status', {}).get('privacyStatus') != 'unlisted':
+        raise SafetyError(f'Upload response for {uid} differs from request: {video_id}')
+    return video_id
+
+
 def summarize_coverage(rows: Sequence[PaperRow]) -> None:
     def count(raw: bool, vid: bool) -> int:
         return sum(bool(row['raw_video']) == raw and bool(row.get('video')) == vid for row in rows)
@@ -707,26 +729,19 @@ def sync_playlists(
             items.insert(position, (item_id, video_id))
 
 
-def authenticate() -> Resource:
-    from google_auth_oauthlib.flow import InstalledAppFlow
+def authenticate() -> tuple[Resource, Any]:
+    """YouTube, and credentials that can also write the Live Database: one login for both."""
     from googleapiclient.discovery import build
 
-    client_id = os.environ.get('google_client_id')
-    client_secret = os.environ.get('google_client_secret')
-    if not client_id or not client_secret:
-        raise SafetyError('Set env vars google_client_id and google_client_secret')
-    flow = InstalledAppFlow.from_client_config({'installed': {
-        'client_id': client_id,
-        'client_secret': client_secret,
-        'auth_uri': 'https://accounts.google.com/o/oauth2/auth',
-        'token_uri': 'https://oauth2.googleapis.com/token',
-    }}, SCOPES)
-    credentials = flow.run_local_server(port=0)
-    return build('youtube', 'v3', credentials=credentials, cache_discovery=False)
+    credentials = google_credentials([*SCOPES, SHEETS_SCOPE])
+    return build('youtube', 'v3', credentials=credentials, cache_discovery=False), credentials
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     rows: Sequence[PaperRow] = ()
+    videos_before = dict[str, str]()
+    credentials = None
+    dry_run = True
     try:
         parser = argparse.ArgumentParser(description=__doc__)
         parser.add_argument('--input', type=Path, default=ROOT / 'sitedata/papers.csv')
@@ -738,9 +753,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.add_argument('--first-video', action='store_true',
                             help='Apply only the first planned update, for testing')
         parser.add_argument('--no-playlists', action='store_true', help='Skip playlist sync')
+        parser.add_argument('--upload', nargs='?', const='all', metavar='UIDS',
+                            help='First upload the local videos YouTube lacks: all, or these comma-separated uids')
         args = parser.parse_args(argv)
         dry_run = args.dry_run or args.drier_run
         fields, rows, papers, original, local_videos, captions = validate_local(args.input, args.videos, args.captions)
+        videos_before = {row['uid']: row.get('video', '') for row in rows}
         if args.drier_run:
             print('DRIER RUN: no auth or API calls; pretending YouTube has no uploads.')
             youtube = cast('Resource', None)
@@ -749,9 +767,27 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             if not re.fullmatch(r'UC[A-Za-z0-9_-]{22}', EXPECTED_CHANNEL_ID):
                 raise SafetyError('Set EXPECTED_CHANNEL_ID to the verified channel ID')
-            youtube = authenticate()
+            youtube, credentials = authenticate()
             videos = enumerate_videos(youtube)
             playlists = {} if args.no_playlists else enumerate_playlists(youtube)
+            if args.upload and not dry_run:
+                wanted = None if args.upload == 'all' else {uid.strip() for uid in args.upload.split(',')}
+                if wanted and (unknown := wanted - set(local_videos)):
+                    raise SafetyError(f'No local video for {sorted(unknown)}')
+                uploads = [uid for uid in missing_videos(videos, papers)
+                           if uid in local_videos and (wanted is None or uid in wanted)]
+                print(f'Videos to upload as unlisted, titled by paper uid ({len(uploads)}):')
+                for uid in uploads:
+                    print(f'  {uid}: {local_videos[uid]} ({local_videos[uid].stat().st_size / 2**20:.0f} MiB)')
+                if uploads and input(f'Upload these {len(uploads)} videos? [y/N] ').strip().lower() == 'y':
+                    uploaded = list[str]()
+                    for uid in tqdm(uploads, desc='Uploads', unit='video'):
+                        uploaded.append(upload_video(youtube, uid, local_videos[uid]))
+                        tqdm.write(f'COMPLETED upload: {uid} {uploaded[-1]}')
+                    videos = enumerate_videos(youtube)
+                    # The uploads playlist can lag behind fresh uploads.
+                    if late := [video_id for video_id in uploaded if video_id not in {v['id'] for v in videos}]:
+                        videos += list(pages(youtube.videos(), part='snippet,status', id=','.join(late), maxResults=50))
         managed = sum(metadata(v['snippet']['description']) is not None for v in videos)
         fresh = sum(metadata(v['snippet']['description']) is None
                     and fresh_paper_id(v, papers) is not None for v in videos)
@@ -762,14 +798,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.first_video:
             plans = plans[:1]
             print(f'FIRST VIDEO: limiting to {len(plans)} update.')
-        apply_updates(youtube, plans, args.input, fields, rows, original, videos, dry_run)
-        if not args.no_playlists:
-            sync_playlists(youtube, playlists, videos, papers, dry_run)
+        if not dry_run:
+            # The whole plan first, on copies; nothing is written before confirmation. The playlists
+            # are planned from the videos as the updates leave them, as when applied.
+            print('Planned YouTube changes:')
+            preview = copy.deepcopy(videos)
+            apply_updates(youtube, plans, args.input, fields, copy.deepcopy(rows), original, preview, dry_run=True)
+            if not args.no_playlists:
+                sync_playlists(youtube, copy.deepcopy(playlists), preview, papers, dry_run=True)
+            if input('Apply these YouTube changes? [y/N] ').strip().lower() != 'y':
+                print('Nothing applied.')
+                dry_run = True
+        if not dry_run:
+            apply_updates(youtube, plans, args.input, fields, rows, original, videos)
+            if not args.no_playlists:
+                sync_playlists(youtube, playlists, videos, papers)
         if dry_run:
             print('DRY RUN: coverage below is the unchanged CSV.')
         summarize_coverage(rows)
         missing = missing_videos(videos, papers)
-        print(f'Papers with raw_video but no current YouTube upload ({len(missing)}); upload by hand:')
+        print(f'Papers with raw_video but no current YouTube upload ({len(missing)}); upload with --upload or by hand:')
         for uid in missing:
             print(f'  {uid}')
         if paths := [str(local_videos[uid]) for uid in missing if uid in local_videos]:
@@ -780,10 +828,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                     print(f'dragon-drop failed: {e}')
         return 0
     finally:
-        if rows:
-            pyperclip.copy('\n'.join(['video', *(row.get('video', '') for row in rows)]))
-            print('Copied the video column (with header, in papers.csv row order). '
-                  'Paste it into the video header cell in Google Sheets.')
+        # Also after a failure part way: the links already written to papers.csv.
+        changes = [CellChange(row['uid'], 'video', videos_before.get(row['uid'], ''), row.get('video', ''))
+                   for row in rows if row.get('video', '') != videos_before.get(row['uid'], '')]
+        if changes and not dry_run and credentials is not None:
+            update_papers_tab(changes, credentials)
 
 
 if __name__ == '__main__':

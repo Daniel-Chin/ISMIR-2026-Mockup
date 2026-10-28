@@ -217,14 +217,16 @@ python scripts/calendar_csv2ics.py
 
 Typical loop: **update Google Sheet → `python pull_from_google_sheet.py` → run Slack prep → sanitize → commit `sitedata/` → deploy**.
 
-For author-uploaded materials, set `INPUT_PATH` in
-[`scripts/parse_google_form_author_uploaded_materials.py`](../scripts/parse_google_form_author_uploaded_materials.py)
-to the Google Forms CSV export, then run `python scripts/parse_google_form_author_uploaded_materials.py`.
+For author-uploaded materials, pull first, then run
+`python -m scripts.parse_google_form_author_uploaded_materials --input <Google Forms CSV export>`
+([source](../scripts/parse_google_form_author_uploaded_materials.py); the whole job, videos and YouTube
+included, is in [repeatable_workflows.md](repeatable_workflows.md)).
 It updates `raw_poster_pdf`, `raw_thumbnail`, `raw_video`, `raw_captions`, and `fun_facts` in
 `sitedata/papers.csv` with priority: manual edits in `papers.csv` > later submissions >
 earlier submissions. A cell holding a value no submission ever had counts as a manual edit
-and is kept (so a manual revert to an earlier submitted value violates its assumptions). It also lists papers with no submission. Paste these columns back into the
-Google Sheet before the next pull.
+and is kept (so a manual revert to an earlier submitted value violates its assumptions). It also lists papers with no submission. Then it lists the changed cells and, after confirmation,
+writes them to the Live Database papers tab through the Sheets API (`utils/live_database.py`;
+`--no-sheet` skips this).
 
 For camera-ready paper PDFs, unzip the CMT download and run
 `python scripts/camera_ready_pdf_from_cmt_to_google_drive.py <unzipped_dir>`.

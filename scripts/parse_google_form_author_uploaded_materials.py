@@ -1,41 +1,63 @@
 '''
-Reads a CSV downloaded from the results of Google Form and fills papers.csv  
-The implementation should change every year, unless they decided to standardize the Google Form.  
+Reads a CSV downloaded from the results of Google Form and fills papers.csv,
+then, after confirmation, the same cells of the Live Database papers tab.
+The implementation should change every year, unless they decided to standardize the Google Form.
+uv run python -m scripts.parse_google_form_author_uploaded_materials --input $csv_path
 '''
 
 import argparse
 import csv
-import io
+import re
 from dataclasses import dataclass, field, fields
 from datetime import datetime
 from pathlib import Path
 from pprint import pprint
 
-import pyperclip
+from utils.live_database import SHEETS_SCOPE, CellChange, google_credentials, update_papers_tab
 
 INPUT_PATH = '~/ismir2026/uploaded_mats.csv'  # Use your own path
 MAX_PAPER_ID = 800
-TIMESTAMP_FORMAT = '%m/%d/%Y %H:%M:%S'
+# The export's timestamp format follows the exporting Google account's locale:
+# '09/21/2026 14:12:59', or '2026/09/21 2:12:59 PM GMT+4' (the zone is the same for every row: dropped).
+TIMESTAMP_FORMATS = ('%m/%d/%Y %H:%M:%S', '%Y/%m/%d %I:%M:%S %p')
 
 OUTPUT_PATH = '../sitedata/papers.csv'
+# Changes to these columns need the downloader (and YouTube) to run for their papers.
+VIDEO_COLUMNS = ('raw_video', 'raw_captions')
 
 
 def parse_timestamp(value: str) -> datetime:
-    return datetime.strptime(value, TIMESTAMP_FORMAT)
+    value = value.split(' GMT')[0].strip()
+    for timestamp_format in TIMESTAMP_FORMATS:
+        try:
+            return datetime.strptime(value, timestamp_format)
+        except ValueError:
+            pass
+    raise ValueError(f'Unknown timestamp format: {value!r}')
 
 
 def parse_optional_text(value: str) -> str | None:
     return value or None
 
 
+def parse_drive_url(value: str) -> str | None:
+    """One link per uploaded file, whatever form the export writes it in ('open?id=X',
+    'u/0/open?usp=forms_web&id=X', 'file/d/X/view'), so that a cell in papers.csv holding an earlier
+    submission is recognised as one, and not mistaken for a manual edit that blocks a new upload."""
+    if not value:
+        return None
+    match = re.search(r'[?&]id=([\w-]+)', value) or re.search(r'/file/d/([\w-]+)', value)
+    return f'https://drive.google.com/open?id={match.group(1)}' if match and 'drive.google.com' in value else value
+
+
 @dataclass(frozen=True)
 class AuthorUploadedMaterials:
     timestamp: datetime = field(metadata={'header': 'Timestamp', 'parse': parse_timestamp}) # no timezone info; non-critical
     paper_id: int = field(metadata={'header': 'Paper ID', 'parse': int})
-    poster_url: str | None = field(metadata={'header': 'poster', 'output': 'raw_poster_pdf'})
-    thumbnail_url: str | None = field(metadata={'header': 'thumbnail', 'output': 'raw_thumbnail'})
-    video_url: str | None = field(metadata={'header': 'video presentation', 'output': 'raw_video'})
-    captions_url: str | None = field(metadata={'header': 'captions', 'output': 'raw_captions'})
+    poster_url: str | None = field(metadata={'header': 'poster', 'output': 'raw_poster_pdf', 'parse': parse_drive_url})
+    thumbnail_url: str | None = field(metadata={'header': 'thumbnail', 'output': 'raw_thumbnail', 'parse': parse_drive_url})
+    video_url: str | None = field(metadata={'header': 'video presentation', 'output': 'raw_video', 'parse': parse_drive_url})
+    captions_url: str | None = field(metadata={'header': 'captions', 'output': 'raw_captions', 'parse': parse_drive_url})
     fun_facts: str | None = field(metadata={'header': 'fun facts', 'output': 'fun_facts'})
 
 
@@ -121,9 +143,10 @@ def debug():
         input('Enter...')
 
 
-def write_into_sitedata(papers: dict[int, AuthorUploadedMaterials], history: History) -> None:
+def write_into_sitedata(papers: dict[int, AuthorUploadedMaterials], history: History) -> list[CellChange]:
     """Priority: manual edits in papers.csv > later submissions > earlier submissions.
-    A nonblank cell that matches no past submission is assumed to be a manual edit and is kept."""
+    A nonblank cell that matches no past submission is assumed to be a manual edit and is kept.
+    Returns the cells it changed."""
     output_path = (Path(__file__).resolve().parent / OUTPUT_PATH).resolve()
     output_map = {item.name: item.metadata['output'] for item in fields(AuthorUploadedMaterials)
                   if 'output' in item.metadata}
@@ -142,6 +165,7 @@ def write_into_sitedata(papers: dict[int, AuthorUploadedMaterials], history: His
         uid_index = headers.index('uid')
         output_columns = {name: headers.index(column) for name, column in output_map.items()}
         rows: list[list[str]] = []
+        changes: list[CellChange] = []
         seen: set[int] = set()
         for row in reader:
             if len(row) != n_cells:
@@ -161,6 +185,7 @@ def write_into_sitedata(papers: dict[int, AuthorUploadedMaterials], history: His
                     if value is None or existing == value:
                         continue
                     if not existing or existing in history[paper_id].get(name, ()):
+                        changes.append(CellChange(str(paper_id), output_map[name], row[index], value))
                         row[index] = value
                     else:
                         print(f'Info: paper {paper_id} {output_map[name]}: keeping manual value {existing!r} '
@@ -176,25 +201,19 @@ def write_into_sitedata(papers: dict[int, AuthorUploadedMaterials], history: His
         writer = csv.writer(destination)
         writer.writerow(headers)
         writer.writerows(rows)
-    print(f'Author materials updated in {output_path}.')
-    print(f'Please paste the updated {", ".join(output_map.values())} columns back into the Google Sheet '
-          'papers tab before running pull_from_google_sheet.py.')
+    print(f'Author materials updated in {output_path}: {len(changes)} cells.')
     for column in output_map.values():
-        if input(f'Copy {column} (with header, in papers.csv row order) to the clipboard? [y/N] ').strip().lower() == 'y':
-            copy_column(headers, rows, column)
-
-
-def copy_column(headers: list[str], rows: list[list[str]], column: str) -> None:
-    """With quoted multi-line cells, which Google Sheets parses on paste, keeping the newlines."""
-    index = headers.index(column)
-    buffer = io.StringIO()
-    writer = csv.writer(buffer, dialect='excel-tab')
-    writer.writerow([column])
-    writer.writerows([row[index]] for row in rows)
-    pyperclip.copy(buffer.getvalue())
-    print(f'Copied. Paste into the {column} header cell.')
+        uids = [change.uid for change in changes if change.column == column]
+        print(f'  {column}: {len(uids)} [{",".join(uids)}]')
+    if uids := sorted({change.uid for change in changes if change.column in VIDEO_COLUMNS}, key=int):
+        print(f'New videos or captions; next: uv run python -m scripts.download_and_rename_videos_and_captions --uids {",".join(uids)}')
+    return changes
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--input', type=Path, default=INPUT_PATH, help='Google Form results CSV path')
-    write_into_sitedata(*parse_materials(parser.parse_args().input))
+    parser.add_argument('--no-sheet', action='store_true', help='Only update the local papers.csv')
+    args = parser.parse_args()
+    changes = write_into_sitedata(*parse_materials(args.input))
+    if changes and not args.no_sheet:
+        update_papers_tab(changes, google_credentials([SHEETS_SCOPE]))

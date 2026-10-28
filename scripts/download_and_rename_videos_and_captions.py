@@ -1,6 +1,8 @@
 """
-Download public Google Drive videos and captions sequentially, naming them by
-paper uid.
+Download Google Drive videos and captions sequentially through the Drive API,
+naming them by paper uid. Needs env vars google_client_id and google_client_secret
+and a browser login to any Google account that can read the files.
+uv run python -m scripts.download_and_rename_videos_and_captions --uids 13,139
 """
 
 import argparse
@@ -11,8 +13,9 @@ import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-import gdown
 from tqdm import tqdm
+
+from utils.live_database import google_credentials
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -38,6 +41,37 @@ def atomic_write(path: Path, contents: str) -> None:
         staged.replace(path)
 
 
+def authenticate():
+    """A Drive API client, after a browser login (the URL is printed)."""
+    from googleapiclient.discovery import build
+
+    credentials = google_credentials(['https://www.googleapis.com/auth/drive.readonly'])
+    return build('drive', 'v3', credentials=credentials, cache_discovery=False)
+
+
+def drive_file_id(url: str) -> str:
+    match = re.search(r'[?&]id=([\w-]+)', url) or re.search(r'/file/d/([\w-]+)', url)
+    if not match:
+        raise ValueError(f'Not a Google Drive file link: {url}')
+    return match.group(1)
+
+
+def drive_download(drive, url: str, directory: Path) -> Path:
+    """Download the Drive file at url into directory under its Drive filename."""
+    from googleapiclient.http import MediaIoBaseDownload
+
+    file_id = drive_file_id(url)
+    name = drive.files().get(fileId=file_id, fields='name', supportsAllDrives=True).execute()['name']
+    path = directory / (Path(name).name or file_id)
+    with path.open('wb') as target:
+        downloader = MediaIoBaseDownload(
+            target, drive.files().get_media(fileId=file_id, supportsAllDrives=True), chunksize=32 * 1024 * 1024)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk(num_retries=3)
+    return path
+
+
 def load_local_urls(urls_path: Path) -> dict[str, dict[str, str]]:
     """Load {uid: {kind: url}}; legacy {uid: video_url} entries are upgraded."""
     raw = json.loads(urls_path.read_text(encoding='utf-8')) if urls_path.exists() else {}
@@ -55,8 +89,9 @@ def load_local_urls(urls_path: Path) -> dict[str, dict[str, str]]:
     return local_urls
 
 
-def download_videos(in_csv: Path, out_dir: Path, captions_out_dir: Path) -> int:
-    """Track local URLs and log successful downloads; skip blank cells.
+def download_videos(in_csv: Path, out_dir: Path, captions_out_dir: Path, uids: set[str] | None = None) -> int:
+    """Track local URLs and log successful downloads; skip blank cells, and
+    papers not in uids when it is given.
 
     download-state/video_urls.json (in out_dir) records, per uid, the URLs of
     downloaded local files: {uid: {"video": url, "captions": url}}, either key
@@ -69,6 +104,11 @@ def download_videos(in_csv: Path, out_dir: Path, captions_out_dir: Path) -> int:
         if not {'uid', 'raw_video', 'raw_captions'} <= set(reader.fieldnames or []):
             raise ValueError('CSV must contain uid, raw_video and raw_captions columns')
         rows = list(reader)
+    if uids is not None:
+        unknown = uids - {(row.get('uid') or '').strip() for row in rows}
+        if unknown:
+            raise ValueError(f'Unknown paper uids: {sorted(unknown)}')
+        rows = [row for row in rows if (row.get('uid') or '').strip() in uids]
 
     dirs = {'video': out_dir, 'captions': captions_out_dir}
     jobs = []
@@ -117,6 +157,7 @@ def download_videos(in_csv: Path, out_dir: Path, captions_out_dir: Path) -> int:
             failures += 1
             tqdm.write(f'Failed uid={paper_id} {kind}: {exc}')
 
+    drive = authenticate() if pending else None
     consecutive_failures = 0
     attempted = 0
     with tqdm(pending, desc='Files', unit='file') as progress:
@@ -137,16 +178,7 @@ def download_videos(in_csv: Path, out_dir: Path, captions_out_dir: Path) -> int:
                 # Retain Drive's filename until its extension is known. Only
                 # publish the final name once the download has completed.
                 with TemporaryDirectory(dir=dirs[kind], prefix=f'.{paper_id}-') as temp:
-                    downloaded = gdown.download(
-                        url=url,
-                        output=temp + os.sep,
-                        fuzzy=True,
-                        quiet=True,
-                        use_cookies=False,
-                    )
-                    if downloaded is None:
-                        raise RuntimeError('Google Drive download failed')
-                    file = Path(downloaded)
+                    file = drive_download(drive, url, Path(temp))
                     if not file.suffix and kind == 'captions':
                         file = file.rename(file.with_name(file.name + '.srt'))
                     if not file.suffix:
@@ -183,8 +215,10 @@ def main() -> int:
     parser.add_argument('--output', type=Path, default=OUT_DIR, help='Video output directory')
     parser.add_argument('--captions-output', type=Path, default=CAPTIONS_OUT_DIR,
                         help='Captions output directory')
+    parser.add_argument('--uids', help='Comma-separated paper uids to download (default: all)')
     args = parser.parse_args()
-    return 1 if download_videos(args.input, args.output, args.captions_output) else 0
+    uids = {uid.strip() for uid in args.uids.split(',') if uid.strip()} if args.uids else None
+    return 1 if download_videos(args.input, args.output, args.captions_output, uids) else 0
 
 
 if __name__ == '__main__':

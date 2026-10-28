@@ -155,7 +155,7 @@ def test_channel_mismatch(configured):
 #     assert source.read_bytes() == original
 
 
-def test_main_validates_before_auth(tmp_path, monkeypatch, capsys):
+def test_main_validates_before_auth(tmp_path, monkeypatch):
     source, videos = local(tmp_path)
     (videos / '003.mp4').write_bytes(b'x')
     auth = Mock()
@@ -163,7 +163,6 @@ def test_main_validates_before_auth(tmp_path, monkeypatch, capsys):
     with pytest.raises(d.SafetyError):
         d.main(['--input', str(source), '--videos', str(videos), '--dry-run'])
     auth.assert_not_called()
-    assert 'Google Sheets' in capsys.readouterr().out
 
 
 def test_paginated_enumeration_and_missing_video(configured):
