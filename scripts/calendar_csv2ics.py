@@ -54,7 +54,11 @@ def toDescription(site_data_path, event):
     else:
         rel_link = ""
 
-    miniconf_des = (miniconf_prefix + miniconf_url + rel_link) if rel_link else ""
+    miniconf_des = (
+        miniconf_prefix + miniconf_url.rstrip("/") + "/" + rel_link
+        if rel_link
+        else ""
+    )
 
     slack_link = (
         f"Slack channel: {event['channel_url']}"
@@ -67,10 +71,7 @@ def toDescription(site_data_path, event):
         else ""
     )
 
-    return (
-        "\n".join(filter(None, [miniconf_des, slack_link, livestream_link])),
-        rel_link,
-    )
+    return "\n".join(filter(None, [miniconf_des, slack_link, livestream_link]))
 
 
 def calendar_csv2ics(in_csv="sitedata/events.csv", out_ics=None):
@@ -105,12 +106,13 @@ def calendar_csv2ics(in_csv="sitedata/events.csv", out_ics=None):
         # use current UTC time for dtstamp
         e_cal.add("dtstamp", datetime.now(pytz.UTC))
 
-        e_cal["description"], e_cal["location"] = toDescription(
+        # No LOCATION: the miniconf link is already in the description.
+        e_cal["description"] = toDescription(
             os.path.normpath(os.path.join(in_csv, "..")),
             event, 
         )
 
-        e_cal.add("summary", f"#{event['category'].replace(' ', '_')} {event['title']}")
+        e_cal.add("summary", " ".join(event["title"].split()))
         # build dtstart/dtend as UTC-aware datetimes
         e_cal.add(
             "dtstart",
