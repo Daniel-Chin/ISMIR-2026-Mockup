@@ -11,10 +11,3 @@
 - tier: Silver
   sponsors:
     - {name: Google DeepMind, logo: google_deepmind.png, url: "https://deepmind.google/"}
-- tier: Bronze
-  sponsors:
-    - {name: ACRCloud, logo: acrcloud.png, url: "https://www.acrcloud.com/"}
-    - {name: Audible Magic, logo: audible_magic.png, url: "https://www.audiblemagic.com"}
-    - {name: ByteDance, logo: bytedance.jpg, url: "http://bytedance.com"}
-    - {name: Klang, logo: klang.png, url: "https://klang.io"}
-    - {name: Piascore, logo: piascore.png, url: "https://piascore.com"}
