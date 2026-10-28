@@ -205,6 +205,9 @@ def main(site_data_path: str):
     music_programs = [e for e in site_data.get("events", []) if e["category"] == "Music"]
     assert len(music_programs) == 1, f"Expected one Music event, got {len(music_programs)}"
     app.jinja_env.globals["music_program_url"] = event_link(music_programs[0])
+    industry_programs = [e for e in site_data.get("events", []) if e["category"] == "Industry"]
+    assert len(industry_programs) == 1, f"Expected one Industry event, got {len(industry_programs)}"
+    app.jinja_env.globals["industry_program_url"] = event_link(industry_programs[0])
     app.jinja_env.globals["helpdesk_url"] = load_helpdesk_url(site_data_path)
     app.jinja_env.globals["calendar_ics_path"] = calendar_ics_path(site_data_path)
 
