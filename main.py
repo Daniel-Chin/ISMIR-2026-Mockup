@@ -171,6 +171,10 @@ def main(site_data_path: str):
         paper.update(day=str(assignment.day), session=str(assignment.session_index),
                      position=str(assignment.position))
 
+    # TBA: the music and industry sheets still hold ISMIR 2025 data.
+    site_data["music"] = []
+    site_data["industry"] = []
+
     for typ in ["papers", "industry", "music", "lbds", "events"]:
         by_uid[typ] = {}
         for p in site_data[typ]:
@@ -198,6 +202,9 @@ def main(site_data_path: str):
     app.jinja_env.globals["opening_start_utc"] = (
         min(map(_event_start, openings)).astimezone(pytz.UTC).isoformat() if openings else ""
     )
+    music_programs = [e for e in site_data.get("events", []) if e["category"] == "Music"]
+    assert len(music_programs) == 1, f"Expected one Music event, got {len(music_programs)}"
+    app.jinja_env.globals["music_program_url"] = event_link(music_programs[0])
     app.jinja_env.globals["helpdesk_url"] = load_helpdesk_url(site_data_path)
     app.jinja_env.globals["calendar_ics_path"] = calendar_ics_path(site_data_path)
 
