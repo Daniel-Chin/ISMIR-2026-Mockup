@@ -34,8 +34,8 @@ logo:
 # uncomment the following line to show the site title next to the logo image
 #site_title: 'ISMIR 2026'
 page_title:
-  prefix: 'ISMIR 2026 Mock'
-  separator: ': '
+  name: 'ISMIR 2026 Mock Virtual Platform (Miniconf)'
+  separator: ' at '
 background_image: 'static/images/Milano_ISMIR_complete_logo.png'
 organization: ISMIR Organization Committee
 
