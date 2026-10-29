@@ -78,7 +78,7 @@ See [workflow.md](workflow.md#session-assignments) for numbering and the by-pape
 ```
 uid, title, day, start_date, start_time, end_time, category, organiser,
 organiser_affiliation, organiser_bio, image, web_link,
-slack_channel, channel_url, live_url, thumbnail_link, event_desc
+slack_channel, channel_url, live_url, onsite_location, event_desc
 ```
 
 | Column | Format / meaning |
