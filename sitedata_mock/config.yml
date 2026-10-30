@@ -13,10 +13,10 @@ paper_day_release: 99
 lbd_day_release: 99 # 0: none, 4: show
 
 name: ISMIR 2026 Mock Run
-tagline: 3-HOUR PIPELINE TEST
+tagline: ISMIR 2026 HYBRID CONFERENCE
 timezone: Asia/Dubai
-date: 22 Sep 2026 (mock)
-citation_date: 22 Sep 2026
+date: 2026 Oct 31-31
+citation_date: 2026 Oct 31
 proceedings_title: Untitled
 logo:
   image: 'static/images/ismir_tabicon.png'
@@ -25,8 +25,8 @@ logo:
 # uncomment the following line to show the site title next to the logo image
 #site_title: 'ISMIR 2026'
 page_title:
-  name: 'ISMIR 2026 Mock Virtual Platform (Miniconf)'
-  separator: ' at '
+  name: 'ISMIR 2026 Mockup Virtual Platform (Miniconf)'
+  separator: ' of '
 background_image: 'static/images/Milano_ISMIR_complete_logo.png'
 organization: ISMIR Organization Committee
 
@@ -39,33 +39,35 @@ organization: ISMIR Organization Committee
 #auth0_domain : miniconf.auth0.com
 
 calendar:
-  colors: #  Keyed by event category, spaces replaced with underscores
-    All_Meeting: '#FDE68A'
-    Oral_session: '#BBFFE3'
-    Poster_session: '#BBFFE3'
-    Award_nominee: '#FECDD3'
-    Tutorials: '#C7D2FE'
-    Majlis: '#FED7AA'
-    Social: '#BAE6FD'
-    Special: '#E9D5FF'
-    Industry: '#E9D5FF'
-    WiMIR_Meetup: '#E9D5FF'
-    Registration: '#E2E8F0'
-    Unconference: '#E2E8F0'
-    Lunch: '#E2E8F0'
-    Meetup: '#E2E8F0'
-    Awards: '#fff2cc'
-    Opening: '#fff2cc'
-    LBD: '#e2efda'
-    Music: '#BBFFBB'
-    VMeetup: '#2380BD'
-    Satellite: '#7986CB'
-    Performance: '#AF0704'
+  # Schedule colours, keyed by event category (spaces -> underscores).
+  # bg: block fill (a soft tint); border: the accent stripe on its left (same hue, deeper).
+  colors:
+    All_Meeting:    {bg: '#F7E8C4', border: '#B8862B'}
+    Opening:        {bg: '#FBF1DC', border: '#C9A24D'}
+    Awards:         {bg: '#FBF1DC', border: '#C9A24D'}
+    Oral_session:   {bg: '#D9EEE9', border: '#2E8C7E'}
+    Poster_session: {bg: '#EAF5F2', border: '#2E8C7E'}
+    Award_nominee:  {bg: '#F7E2E5', border: '#B4566B'}
+    Tutorials:      {bg: '#E5E8F7', border: '#5764B0'}
+    Majlis:         {bg: '#F7E4D7', border: '#C06A3F'}
+    Special:        {bg: '#EFE5F3', border: '#8A5A9C'}
+    Industry:       {bg: '#EFE5F3', border: '#8A5A9C'}
+    WiMIR_Meetup:   {bg: '#F4E4EF', border: '#A2557F'}
+    Social:         {bg: '#DFEDF7', border: '#3B7CB0'}
+    Registration:   {bg: '#EEF0F3', border: '#98A2AE'}
+    Lunch:          {bg: '#EEF0F3', border: '#98A2AE'}
+    Meetup:         {bg: '#EEF0F3', border: '#98A2AE'}
+    Unconference:   {bg: '#EEF0F3', border: '#98A2AE'}
+    LBD:            {bg: '#E8EFDD', border: '#6A8C45'}
+    Music:          {bg: '#E1F0E3', border: '#4C9459'}
+    VMeetup:        {bg: '#DDEAF6', border: '#2F6FA8'}
+    Satellite:      {bg: '#E5E6F4', border: '#5E63A6'}
+    Performance:    {bg: '#F6E0DE', border: '#A8443B'}
 
 zoom_shared_webinar_start_hhmm: '06:00'
 zoom_shared_webinar_end_hhmm: '23:59'
 
-miniconf_url: 'https://daniel-chin.github.io/ISMIR2026-Kit'
+miniconf_url: 'https://daniel-chin.github.io/ISMIR-2026-Mockup'
 official_site_url: 'https://ismir2026.ismir.net/'
 helpdesk_url: 'https://ismir2026-mockup.slack.com/archives/C0BLUL9V77Y'
 # The two Cloudflare Workers behind the miniconf's add-ons (each folder's integration.md). Use
