@@ -15,8 +15,8 @@ jobs:
     name: Refresh artifacts
     runs-on: ubuntu-latest
     env:
-      DEPLOYMENT: ${{ vars.DEPLOYMENT }}
-      MOCKUP_FLAG: ${{ vars.DEPLOYMENT == 'mockup' && '--mockup' || '' }}
+      DEPLOYMENT: ${{ secrets.DEPLOYMENT }}
+      MOCKUP_FLAG: ${{ secrets.DEPLOYMENT == 'mockup' && '--mockup' || '' }}
       ZOOM_REDIRECT_ACCESS_TOKEN: ${{ secrets.ZOOM_REDIRECT_ACCESS_TOKEN }}
       PAPERS_SHEET_URL: ${{ secrets.PAPERS_SHEET_URL}}
       SESSION_ASSIGNMENT_SHEET_URL: ${{ secrets.SESSION_ASSIGNMENT_SHEET_URL}}
