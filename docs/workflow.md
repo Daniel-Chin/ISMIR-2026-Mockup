@@ -177,7 +177,7 @@ CSV files. See [./SPREADSHEET_FORMAT.md](./SPREADSHEET_FORMAT.md) for documentat
 - **`industry.csv`** — sponsor / industry sessions.
 
 Additionally,  
-- **`config.yml`** — site-wide settings: conference name/dates, feature toggles (`paper_videos`, `lbd_embeds`, …), calendar color map, Auth0 client ID, release-day controls (`paper_day_release`).
+- **`config.yml`** — site-wide settings: conference name/dates, feature toggles (`paper_videos`, `poster_embeds`, …), calendar color map, release-day controls (`paper_day_release`).
 
 ### Session assignments
 

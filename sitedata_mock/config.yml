@@ -1,11 +1,9 @@
 # RELEASE CONTROL
 
-music_links: true
 poster_embeds: true
 paper_embeds: true
 paper_videos: true
 slides_embeds: true
-lbd_embeds: true
 
 browse_paper_buttons: 0  # 0: none, 1: show
 
@@ -14,19 +12,12 @@ browse_paper_buttons: 0  # 0: none, 1: show
 paper_day_release: 99
 lbd_day_release: 99 # 0: none, 4: show
 
-# CHANNEL METADATA
-
-music_program_channel: '#music-program'
-music_program_url: ""
-
-
 name: ISMIR 2026 Mock Run
 tagline: 3-HOUR PIPELINE TEST
 timezone: Asia/Dubai
 date: 22 Sep 2026 (mock)
 citation_date: 22 Sep 2026
 proceedings_title: Untitled
-analytics: UA-
 logo:
   image: 'static/images/ismir_tabicon.png'
   width: 200px
@@ -39,21 +30,13 @@ page_title:
 background_image: 'static/images/Milano_ISMIR_complete_logo.png'
 organization: ISMIR Organization Committee
 
-# Remove or change to your chat server.
-#chat_server: miniconf.sloppy.zone
-#default_presentation_id: 38922815
-#default_poster_pdf: /static/images/GLTR_poster.pdf
-
-
-
 # Configuration for auth
 #Test user
 #user: miniconf@miniconf.com
 #pass: mIniconf1_
-
-use_auth0:
-auth0_client_id : JIdr6wi0z27LyLgwkJF0fpk700aj7MNH
-auth0_domain : miniconf.auth0.com
+#use_auth0:
+#auth0_client_id : JIdr6wi0z27LyLgwkJF0fpk700aj7MNH
+#auth0_domain : miniconf.auth0.com
 
 calendar:
   colors: #  Keyed by event category, spaces replaced with underscores
@@ -78,7 +61,6 @@ calendar:
     VMeetup: '#2380BD'
     Satellite: '#7986CB'
     Performance: '#AF0704'
-  sunday_saturday: false  #  Include Sunday and Saturday
 
 zoom_shared_webinar_start_hhmm: '06:00'
 zoom_shared_webinar_end_hhmm: '23:59'

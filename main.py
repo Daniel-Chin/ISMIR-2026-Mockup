@@ -850,12 +850,6 @@ def lbd(lbd):
     return render_template("lbd.html", **data)
 
 
-@app.route("/chat.html")
-def chat():
-    data = _data()
-    return render_template("chat.html", **data)
-
-
 # FRONT END SERVING
 
 
