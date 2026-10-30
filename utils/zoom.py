@@ -34,14 +34,15 @@ def getAccountCreds():
         load_dotenv(dotenv_path=Path(".") / ".env")
         try:
             accountCreds = {
-                "accountId": os.environ["accountId"],
-                "clientId": os.environ["clientId"],
-                "clientSecret": os.environ["clientSecret"],
+                "accountId": os.environ["ZOOM_API_ACCOUNT_ID"],
+                "clientId": os.environ["ZOOM_API_CLIENT_ID"],
+                "clientSecret": os.environ["ZOOM_API_CLIENT_SECRET"],
             }
         except KeyError as missing:
             raise RuntimeError(
-                f"Missing Zoom credential {missing} — add accountId, clientId and "
-                "clientSecret from a Server-to-Server OAuth app to .env"
+                f"Missing Zoom credential {missing} — add ZOOM_API_ACCOUNT_ID, "
+                "ZOOM_API_CLIENT_ID and ZOOM_API_CLIENT_SECRET from a "
+                "Server-to-Server OAuth app to .env"
             ) from None
     return accountCreds
 
