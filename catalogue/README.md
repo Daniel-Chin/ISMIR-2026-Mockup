@@ -31,7 +31,7 @@ without a redeploy.
 ## Mock pipeline (end-to-end test, no keys needed)
 
 ```bash
-python scripts/make_mock_data.py            # if sitedata_mock/ not present
+python scripts/make_example_mock_data.py            # if sitedata_mock/ not present
 python catalogue/build_catalogue.py --path sitedata_mock/ --out-dir build/catalogue_mock/ --version mock
 python catalogue/build_index.py --catalogue build/catalogue_mock/catalogue-mock.json --fake-embeddings
 python catalogue/upload.py --dir build/catalogue_mock/ --version mock --bucket gs://<test-bucket>

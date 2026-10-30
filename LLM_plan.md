@@ -62,7 +62,7 @@ Sheets/Drive directly. Reality:
   `PYTHON_FILES` (main.py, scripts/) never touches `bot/`.
 - **Legacy `scripts/embeddings.py`** (deepset/sentence_bert, old MiniConf
   recommendation feature) is not reused — modern embedding API instead.
-- **Mock data pipeline exists**: `scripts/make_mock_data.py` →
+- **Mock data pipeline exists**: `scripts/make_example_mock_data.py` →
   `sitedata_mock/`. The catalogue builder must accept `--path
   sitedata_mock/` so the whole assistant is testable end-to-end against
   mock data before real data exists.
@@ -336,7 +336,7 @@ Each deployable and testable on its own; build in order.
    `sitedata/` (and `sitedata_mock/`), upload to GCS.
    Test: schema validation passes; every paper has `slack_channel_id`
    (parsed from `channel_url`) and `miniconf_url`; no private columns in
-   output; mock pipeline (`make_mock_data.py` → build → validate) green.
+   output; mock pipeline (`make_example_mock_data.py` → build → validate) green.
 2. **`bot/` skeleton** — new Slack app registered; `/ask-ismir` end-to-end
    with a stubbed echo agent through ingress → Cloud Tasks → worker →
    chat.update. Test: ack < 3s; duplicate task delivery → one answer.

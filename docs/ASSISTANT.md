@@ -143,7 +143,7 @@ cost estimate from live pricing before the conference and set
 
 ```bash
 # mock catalogue artifacts (no keys: deterministic fake embeddings)
-python scripts/make_mock_data.py
+python scripts/make_example_mock_data.py
 python catalogue/build_catalogue.py --path sitedata_mock/ --out-dir build/catalogue_mock/ --version mock
 python catalogue/build_index.py --catalogue build/catalogue_mock/catalogue-mock.json --fake-embeddings
 

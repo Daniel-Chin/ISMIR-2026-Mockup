@@ -8,7 +8,7 @@ Creates:
   static/calendar/<config name>.ics
 
 Run from the repo root:
-  python scripts/make_mock_data.py
+  python scripts/make_example_mock_data.py
 
 Then preview the site:
   python main.py --mockup

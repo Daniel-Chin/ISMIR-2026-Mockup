@@ -1,6 +1,6 @@
 """Turn sitedata_mock/ into paste-ready tabs for the master Google Sheet.
 
-Reads sitedata_mock/*.csv (from make_mock_data.py) plus the Google Drive file
+Reads sitedata_mock/*.csv (from make_example_mock_data.py) plus the Google Drive file
 IDs of the uploaded mock PDFs (scripts/mock_drive_ids.json) and writes one
 .tsv per sheet tab into sheet_export/. TSV because pasting tab-separated text
 into Google Sheets splits into columns automatically; CSV pastes as one column.

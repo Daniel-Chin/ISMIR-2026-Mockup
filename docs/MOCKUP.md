@@ -39,10 +39,10 @@ for the full per-file column reference.
 
 ## Mock inputs
 
-`scripts/make_mock_data.py` (run from repo root, no credentials needed):
+`scripts/make_example_mock_data.py` (run from repo root, no credentials needed):
 
 ```bash
-.venv/bin/python scripts/make_mock_data.py
+.venv/bin/python scripts/make_example_mock_data.py
 ```
 
 Produces:
