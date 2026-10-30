@@ -45,9 +45,9 @@ an **owner/admin** of the Zoom account.
 6. In the repo root, create `.env` (already gitignored — never commit it):
 
    ```
-   accountId=...
-   clientId=...
-   clientSecret=...
+   ZOOM_API_ACCOUNT_ID=...
+   ZOOM_API_CLIENT_ID=...
+   ZOOM_API_CLIENT_SECRET=...
    ```
 
 7. Smoke test (read-only, creates nothing):
@@ -194,7 +194,8 @@ During the session the host still clicks **Open all rooms** after the craze.
 
 ## Idempotence and the sheet round-trip
 
-Meetings and the webinar are keyed by **topic == event title**. Re-running
+Meetings and the webinar are keyed by **topic == event title** (with a `mock-`
+prefix under `--mockup`, so mock and real entries never match). Re-running
 `setup-zoom` should never duplicate a meeting.
 
 If `python pull_from_google_sheet.py` / `python pull_from_google_sheet.py --mockup` ever overwrite `events.csv` — including `live_url`, simply re-run `setup-zoom`: existing poster meetings are found by title, the shared webinar is found by its fixed identity, and URLs are backfilled.

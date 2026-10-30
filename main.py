@@ -130,10 +130,10 @@ def group_by_days(sdata):
         }
         return out
 
-    return [(day, f(day, groups[day])) for day in map(str, range(1, 6))]
+    return [(day, f(day, groups.get(day, []))) for day in map(str, range(1, 6))]
 
 
-def main(site_data_path: str):
+def main(site_data_path: str, mockup: bool = False):
     load_dotenv()
     extra_files = ["README.md"]
     # Load all for your sitedata one time.
@@ -174,7 +174,6 @@ def main(site_data_path: str):
         paper.update(day=str(assignment.day), session=str(assignment.session_index),
                      position=str(assignment.position))
 
-    # TBA: the music and industry sheets still hold ISMIR 2025 data.
     site_data["music"] = []
     site_data["industry"] = []
 
@@ -205,12 +204,8 @@ def main(site_data_path: str):
     app.jinja_env.globals["opening_start_utc"] = (
         min(map(_event_start, openings)).astimezone(pytz.UTC).isoformat() if openings else ""
     )
-    music_programs = [e for e in site_data.get("events", []) if e["category"] == "Music"]
-    assert len(music_programs) == 1, f"Expected one Music event, got {len(music_programs)}"
-    app.jinja_env.globals["music_program_url"] = event_link(music_programs[0])
-    industry_programs = [e for e in site_data.get("events", []) if e["category"] == "Industry"]
-    assert len(industry_programs) == 1, f"Expected one Industry event, got {len(industry_programs)}"
-    app.jinja_env.globals["industry_program_url"] = event_link(industry_programs[0])
+    app.jinja_env.globals["music_program_url"] = _program_url("Music", mockup)
+    app.jinja_env.globals["industry_program_url"] = _program_url("Industry", mockup)
     sponsors["dir"] = os.path.abspath(os.path.join(site_data_path, "sponsors"))
     sponsors_yml = os.path.join(sponsors["dir"], "sponsors.yml")
     if os.path.exists(sponsors_yml):
@@ -235,6 +230,14 @@ def main(site_data_path: str):
     by_uid["days"] = dict(zip(days, events))
 
     return extra_files
+
+
+def _program_url(category, mockup):
+    """Page of the category's only event; "" in the mockup, which has none."""
+    programs = [e for e in site_data.get("events", []) if e["category"] == category]
+    expected = (0, 1) if mockup else (1, )
+    assert len(programs) in expected, f"Expected {expected} {category} events, got {len(programs)}"
+    return event_link(programs[0]) if programs else ""
 
 
 def _event_start(event):
@@ -850,12 +853,6 @@ def lbd(lbd):
     return render_template("lbd.html", **data)
 
 
-@app.route("/chat.html")
-def chat():
-    data = _data()
-    return render_template("chat.html", **data)
-
-
 # FRONT END SERVING
 
 
@@ -970,7 +967,7 @@ if __name__ == "__main__":
     args = parse_arguments()
     data_path = "sitedata_mock" if args.mockup else "sitedata"
 
-    extra_files = main(data_path)
+    extra_files = main(data_path, mockup=args.mockup)
     app.jinja_env.globals["dev_build"] = args.dev
     if args.build:
         freezer.freeze()

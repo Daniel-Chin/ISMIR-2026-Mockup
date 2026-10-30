@@ -1,11 +1,9 @@
 # RELEASE CONTROL
 
-music_links: true
 poster_embeds: true
 paper_embeds: true
 paper_videos: true
 slides_embeds: true
-lbd_embeds: true
 
 browse_paper_buttons: 0  # 0: none, 1: show
 
@@ -14,19 +12,12 @@ browse_paper_buttons: 0  # 0: none, 1: show
 paper_day_release: 99
 lbd_day_release: 99 # 0: none, 4: show
 
-# CHANNEL METADATA
-
-music_program_channel: '#music-program'
-music_program_url: ""
-
-
 name: ISMIR 2026
 tagline: ISMIR 2026 HYBRID CONFERENCE
 timezone: Asia/Dubai
 date: 2026 Nov 8-12
 citation_date: 2026 Nov 10
 proceedings_title: Untitled
-analytics: UA-
 logo:
   image: 'static/images/ismir_tabicon.png'
   width: 200px
@@ -34,26 +25,18 @@ logo:
 # uncomment the following line to show the site title next to the logo image
 #site_title: 'ISMIR 2026'
 page_title:
-  prefix: 'ISMIR 2026'
-  separator: ': '
+  name: 'ISMIR 2026 Virtual Platform (Miniconf)'
+  separator: ' of '
 background_image: 'static/images/Milano_ISMIR_complete_logo.png'
 organization: ISMIR Organization Committee
-
-# Remove or change to your chat server.
-#chat_server: miniconf.sloppy.zone
-#default_presentation_id: 38922815
-#default_poster_pdf: /static/images/GLTR_poster.pdf
-
-
 
 # Configuration for auth
 #Test user
 #user: miniconf@miniconf.com
 #pass: mIniconf1_
-
-use_auth0:
-auth0_client_id : JIdr6wi0z27LyLgwkJF0fpk700aj7MNH
-auth0_domain : miniconf.auth0.com
+#use_auth0:
+#auth0_client_id : JIdr6wi0z27LyLgwkJF0fpk700aj7MNH
+#auth0_domain : miniconf.auth0.com
 
 calendar:
   # Schedule colours, keyed by event category (spaces -> underscores).
@@ -80,7 +63,6 @@ calendar:
     VMeetup:        {bg: '#DDEAF6', border: '#2F6FA8'}
     Satellite:      {bg: '#E5E6F4', border: '#5E63A6'}
     Performance:    {bg: '#F6E0DE', border: '#A8443B'}
-  sunday_saturday: false  #  Include Sunday and Saturday
 
 zoom_shared_webinar_start_hhmm: '06:00'
 zoom_shared_webinar_end_hhmm: '23:59'

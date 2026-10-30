@@ -1,36 +1,7 @@
-# Drafted by GPT-5
-
 name: Refresh website
 
 on:
   workflow_dispatch:
-
-  workflow_call:
-    inputs:
-      mockup:
-        description: Refresh the mockup version
-        required: false
-        default: false
-        type: boolean
-    secrets:
-      ZOOM_REDIRECT_ACCESS_TOKEN:
-        required: true
-      PAPERS_SHEET_URL:
-        required: false
-      SESSION_ASSIGNMENT_SHEET_URL:
-        required: false
-      EVENTS_SHEET_URL:
-        required: false
-      INDUSTRY_SHEET_URL:
-        required: false
-      MUSIC_SHEET_URL:
-        required: false
-      LBDS_SHEET_URL:
-        required: false
-      LBDS_GROUPING:
-        required: false
-      LIVE_OVERVIEW_ADMIN_KEY:
-        required: false
 
 permissions:
   contents: read
@@ -44,6 +15,8 @@ jobs:
     name: Refresh artifacts
     runs-on: ubuntu-latest
     env:
+      DEPLOYMENT: ${{ secrets.DEPLOYMENT }}
+      MOCKUP_FLAG: ${{ secrets.DEPLOYMENT == 'mockup' && '--mockup' || '' }}
       ZOOM_REDIRECT_ACCESS_TOKEN: ${{ secrets.ZOOM_REDIRECT_ACCESS_TOKEN }}
       PAPERS_SHEET_URL: ${{ secrets.PAPERS_SHEET_URL}}
       SESSION_ASSIGNMENT_SHEET_URL: ${{ secrets.SESSION_ASSIGNMENT_SHEET_URL}}
@@ -71,12 +44,7 @@ jobs:
         run: uv sync
 
       - name: Pull data
-        if: ${{ !inputs.mockup }}
-        run: uv run python pull_from_google_sheet.py
-
-      - name: Pull mockup data
-        if: ${{ inputs.mockup }}
-        run: uv run python pull_from_google_sheet.py --mockup
+        run: uv run python pull_from_google_sheet.py $MOCKUP_FLAG
 
       # Caches are immutable, so each run saves under a new key and restores
       # the newest one via the prefix.
@@ -88,7 +56,7 @@ jobs:
           restore-keys: drive-thumbnails-
 
       - name: Download paper thumbnails
-        run: uv run python scripts/download_paper_thumbnails.py ${{ inputs.mockup && '--mockup' || '' }}
+        run: uv run python scripts/download_paper_thumbnails.py $MOCKUP_FLAG
 
       # always(): keep partial progress even if the download or a later step fails.
       - name: Save thumbnail cache
@@ -99,12 +67,7 @@ jobs:
           key: drive-thumbnails-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Build website
-        if: ${{ !inputs.mockup }}
-        run: uv run python main.py --build
-
-      - name: Build mockup website
-        if: ${{ inputs.mockup }}
-        run: uv run python main.py --mockup --build
+        run: uv run python main.py $MOCKUP_FLAG --build
 
       # Sheet problems only produce warnings; a Live Overview failure never blocks miniconf.
       # The admin key is exposed to this step only; mockup runs never sync the backend.
@@ -115,7 +78,7 @@ jobs:
           LIVE_OVERVIEW_ADMIN_KEY: ${{ secrets.LIVE_OVERVIEW_ADMIN_KEY }}
         run: |
           bash install.sh
-          bash build.sh ${{ inputs.mockup && '--mockup' || '' }}
+          bash build.sh $MOCKUP_FLAG
 
       - name: Merge Live Overview
         run: |
@@ -129,7 +92,7 @@ jobs:
         working-directory: preconf
         run: |
           bash install.sh
-          bash build.sh ${{ inputs.mockup && '--mockup' || '' }}
+          bash build.sh $MOCKUP_FLAG
 
       - name: Merge Pre-Conference Lounge
         run: |

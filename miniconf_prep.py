@@ -32,7 +32,7 @@ def parse_arguments():
     parser.add_argument(
         "--mockup",
         action="store_true",
-        help="Use sitedata_mock and MOCKUP_SLACK_* credentials instead of live data and credentials.",
+        help="Use sitedata_mock instead of live data. Slack actions require mockup.env to be loaded.",
     )
 
     parser.add_argument(

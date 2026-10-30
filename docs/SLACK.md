@@ -63,7 +63,7 @@ the workspace (workspace admin, or an app-approval flow).
    Permissions**, install or reinstall the app, and copy the **Bot User OAuth
    Token** and **User OAuth Token** instead.
 
-7. In the repo root, add to `.env` (already gitignored — never commit it):
+7. In the repo root, add to `real.env` or `mockup.env` (already gitignored — never commit them):
 
    ```
    SLACK_USER_TOKEN=xoxp-...
@@ -262,18 +262,17 @@ members, and topic/purpose are simply overwritten.
 
 ## Live and mockup credentials
 
-Provisioning uses `SLACK_BOT_TOKEN` and `SLACK_USER_TOKEN` by default. Add
-`--mockup` to any `miniconf_prep.py` command to select `MOCKUP_SLACK_BOT_TOKEN`
-and `MOCKUP_SLACK_USER_TOKEN`. The announcement bot's `--mockup` selects
-`MOCKUP_SLACK_TOKEN_ANNOUNCEMENT_BOT`; otherwise it uses
-`SLACK_TOKEN_ANNOUNCEMENT_BOT`. There is no fallback to live credentials.
+`SLACK_BOT_TOKEN`, `SLACK_USER_TOKEN` and `SLACK_TOKEN_ANNOUNCEMENT_BOT` have the
+same names in both workspaces. The loaded env file selects the workspace:
+`uv run --env-file real.env ...` or `uv run --env-file mockup.env ...`. Keep these
+tokens out of `.env`, which is loaded as a fallback for anything the env file omits.
 
-`--mockup` selects both `sitedata_mock/` and mockup credentials. Without it,
-commands use `sitedata/` and live credentials. `--prod` still controls dummy data
+`--mockup` selects `sitedata_mock/`, and Slack commands exit unless `DEPLOYMENT`
+from the env file agrees with it. `--prod` still controls dummy data
 and invitation recipients, not the Slack workspace.
 
 For direct Python use, call `utils.slack.configure_clients(is_mockup=True)`
-before Slack operations. Switching credentials clears cached channel/user IDs.
+before Slack operations. It clears cached channel/user IDs.
 The separate LLM and self-service apps retain their own documented credentials.
 
 ## utils/slack.py API surface

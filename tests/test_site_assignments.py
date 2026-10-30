@@ -6,7 +6,7 @@ import shutil
 import pytest
 
 import main as site
-from scripts import make_mock_data
+from scripts import make_example_mock_data
 
 
 @pytest.fixture
@@ -17,14 +17,14 @@ def site_data(tmp_path, monkeypatch):
     for path in source.iterdir():
         if path.suffix in {".csv", ".yml"}:
             shutil.copy(path, destination)
-    monkeypatch.setattr(make_mock_data, "MOCK_DIR", str(destination))
-    monkeypatch.setattr(make_mock_data, "PDF_DIR", str(tmp_path))
-    make_mock_data.make_papers()
-    make_mock_data.make_events()
-    make_mock_data.make_lbds()
-    make_mock_data.make_music()
-    make_mock_data.make_industry()
-    make_mock_data.make_config()
+    monkeypatch.setattr(make_example_mock_data, "MOCK_DIR", str(destination))
+    monkeypatch.setattr(make_example_mock_data, "PDF_DIR", str(tmp_path))
+    make_example_mock_data.make_papers()
+    make_example_mock_data.make_events()
+    make_example_mock_data.make_lbds()
+    make_example_mock_data.make_music()
+    make_example_mock_data.make_industry()
+    make_example_mock_data.make_config()
     # Multiple days and non-UID order catch accidental reliance on CSV ordering.
     with (destination / "session_assignment.csv").open("w", newline="") as handle:
         csv.writer(handle).writerows([

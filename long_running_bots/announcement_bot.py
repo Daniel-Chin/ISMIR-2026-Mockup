@@ -13,11 +13,13 @@
     - Paste in `.env`:
     - "SLACK_TOKEN_ANNOUNCEMENT_BOT=xoxb-..."
     - Set a profile image.
+- You need to create a public channel #bot-home. Every exception is sent there.
+  The bot joins it by itself.
 
 Example CLI:
-    - `uv run python -m long_running_bots.announcement_bot --mockup `
-    - `uv run python -m long_running_bots.announcement_bot --mockup --testing`
-    - `uv run python -m long_running_bots.announcement_bot`
+    - `uv run --env-file mockup.env python -m long_running_bots.announcement_bot --mockup`
+    - `uv run --env-file mockup.env python -m long_running_bots.announcement_bot --mockup --testing`
+    - `uv run --env-file   real.env python -m long_running_bots.announcement_bot`
 
 Details:
 - Interactive shell. Type `help` for commands. Bot output is printed above the prompt.
@@ -57,6 +59,13 @@ Details:
   (`goto`, `calibrate`, `running late`) therefore also serves to auto split the video recordings:
   `scripts/event_boundaries.py` replays the tape into event boundaries, which a human checks, then
   `scripts/event_boundaries_to_ffmpeg.py` turns into cut commands.
+- Posts "I awake!" and "I exit." to #bot-home.
+- Exceptions: recovered from where possible and sent to #bot-home right away. Repeats of the same
+  error are only printed for `REPEAT_REPORT_INTERVAL_SECONDS`. If sending to #bot-home fails, the
+  report is printed, stored, and printed again on exit.
+    - Slack setup and history recovery at startup retry until they succeed.
+    - A failing event does not block the others. Its post is retried on the next tick.
+    - A failed offset message is rebuilt and retried on the next tick.
 - Loads events.csv once at startup. If you change it during the conference, restart this script.
 '''
 
@@ -70,6 +79,7 @@ import re
 import sys
 import textwrap
 import threading
+import time
 import traceback
 from dataclasses import dataclass, field
 from datetime import date, datetime, time as dtime, timedelta
@@ -82,12 +92,14 @@ from dotenv import load_dotenv
 from zoneinfo import ZoneInfo
 
 from catalogue.build_catalogue import slack_channel_id
+from utils.deployment import check_deployment
 from utils.shared import load_conference_timezone_name
 
 ANNOUNCE_IN_ADVANCE = 10  # minutes
 FRESH_WINDOW = timedelta(minutes=2 * ANNOUNCE_IN_ADVANCE)
 STARTED_GRACE = timedelta(minutes=2 * ANNOUNCE_IN_ADVANCE)
 ANNOUNCEMENTS_CHANNEL = "general"
+BOT_HOME_CHANNEL = "bot-home"
 KEYWORD = "Beep Bop"
 PROMPT_TIMEOUT_SECONDS = 60
 BOT_TOKEN_ENV_VAR = "SLACK_TOKEN_ANNOUNCEMENT_BOT"
@@ -95,6 +107,8 @@ MISSED_EVENT_THRESHOLD_SECONDS = 60
 HISTORY_PAGE_LIMIT = 200
 MAX_SLEEP_SECONDS = 30.0
 STATE_DIR = Path("tmp")
+REPEAT_REPORT_INTERVAL_SECONDS = 600
+MAX_REPORT_CHARS = 3000
 
 # Kinds of announcement log entries.
 MAIN = "main"      # regular announcement at T - ANNOUNCE_IN_ADVANCE
@@ -351,13 +365,13 @@ class StdoutSlackClient:
 
 
 def create_slack_client(is_mockup: bool = False) -> Any:
+    check_deployment(is_mockup)
     env_path = Path(".") / ".env"
     load_dotenv(dotenv_path=env_path)
-    token_env_var = ("MOCKUP_" if is_mockup else "") + BOT_TOKEN_ENV_VAR
-    token = os.environ.get(token_env_var, "").strip()
+    token = os.environ.get(BOT_TOKEN_ENV_VAR, "").strip()
     if not token:
         raise RuntimeError(
-            f"Missing {token_env_var} in environment or .env file."
+            f"Missing {BOT_TOKEN_ENV_VAR} in environment or .env file."
         )
     slack_sdk = importlib.import_module("slack_sdk")
     return slack_sdk.WebClient(token=token)
@@ -478,6 +492,75 @@ def say(*lines: str) -> None:
         print(f"[{stamp}] {line}", flush=True)
 
 
+class ErrorReporter:
+    def __init__(self) -> None:
+        self.client: Any = None
+        self.channel_id: str | None = None
+        self.last_sent: dict[str, float] = {}
+        self.undelivered: list[str] = []
+
+    def connect(self, client: Any, channel_id: str | None = None) -> None:
+        self.client = client
+        self.channel_id = channel_id
+
+    def send(self, text: str) -> None:
+        if self.client is None:
+            raise RuntimeError("No Slack client yet.")
+        if self.channel_id is None:
+            channel_id = find_channel_id(self.client, BOT_HOME_CHANNEL)
+            join_channel_if_needed(self.client, channel_id)
+            self.channel_id = channel_id
+        self.client.chat_postMessage(channel=self.channel_id, text=text)
+
+    def report(self, context: str) -> None:
+        """Call from an `except` block. Never raises."""
+        trace = traceback.format_exc()
+        print(trace, end="", file=sys.stderr, flush=True)
+        say(f"!! Error while {context}.")
+        key = f"{context}: {traceback.format_exc(limit=0)}"
+        now = time.monotonic()
+        last = self.last_sent.get(key)
+        if last is not None and now - last < REPEAT_REPORT_INTERVAL_SECONDS:
+            return
+        self.last_sent[key] = now
+        self.deliver(f"Error while {context}:\n```{trace[-MAX_REPORT_CHARS:]}```")
+
+    def deliver(self, text: str) -> None:
+        """Never raises."""
+        try:
+            self.send(text)
+        except Exception:
+            say(f"!! Could not send to #{BOT_HOME_CHANNEL}:", text)
+            traceback.print_exc()
+            self.undelivered.append(text)
+
+    def print_undelivered(self) -> None:
+        if self.undelivered:
+            say(f"!! {len(self.undelivered)} error(s) never reached #{BOT_HOME_CHANNEL}:",
+                *self.undelivered)
+
+
+reporter = ErrorReporter()
+
+
+def attempt(context: str, action: Callable[..., Any], *args: Any) -> bool:
+    try:
+        action(*args)
+    except Exception:
+        reporter.report(context)
+        return False
+    return True
+
+
+def retry_until_success(context: str, action: Callable[..., Any], *args: Any) -> Any:
+    while True:
+        try:
+            return action(*args)
+        except Exception:
+            reporter.report(context)
+            time.sleep(MAX_SLEEP_SECONDS)
+
+
 class AnnouncementBot:
     def __init__(
         self,
@@ -511,6 +594,7 @@ class AnnouncementBot:
         self.state = BotState()
         self.tape_path = state_path.with_suffix(".tape.jsonl")
         self.last_taped: dict[str, Any] | None = None
+        self.offset_post_owed = False
 
     # ---------- time & schedule ----------
 
@@ -627,7 +711,7 @@ class AnnouncementBot:
                 say(f"!! Could not parse {self.state_path} ({exc!r}); recovering from Slack history.")
         else:
             say(f"No state file at {self.state_path}; recovering from Slack history.")
-        self.recover_from_slack()
+        retry_until_success("recovering from Slack history", self.recover_from_slack)
         self.save()
 
     def recover_from_slack(self) -> None:
@@ -813,36 +897,44 @@ class AnnouncementBot:
         self.pending = None
         now = self.now()
         for uid in pending.uids:
-            event = self.by_uid[uid]
-            if announce and self.main_due(event, now):
-                self.post_main(event, now)
-                if self.purpose_due(event, now):
-                    self.post_purpose(event, now)
-            else:
-                self.state.log.append(LogEntry(uid=uid, kind=SKIP, at=now))
-                say(f"Skipped stale announcement for {self.describe(event)}.")
+            attempt(f"resolving stale event #{uid}", self.resolve_stale_event, uid, announce, now)
         self.save()
+
+    def resolve_stale_event(self, uid: int, announce: bool, now: datetime) -> None:
+        event = self.by_uid[uid]
+        if announce and self.main_due(event, now):
+            self.post_main(event, now)
+            if self.purpose_due(event, now):
+                self.post_purpose(event, now)
+        else:
+            self.state.log.append(LogEntry(uid=uid, kind=SKIP, at=now))
+            say(f"Skipped stale announcement for {self.describe(event)}.")
 
     def tick(self) -> float:
         with self.lock:
             now = self.now()
-            self.clear_stale_offset(now)
-            self.freeze_started(now)
+            attempt("clearing a stale offset", self.clear_stale_offset, now)
+            attempt("freezing started events", self.freeze_started, now)
             if self.pending is not None and now >= self.pending.deadline:
                 say("No response received; skipping.")
-                self.resolve_pending(announce=False)
+                attempt("skipping stale events", self.resolve_pending, False)
+            if self.offset_post_owed:
+                attempt("retrying the schedule update", self.post_offset_update)
             pending_uids = set(self.pending.uids) if self.pending else set()
             for event in self.events:
                 if event.uid in pending_uids:
                     continue
-                if self.extra_due(event, now):
-                    self.post_extra(event, now)
-                if self.main_due(event, now):
-                    self.post_main(event, now)
-                if self.purpose_due(event, now):
-                    self.post_purpose(event, now)
-            self.save()
+                attempt(f"announcing event #{event.uid}", self.post_due, event, now)
+            attempt("saving state", self.save)
             return self.seconds_until_next_action(now)
+
+    def post_due(self, event: ScheduledEvent, now: datetime) -> None:
+        if self.extra_due(event, now):
+            self.post_extra(event, now)
+        if self.main_due(event, now):
+            self.post_main(event, now)
+        if self.purpose_due(event, now):
+            self.post_purpose(event, now)
 
     def seconds_until_next_action(self, now: datetime) -> float:
         candidates: list[datetime] = []
@@ -864,8 +956,7 @@ class AnnouncementBot:
             try:
                 wait = self.tick()
             except Exception:
-                say("!! Scheduler error (will retry):")
-                traceback.print_exc()
+                reporter.report("running the scheduler (will retry)")
                 wait = MAX_SLEEP_SECONDS
             with self.wakeup:
                 self.wakeup.wait(timeout=wait)
@@ -885,7 +976,16 @@ class AnnouncementBot:
         if minutes == old_minutes:
             say(f"Offset unchanged ({minutes:+d} min); nothing posted.")
             return
+        self.offset_post_owed = True
+        if not attempt("posting the schedule update", self.post_offset_update):
+            say("!! Offset saved locally; the schedule update will be retried.")
 
+    def post_offset_update(self) -> None:
+        offset = self.state.offset
+        if offset is None:
+            self.offset_post_owed = False
+            return
+        now = self.now()
         corrections: list[tuple[str, datetime, int]] = []
         corrected: list[ScheduledEvent] = []
         for event in self.events:
@@ -896,13 +996,9 @@ class AnnouncementBot:
             if t_minus >= 0:
                 corrections.append((event.channel_id, start, t_minus))
                 corrected.append(event)
-        text = render_offset_message(minutes, corrections)
-        try:
-            self.post(text)
-        except Exception:
-            say("!! Offset saved locally, but posting the schedule update to Slack failed:")
-            traceback.print_exc()
-            return
+        text = render_offset_message(offset.minutes, corrections)
+        self.post(text)
+        self.offset_post_owed = False
         for event in corrected:
             self.state.log.append(LogEntry(uid=event.uid, kind=UPDATE, at=now))
         self.save()
@@ -947,8 +1043,7 @@ class AnnouncementBot:
             try:
                 self._dispatch(line)
             except Exception:
-                say("!! Command failed:")
-                traceback.print_exc()
+                reporter.report(f"running command {line!r}")
             self.poke()
 
     def _dispatch(self, line: str) -> None:
@@ -1139,17 +1234,25 @@ def run(site_data_path: str, is_mockup: bool = False, is_testing: bool = False) 
                 "(environment or .env). Unset it and retry."
             )
         announcements_channel_id = "ANNOUNCEMENTS"
+        bot_home_channel_id = "BOT_HOME"
         client: Any = StdoutSlackClient({
             announcements_channel_id: ANNOUNCEMENTS_CHANNEL,
+            bot_home_channel_id: BOT_HOME_CHANNEL,
             **{event.channel_id: event.title for event in events},
         })
+        reporter.connect(client, bot_home_channel_id)
     else:
         client = create_slack_client(is_mockup=is_mockup)
-        announcements_channel_id = find_channel_id(
-            client, ANNOUNCEMENTS_CHANNEL
+        reporter.connect(client)
+        announcements_channel_id = retry_until_success(
+            f"finding #{ANNOUNCEMENTS_CHANNEL}", find_channel_id, client, ANNOUNCEMENTS_CHANNEL,
         )
-        join_channel_if_needed(client, announcements_channel_id)
+        retry_until_success(
+            f"joining #{ANNOUNCEMENTS_CHANNEL}",
+            join_channel_if_needed, client, announcements_channel_id,
+        )
 
+    reporter.deliver("I awake!")
     suffix = ("_mockup" if is_mockup else "") + ("_testing" if is_testing else "")
     state_path = STATE_DIR / f"announcement_bot_state{suffix}.json"
     bot = AnnouncementBot(
@@ -1168,7 +1271,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--mockup",
         action="store_true",
-        help="Use sitedata_mock and MOCKUP_SLACK_TOKEN_ANNOUNCEMENT_BOT.",
+        help="Use sitedata_mock. Requires mockup.env to be loaded.",
     )
     parser.add_argument(
         "--testing",
@@ -1180,10 +1283,20 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    run(
-        "sitedata_mock" if args.mockup else "sitedata",
-        is_mockup=args.mockup, is_testing=args.testing,
-    )
+    try:
+        run(
+            "sitedata_mock" if args.mockup else "sitedata",
+            is_mockup=args.mockup, is_testing=args.testing,
+        )
+    except Exception:
+        reporter.report("running the bot (fatal, exiting)")
+        raise
+    finally:
+        try:
+            if reporter.client is not None:
+                reporter.deliver("I exit.")
+        finally:
+            reporter.print_undelivered()
 
 
 if __name__ == "__main__":

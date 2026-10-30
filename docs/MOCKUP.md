@@ -39,10 +39,10 @@ for the full per-file column reference.
 
 ## Mock inputs
 
-`scripts/make_mock_data.py` (run from repo root, no credentials needed):
+`scripts/make_example_mock_data.py` (run from repo root, no credentials needed):
 
 ```bash
-.venv/bin/python scripts/make_mock_data.py
+.venv/bin/python scripts/make_example_mock_data.py
 ```
 
 Produces:
@@ -94,8 +94,9 @@ pre-filled with the mock data and real Drive media links (`raw_* = open?id=...`)
 with 5 tabs; the mock uses 5 single-tab sheets because they were created via
 the Drive API, which can't add tabs — the CSV-export mechanism is identical.
 
-**`python pull_from_google_sheet.py --mockup`** pulls all five sheets into
-`sitedata_mock/*.csv` via unauthenticated export URLs and rebuilds the calendar.
+**`uv run --env-file mockup.env python pull_from_google_sheet.py --mockup`** pulls the sheets named by the
+`*_SHEET_URL` env vars in `mockup.env` (same names as `real.env`; tab URLs
+with a `gid`) into `sitedata_mock/*.csv` via unauthenticated export URLs and rebuilds the calendar.
 Verified end-to-end: edit sheet → `python pull_from_google_sheet.py --mockup`
 → `python main.py --mockup` → poster pages embed the Drive PDFs.
 
@@ -122,12 +123,12 @@ Full Slack reference in [SLACK.md](SLACK.md).
 
 One-time: create a free test Slack workspace, create a Slack app with bot scopes
 `channels:manage`, `channels:read`, `groups:write`, `chat:write`, `users:read`,
-`users:read.email`, install it, and put in `.env` (gitignored):
+`users:read.email`, install it, and put in `mockup.env` (gitignored):
 
 ```
-MOCKUP_SLACK_BOT_TOKEN=xoxb-...
-MOCKUP_SLACK_USER_TOKEN=xoxp-...
-MOCKUP_SLACK_TOKEN_ANNOUNCEMENT_BOT=xoxb-...
+SLACK_BOT_TOKEN=xoxb-...
+SLACK_USER_TOKEN=xoxp-...
+SLACK_TOKEN_ANNOUNCEMENT_BOT=xoxb-...
 DUMMY_EMAIL=<your-email-in-that-workspace>   # invites go here in non-prod mode
 ```
 
@@ -165,9 +166,9 @@ Full reference: [ZOOM.md](ZOOM.md) (app creation, scopes, API surface, troublesh
 Create a Zoom Server-to-Server OAuth app, add to `.env`:
 
 ```
-accountId=...
-clientId=...
-clientSecret=...
+ZOOM_API_ACCOUNT_ID=...
+ZOOM_API_CLIENT_ID=...
+ZOOM_API_CLIENT_SECRET=...
 ```
 
 The `setup-zoom` action is fully wired:
@@ -201,7 +202,7 @@ room-less meetings. Caveat: free Zoom accounts cap meetings at 40 min.
 
 ### 4. Run the 3 hours
 
-- T-0:15 — start site (or run the `Refresh website` workflow with `mockup`), post welcome in Slack `#general`.
+- T-0:15 — start site (or run the `Refresh website` workflow in the mockup repo), post welcome in Slack `#general`.
 - 18:10 — run the mock tutorial and verify its page and private Slack channel.
 - 18:30 — open the Oral Session Zoom from the calendar's `live_url`.
 - 19:00 — poster session: Q&A happens in the per-paper channels (`p1-1-…` … `p1-6-…`).

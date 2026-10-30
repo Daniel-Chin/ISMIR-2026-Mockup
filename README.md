@@ -1,6 +1,6 @@
 # Welcome to ISMIR 2026 virtual platform creation code!!
 
-> **Docs:** [docs/workflow.md](docs/workflow.md) — full pipeline reference (data formats, Slack/Zoom automation, deploy). [docs/SPREADSHEET_FORMAT.md](docs/SPREADSHEET_FORMAT.md) — master Google Sheet tabs/columns the pipeline expects. [docs/repeatable_workflows.md](docs/repeatable_workflows.md) — repeatable jobs, e.g. digesting new author uploads (form → Live Database → videos → YouTube). [docs/YOUTUBE.md](docs/YOUTUBE.md) — presentation videos on YouTube. [docs/MOCKUP.md](docs/MOCKUP.md) — 3-hour mock conference runbook with generated test data (`scripts/make_mock_data.py` → `sitedata_mock/`). [docs/ZOOM.md](docs/ZOOM.md) — Zoom integration: S2S OAuth setup, `setup-zoom`, poster breakout rooms. [docs/SLACK.md](docs/SLACK.md) — Slack integration: bot app setup, `setup-papers-*` channel pipeline, invites, topic/purpose. [docs/IDENTITY.md](docs/IDENTITY.md) — matching people across CMT, registration and Slack (`utils/identity.py`). [docs/ASSISTANT.md](docs/ASSISTANT.md) — ISMIR Guide LLM assistant: catalogue export (`catalogue/`), Slack bot (`bot/`), setup, operator loop, guardrails. [docs/SPONSORS.md](docs/SPONSORS.md) — sponsor logos on the Industry event page (`sitedata/sponsors/`).
+> **Docs:** [docs/workflow.md](docs/workflow.md) — full pipeline reference (data formats, Slack/Zoom automation, deploy). [docs/SPREADSHEET_FORMAT.md](docs/SPREADSHEET_FORMAT.md) — master Google Sheet tabs/columns the pipeline expects. [docs/repeatable_workflows.md](docs/repeatable_workflows.md) — repeatable jobs, e.g. digesting new author uploads (form → Live Database → videos → YouTube). [docs/YOUTUBE.md](docs/YOUTUBE.md) — presentation videos on YouTube. [docs/MOCKUP.md](docs/MOCKUP.md) — 3-hour mock conference runbook with generated test data (`scripts/make_example_mock_data.py` → `sitedata_mock/`). [docs/ZOOM.md](docs/ZOOM.md) — Zoom integration: S2S OAuth setup, `setup-zoom`, poster breakout rooms. [docs/SLACK.md](docs/SLACK.md) — Slack integration: bot app setup, `setup-papers-*` channel pipeline, invites, topic/purpose. [docs/IDENTITY.md](docs/IDENTITY.md) — matching people across CMT, registration and Slack (`utils/identity.py`). [docs/ASSISTANT.md](docs/ASSISTANT.md) — ISMIR Guide LLM assistant: catalogue export (`catalogue/`), Slack bot (`bot/`), setup, operator loop, guardrails. [docs/SPONSORS.md](docs/SPONSORS.md) — sponsor logos on the Industry event page (`sitedata/sponsors/`).
 
 Run with Python 3.12
 
@@ -23,8 +23,8 @@ Run with Python 3.12
 
 ## Paper Slack Channel Setup
 
-For mockup runs, add `--mockup` to prep commands; these
-use `MOCKUP_SLACK_BOT_TOKEN` and `MOCKUP_SLACK_USER_TOKEN` from `.env`.
+Slack tokens come from the env file: run with `uv run --env-file real.env ...`, or for
+mockup runs `uv run --env-file mockup.env ...` and add `--mockup` to prep commands.
 
 See [docs/SLACK.md](docs/SLACK.md) for the full pipeline (app/token setup, what each step does, idempotence, troubleshooting). Short version:
 

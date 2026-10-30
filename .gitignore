@@ -169,6 +169,7 @@ activemq-data/
 
 # Environments
 .env
+*.env
 .envrc
 .venv
 # Local attendee exports and other contact data; never publish or commit.

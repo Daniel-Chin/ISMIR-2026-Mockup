@@ -21,7 +21,7 @@ Source: <https://ismir2026.ismir.net/meet-the-sponsors>. Only sponsorship tiers 
 
 1. Download the original logo (strip the `thumbnail_` prefix from the image URL on the sponsors page for full resolution).
 2. Shrink it if it's large: logos display at most 60px tall, so 800px wide is plenty (`PIL`: resize to width 800, `optimize=True`; quantize PNGs to 256 colours).
-   If it is dark on a transparent background (currently Moises and Audible Magic), flatten it onto white with ~12% padding: Dark Reader darkens the page (including CSS backgrounds) but not images, so such logos become invisible.
+   If it is dark on a transparent background (currently Moises), flatten it onto white with ~12% padding: Dark Reader darkens the page (including CSS backgrounds) but not images, so such logos become invisible.
 3. Save it in `sitedata/sponsors/` and add an entry to `sponsors.yml`.
 
 For a new conference, replace the directory contents.
