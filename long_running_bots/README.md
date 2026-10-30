@@ -2,7 +2,7 @@
 ```fish
 tmux new -s anno_bot
 systemd-inhibit --what=sleep --why='announcement bot' \
-    uv run --env-file mockup.env python -m long_running_bots.announcement_bot --mockup
+    uv run --env-file which.env python -m long_running_bots.announcement_bot --mockup_or_not
 # interact...
 # ctrl-B D
 tmux new -s self_s_bot

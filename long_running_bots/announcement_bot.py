@@ -18,8 +18,8 @@
 
 Example CLI:
     - `uv run --env-file mockup.env python -m long_running_bots.announcement_bot --mockup`
-    - `uv run python -m long_running_bots.announcement_bot --mockup --testing`
-    - `uv run python -m long_running_bots.announcement_bot`
+    - `uv run --env-file mockup.env python -m long_running_bots.announcement_bot --mockup --testing`
+    - `uv run --env-file   real.env python -m long_running_bots.announcement_bot`
 
 Details:
 - Interactive shell. Type `help` for commands. Bot output is printed above the prompt.
