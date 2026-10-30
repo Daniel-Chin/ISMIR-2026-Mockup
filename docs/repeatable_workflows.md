@@ -38,7 +38,7 @@ Steps:
 - `uv run python -m scripts.police_videos`
 - Is any video longer than 3:10? Notify authors.
 - `uv run python -m scripts.time_stretch_videos`, or leave such a video out of the upload until the authors
-  send a shorter one.
+  send a shorter one. It retimes the video's captions by the same speed.
 - Upload the new videos in YouTube Studio (zoom.admin.ismir2026@gmail.com): select the files in `tmp/videos`.
   - Keep the title as the file name (the paper uid, e.g. `13`) and leave the description empty: that is how
     the next step recognises a fresh upload and its paper.

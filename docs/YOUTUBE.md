@@ -8,6 +8,7 @@ The whole job, from the Google Form to the Live Database: [repeatable_workflows.
   - Downloads through the Google Drive API (`--uids` for only some papers).
 - Use [../scripts/police_videos.py](../scripts/police_videos.py) to monitor durations. 
 - Use [../scripts/time_stretch_videos.py](../scripts/time_stretch_videos.py)  
+  - Speeds up too-long videos and retimes their captions to match.
 
 ## Manually upload videos
 - YouTube studio account verification
