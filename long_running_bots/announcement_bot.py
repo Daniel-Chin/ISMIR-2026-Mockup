@@ -17,7 +17,7 @@
   The bot joins it by itself.
 
 Example CLI:
-    - `uv run python -m long_running_bots.announcement_bot --mockup `
+    - `uv run --env-file mockup.env python -m long_running_bots.announcement_bot --mockup`
     - `uv run python -m long_running_bots.announcement_bot --mockup --testing`
     - `uv run python -m long_running_bots.announcement_bot`
 
@@ -92,6 +92,7 @@ from dotenv import load_dotenv
 from zoneinfo import ZoneInfo
 
 from catalogue.build_catalogue import slack_channel_id
+from utils.deployment import check_deployment
 from utils.shared import load_conference_timezone_name
 
 ANNOUNCE_IN_ADVANCE = 10  # minutes
@@ -364,13 +365,13 @@ class StdoutSlackClient:
 
 
 def create_slack_client(is_mockup: bool = False) -> Any:
+    check_deployment(is_mockup)
     env_path = Path(".") / ".env"
     load_dotenv(dotenv_path=env_path)
-    token_env_var = ("MOCKUP_" if is_mockup else "") + BOT_TOKEN_ENV_VAR
-    token = os.environ.get(token_env_var, "").strip()
+    token = os.environ.get(BOT_TOKEN_ENV_VAR, "").strip()
     if not token:
         raise RuntimeError(
-            f"Missing {token_env_var} in environment or .env file."
+            f"Missing {BOT_TOKEN_ENV_VAR} in environment or .env file."
         )
     slack_sdk = importlib.import_module("slack_sdk")
     return slack_sdk.WebClient(token=token)
@@ -1270,7 +1271,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--mockup",
         action="store_true",
-        help="Use sitedata_mock and MOCKUP_SLACK_TOKEN_ANNOUNCEMENT_BOT.",
+        help="Use sitedata_mock. Requires mockup.env to be loaded.",
     )
     parser.add_argument(
         "--testing",

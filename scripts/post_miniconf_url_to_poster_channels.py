@@ -46,7 +46,7 @@ def find_posted_message_ts(channel_id: str, message: str) -> str | None:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--dry-run', action='store_true', help='Print messages without posting.')
-    parser.add_argument('--mockup', action='store_true', help='Use the MOCKUP_ Slack workspace.')
+    parser.add_argument('--mockup', action='store_true', help='Use the mockup workspace. Requires mockup.env to be loaded.')
     args = parser.parse_args()
 
     slack.configure_clients(is_mockup=args.mockup)

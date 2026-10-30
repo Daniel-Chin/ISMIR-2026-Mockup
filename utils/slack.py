@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 from slack_sdk.errors import SlackApiError
 from slack_sdk.http_retry.builtin_handlers import RateLimitErrorRetryHandler
 
+from utils.deployment import check_deployment
 from utils.shared import format_session_window, load_conference_timezone_name, load_site_config
 from utils.zoom_redirect import build_zoom_redirect_url, load_zoom_redirect_access_token
 
@@ -32,19 +33,17 @@ ssl_context = ssl.create_default_context(cafile=certifi.where())
 env_path = Path(".") / ".env"
 load_dotenv(dotenv_path=env_path)
 
-def configure_clients(is_mockup: bool = False) -> None:
-    """Select one workspace's credentials and discard workspace-specific caches.
+def _create_clients(is_mockup: bool) -> None:
+    """Build clients from the loaded env file's tokens and discard workspace-specific caches.
 
     Missing tokens stay empty, allowing local-only actions without credentials.
-    Mockup mode never falls back to live tokens.
     """
     global client_bot, client_user, _user_maps, _channel_maps, _workspace_url, ADD_HISTORY_PATH
-    prefix = "MOCKUP_" if is_mockup else ""
     client_bot = slack_sdk.WebClient(
-        token=os.environ.get(f"{prefix}SLACK_BOT_TOKEN", ""), ssl=ssl_context
+        token=os.environ.get("SLACK_BOT_TOKEN", ""), ssl=ssl_context
     )
     client_user = slack_sdk.WebClient(
-        token=os.environ.get(f"{prefix}SLACK_USER_TOKEN", ""), ssl=ssl_context
+        token=os.environ.get("SLACK_USER_TOKEN", ""), ssl=ssl_context
     )
     for client in (client_bot, client_user):
         client.retry_handlers.append(RateLimitErrorRetryHandler(max_retry_count=5))
@@ -54,7 +53,13 @@ def configure_clients(is_mockup: bool = False) -> None:
     ADD_HISTORY_PATH = Path(f"tmp/channel_add_history{'_mockup' if is_mockup else ''}.json")
 
 
-configure_clients()
+def configure_clients(is_mockup: bool = False) -> None:
+    """Rebuild clients, exiting unless the loaded env file agrees with `is_mockup`."""
+    check_deployment(is_mockup)
+    _create_clients(is_mockup)
+
+
+_create_clients(is_mockup=False)
 
 
 def getWorkspaceURL() -> str:

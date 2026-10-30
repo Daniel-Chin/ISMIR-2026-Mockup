@@ -23,8 +23,8 @@ Run with Python 3.12
 
 ## Paper Slack Channel Setup
 
-For mockup runs, add `--mockup` to prep commands; these
-use `MOCKUP_SLACK_BOT_TOKEN` and `MOCKUP_SLACK_USER_TOKEN` from `.env`.
+Slack tokens come from the env file: run with `uv run --env-file real.env ...`, or for
+mockup runs `uv run --env-file mockup.env ...` and add `--mockup` to prep commands.
 
 See [docs/SLACK.md](docs/SLACK.md) for the full pipeline (app/token setup, what each step does, idempotence, troubleshooting). Short version:
 

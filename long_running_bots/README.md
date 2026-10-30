@@ -2,7 +2,7 @@
 ```fish
 tmux new -s anno_bot
 systemd-inhibit --what=sleep --why='announcement bot' \
-    uv run python -m long_running_bots.announcement_bot --mockup
+    uv run --env-file mockup.env python -m long_running_bots.announcement_bot --mockup
 # interact...
 # ctrl-B D
 tmux new -s self_s_bot
@@ -71,8 +71,8 @@ bash tmp/cut.sh   # outputs "tmp/event_videos/{date} {title}.mp4"
 ## Notes
 For ISMIR2026, Daniel Chin is in charge of keeping the process running, by keeping his home desktop always on, and opening ssh for maintenance.  
 
-The announcement bot uses `SLACK_TOKEN_ANNOUNCEMENT_BOT` by default and
-`MOCKUP_SLACK_TOKEN_ANNOUNCEMENT_BOT` with `--mockup`. Set both in `.env`.
+The announcement bot uses `SLACK_TOKEN_ANNOUNCEMENT_BOT` from the loaded env file:
+`real.env`, or `mockup.env` with `--mockup`. It exits if the two disagree.
 The self-service bot uses its separate `SLACK_BOT_TOKEN_SELF_SERVICE` and
 `SLACK_APP_TOKEN_SELF_SERVICE` credentials; it has no mockup or path flags.
 
