@@ -36,6 +36,11 @@ def parse_timestamp(value: str) -> datetime:
     raise ValueError(f'Unknown timestamp format: {value!r}')
 
 
+def squeezed(text: str) -> str:
+    """For comparing a sheet cell with a submission: a paste into the sheet can change the whitespace."""
+    return ' '.join(text.split())
+
+
 def parse_optional_text(value: str) -> str | None:
     return value or None
 
@@ -182,9 +187,9 @@ def write_into_sitedata(papers: dict[int, AuthorUploadedMaterials], history: His
                 for name, index in output_columns.items():
                     value = getattr(materials, name)
                     existing = row[index].strip()
-                    if value is None or existing == value:
+                    if value is None or squeezed(existing) == squeezed(value):
                         continue
-                    if not existing or existing in history[paper_id].get(name, ()):
+                    if not existing or squeezed(existing) in map(squeezed, history[paper_id].get(name, ())):
                         changes.append(CellChange(str(paper_id), output_map[name], row[index], value))
                         row[index] = value
                     else:

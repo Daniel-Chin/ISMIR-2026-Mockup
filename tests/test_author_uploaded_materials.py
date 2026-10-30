@@ -149,3 +149,21 @@ def test_unexpected_rows(tmp_path, rows):
 #             datetime(2026, 10, 6, 9), 3, 'poster', 'thumbnail', 'video', 'captions', None,
 #         )})
 #     assert path.read_bytes() == original
+
+
+def test_whitespace_differences_are_not_manual_edits(tmp_path, monkeypatch, capsys):
+    output = tmp_path / 'papers.csv'
+    output.write_text('uid,fun_facts\n1,"Old\n facts"\n2,"Same\n facts"\n3,Edited by hand\n', encoding='utf-8')
+    monkeypatch.setattr(parser, 'OUTPUT_PATH', str(output))
+    material = dict(timestamp=datetime(2026, 10, 30), poster_url='p', thumbnail_url='t', video_url='v', captions_url='c')
+    papers = {
+        1: AuthorUploadedMaterials(paper_id=1, fun_facts='New facts', **material),
+        2: AuthorUploadedMaterials(paper_id=2, fun_facts='Same\nfacts', **material),
+        3: AuthorUploadedMaterials(paper_id=3, fun_facts='Submitted', **material),
+    }
+    history = {1: {'fun_facts': {'Old\nfacts', 'New facts'}}, 2: {'fun_facts': {'Same\nfacts'}}, 3: {'fun_facts': {'Submitted'}}}
+    changes = parser.write_into_sitedata(papers, history)
+    assert [(c.uid, c.column, c.after) for c in changes if c.column == 'fun_facts'] == [('1', 'fun_facts', 'New facts')]
+    assert 'keeping manual value' in capsys.readouterr().out  # paper 3 only
+    with output.open(newline='', encoding='utf-8') as source:
+        assert [row['fun_facts'] for row in csv.DictReader(source)] == ['New facts', 'Same\n facts', 'Edited by hand']
