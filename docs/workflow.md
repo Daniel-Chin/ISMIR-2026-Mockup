@@ -85,7 +85,7 @@ are cached between runs (see below).
 To build the static site locally into `build/` (add `--mockup` to each command for `sitedata_mock/`):
 
 ```bash
-uv run python pull_from_google_sheet.py
+uv run --env-file real.env python pull_from_google_sheet.py
 uv run python scripts/download_paper_thumbnails.py
 uv run python main.py --build
 ```
@@ -199,17 +199,11 @@ Zoom and the catalogue use `session_assignment.csv` for paper day, session, and 
 
 ### Importing fresh data
 
-`python pull_from_google_sheet.py` pulls CSVs from the master **Google Sheet** (requires env vars `*_SHEET_URL`):
+`python pull_from_google_sheet.py` pulls CSVs from the master **Google Sheet** (requires env vars `*_SHEET_URL` from `real.env` or `mockup.env`, whose `DEPLOYMENT` must match `--mockup`):
 
 ```bash
-export INDUSTRY_SHEET_URL="https://docs.google.com/spreadsheets/d/<sheet-id>/edit?gid=<tab-gid>#gid=<tab-gid>"
-export PAPERS_SHEET_URL=...
-export EVENTS_SHEET_URL=...
-export MUSIC_SHEET_URL=...
-export LBDS_SHEET_URL=...
-export SESSION_ASSIGNMENT_SHEET_URL=...
-
-python pull_from_google_sheet.py
+uv run --env-file real.env python pull_from_google_sheet.py
+uv run --env-file mockup.env python pull_from_google_sheet.py --mockup
 
 # Then rebuild the calendar:
 python scripts/calendar_csv2ics.py

@@ -94,8 +94,9 @@ pre-filled with the mock data and real Drive media links (`raw_* = open?id=...`)
 with 5 tabs; the mock uses 5 single-tab sheets because they were created via
 the Drive API, which can't add tabs — the CSV-export mechanism is identical.
 
-**`python pull_from_google_sheet.py --mockup`** pulls all five sheets into
-`sitedata_mock/*.csv` via unauthenticated export URLs and rebuilds the calendar.
+**`uv run --env-file mockup.env python pull_from_google_sheet.py --mockup`** pulls the sheets named by the
+`*_SHEET_URL` env vars in `mockup.env` (same names as `real.env`; tab URLs
+with a `gid`) into `sitedata_mock/*.csv` via unauthenticated export URLs and rebuilds the calendar.
 Verified end-to-end: edit sheet → `python pull_from_google_sheet.py --mockup`
 → `python main.py --mockup` → poster pages embed the Drive PDFs.
 
@@ -201,7 +202,7 @@ room-less meetings. Caveat: free Zoom accounts cap meetings at 40 min.
 
 ### 4. Run the 3 hours
 
-- T-0:15 — start site (or run the `Refresh website` workflow with `mockup`), post welcome in Slack `#general`.
+- T-0:15 — start site (or run the `Refresh website` workflow in the mockup repo), post welcome in Slack `#general`.
 - 18:10 — run the mock tutorial and verify its page and private Slack channel.
 - 18:30 — open the Oral Session Zoom from the calendar's `live_url`.
 - 19:00 — poster session: Q&A happens in the per-paper channels (`p1-1-…` … `p1-6-…`).
