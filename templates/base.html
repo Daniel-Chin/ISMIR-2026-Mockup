@@ -154,7 +154,9 @@
             {% set experimental_features = ['Live Overview', 'Warm-up Discussion'] %}
             {% for href, id in navigation_bar %}
             <li class="nav-item {% if id == active_page %}active{% endif %}">
-              {% if href.startswith('http') %}
+              {% if not href %}
+              <a class="nav-link" href="#" onclick="alert('Sorry, not supported for mockup.'); return false;">{{id}}</a>
+              {% elif href.startswith('http') %}
               <a class="nav-link" href="{{href}}" target="_blank" rel="noopener noreferrer">{% if id in experimental_features %}<img class="nav-lab-icon" src="static/images/experimental.svg" alt=""><span class="sr-only">Experimental: </span>{% endif %}{{id}}</a>
               {% else %}
               <a class="nav-link" href="{{href}}">{% if id in experimental_features %}<img class="nav-lab-icon" src="static/images/experimental.svg" alt=""><span class="sr-only">Experimental: </span>{% endif %}{{id}}</a>
