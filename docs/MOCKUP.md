@@ -134,8 +134,8 @@ node scripts/smoke.mjs https://live-api-mock.liweilin.org https://daniel-chin.gi
 ```
 
 1. In the mockup repository, set the `LIVE_OVERVIEW_ADMIN_KEY` Actions secret to the mock `ADMIN_KEY`. Its
-   build then pushes the mock schedule to this backend; `build_miniconf.py` refuses to push mock data to the
-   production backend.
+   build then pushes the mock schedule to this backend, despite the warnings a small program always raises;
+   `build_miniconf.py` refuses to push mock data to the production backend.
 2. Create a separate Zoom App from `live_overview/observer_config/ISMIR2026 Mock Observer v1.json`. Don't
    repoint a production app: it would cut off the production Observers.
 3. On `https://live-api-mock.liweilin.org/admin.html`, configure the app as `v1` with origin

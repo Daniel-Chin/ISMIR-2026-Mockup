@@ -10,7 +10,7 @@ How Live Overview fits into the miniconf build. In this document `.` is the repo
   - Uses event start and end times to poll only meetings that are live, decides each event's `live`/`upcoming`/`history` status, keeps peak headcounts after an event ends, and runs the test clock (set on its own `admin.html`; every page then shows that time).
   - Production: the Worker at `live_overview_api` in `config.yml`. `LIVE_OVERVIEW_API_ORIGIN` (or `--api-origin`) overrides it.
 - **Easter egg sign-in**: the hidden piano's finders list and Slack sign-in use the Warm-up Discussion's backend (`warmup_api` in `config.yml`, see `./preconf/integration.md`). The page has no Sign in button; the egg's message offers it.
-  - Schedule push: `build.sh` uploads the full schedule, raw `live_url`s included, via `/api/admin/import`. This happens only when `LIVE_OVERVIEW_ADMIN_KEY` is set and there are no sheet problems, and it is skipped when nothing changed. `./sitedata` goes to the production backend; `--mockup` goes to the rehearsal backend and refuses the production one. The push isn't ideal, but we keep it while the backend lives outside the repo.
+  - Schedule push: `build.sh` uploads the full schedule, raw `live_url`s included, via `/api/admin/import`. This happens only when `LIVE_OVERVIEW_ADMIN_KEY` is set and there are no sheet problems, and it is skipped when nothing changed. `./sitedata` goes to the production backend, sheet problems blocking it; `--mockup` goes to the rehearsal backend, whatever its problems, and refuses the production one. The push isn't ideal, but we keep it while the backend lives outside the repo.
 
 ## URLs
 - `prefix` = `miniconf_url` in `config.yml` (`https://ismir2026program.ismir.net` or `https://daniel-chin.github.io/ISMIR2026-Kit`).

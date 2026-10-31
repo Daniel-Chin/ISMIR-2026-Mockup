@@ -204,7 +204,8 @@ def main():
     blocker = sync_blocker(args.mockup, args.data, args.api_origin, key)
     if blocker:
         print(f'Live Overview: backend sync skipped ({blocker})')
-    elif problems:
+    # The mock program is a small cut of the real sheets, which always leaves sheet problems.
+    elif problems and not args.mockup:
         warn('backend sync skipped: fix the sheet problems above; the backend keeps its last good schedule')
     else:
         try:
