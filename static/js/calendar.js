@@ -230,7 +230,8 @@ function make_cal(name) {
                 cal.setDate(firstDay);
                 cal.on('clickSchedule', e => {
                     const s = e.schedule;
-                    if (s.location.length > 0) window.open(s.location, '_self');
+                    const newTab = e.event.ctrlKey || e.event.metaKey;
+                    if (s.location.length > 0) window.open(s.location, newTab ? '_blank' : '_self');
                 });
             });
 
@@ -257,7 +258,7 @@ function make_cal(name) {
                               $(`#tab-${location[1]} #day .${location[location.length - 1]}`)[0].scrollIntoView();
                               $('html')[0].scrollTop -= 150;
                             } else {
-                              window.open(s.location, '_blanket');
+                              window.open(s.location, '_blank');
                             }
                         }
                     });
