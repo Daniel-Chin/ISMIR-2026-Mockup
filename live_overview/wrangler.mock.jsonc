@@ -1,0 +1,45 @@
+{
+  // The rehearsal backend: the same code as production, with its own Worker and Durable Object, so
+  // nothing done in a rehearsal reaches the production schedule, Zoom grants or counts.
+  // npx wrangler deploy -c wrangler.mock.jsonc
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ismir-backend-mock",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "routes": [{ "pattern": "live-api-mock.liweilin.org", "custom_domain": true }],
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "html_handling": "none"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CONFERENCE",
+        "class_name": "Conference"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "Conference"
+      ]
+    }
+  ],
+  "vars": {
+    "PUBLIC_VIEW_ORIGINS": "https://daniel-chin.github.io",
+    "ALLOW_DEBUG_CLOCK": "1",
+    "ALLOW_LEGACY_OBSERVER": "0",
+    "MAX_PUBLIC_WS_CLIENTS": "1500"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

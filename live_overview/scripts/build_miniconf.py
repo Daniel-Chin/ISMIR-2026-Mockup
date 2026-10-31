@@ -118,6 +118,18 @@ def sync_backend(schedule, api_origin, key):
     print(f"Live Overview: backend schedule updated ({result.get('events')} events)")
 
 
+def sync_blocker(mockup, explicit_data, api_origin, key):
+    """Why this build must not push its schedule to api_origin, or None.
+    Mock data goes to the rehearsal backend (wrangler.mock.jsonc), never to the production one."""
+    if explicit_data:
+        return 'not production data'
+    if not key:
+        return 'no LIVE_OVERVIEW_ADMIN_KEY'
+    if mockup and api_origin == read_config(REPO / 'sitedata' / 'config.yml')['live_overview_api']:
+        return 'mock data, and this is the production backend'
+    return None
+
+
 def debug_page(page):
     """live.html -> live-debug.html: the same page, marked as the debug channel (features.js).
 
@@ -167,7 +179,7 @@ def write_site(out, api_origin, conf, schedule):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--mockup', action='store_true', help='Read ../sitedata_mock instead of ../sitedata (never syncs the backend)')
+    parser.add_argument('--mockup', action='store_true', help='Read ../sitedata_mock instead of ../sitedata')
     parser.add_argument('--data', help='Explicit data_path (overrides --mockup; never syncs the backend)')
     parser.add_argument('--out', default=str(ROOT / 'build'))
     parser.add_argument('--api-origin', help='Backend origin (default: $LIVE_OVERVIEW_API_ORIGIN, else live_overview_api in config.yml)')
@@ -187,10 +199,11 @@ def main():
     write_site(Path(args.out).resolve(), args.api_origin, conf, schedule)
     print(f"Live Overview: {len(schedule['events'])} events from {data_path} -> {args.out}")
 
-    # Only the production sheets may replace the live backend schedule.
+    # Each deployment syncs its own backend: production sheets to production, mock sheets to the mock.
     key = os.environ.get('LIVE_OVERVIEW_ADMIN_KEY', '').strip()
-    if args.mockup or args.data or not key:
-        print('Live Overview: backend sync skipped (' + ('not production data' if key else 'no LIVE_OVERVIEW_ADMIN_KEY') + ')')
+    blocker = sync_blocker(args.mockup, args.data, args.api_origin, key)
+    if blocker:
+        print(f'Live Overview: backend sync skipped ({blocker})')
     elif problems:
         warn('backend sync skipped: fix the sheet problems above; the backend keeps its last good schedule')
     else:

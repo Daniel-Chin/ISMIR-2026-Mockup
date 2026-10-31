@@ -70,7 +70,9 @@ jobs:
         run: uv run python main.py $MOCKUP_FLAG --build
 
       # Sheet problems only produce warnings; a Live Overview failure never blocks miniconf.
-      # The admin key is exposed to this step only; mockup runs never sync the backend.
+      # The admin key is exposed to this step only. Each deployment holds its own backend's key:
+      # the mockup repository's is the rehearsal backend's, and build_miniconf.py refuses to push
+      # mock data to the production backend.
       - name: Build Live Overview
         continue-on-error: true
         working-directory: live_overview

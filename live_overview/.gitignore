@@ -35,6 +35,7 @@ scripts/*.mjs
 scripts/migrate_server.py
 test/*
 !test/test_schedule.py
+!test/test_sync_blocker.py
 
 # uv env (install.sh)
 .venv/
