@@ -171,8 +171,15 @@ function make_cal(name) {
                 return [start, new start.constructor(start).addDate(numDays - 1)];
             };
 
-            const timeTemplate = schedule => '<strong>'
-                + moment(schedule.raw.wallStart).format('HH:mm') + '</strong> ' + eventTitle(schedule);
+            const isTabLocation = location => location.split("-")[0] === 'tab';
+            // A real link, so the browser handles ctrl-click, middle-click and the context menu.
+            const timeTemplate = schedule => {
+                const caption = '<strong>' + moment(schedule.raw.wallStart).format('HH:mm')
+                    + '</strong> ' + eventTitle(schedule);
+                const location = schedule.location;
+                return location.length > 0 && !isTabLocation(location)
+                    ? `<a class="calendar-event-link" href="${location}">${caption}</a>` : caption;
+            };
 
             // One calendar instance per hour range, stacked with a zig-zag break between.
             const addCalendars = (parent, id, evs, options, setup) => {
@@ -228,11 +235,6 @@ function make_cal(name) {
                 },
             }, cal => {
                 cal.setDate(firstDay);
-                cal.on('clickSchedule', e => {
-                    const s = e.schedule;
-                    const newTab = e.event.ctrlKey || e.event.metaKey;
-                    if (s.location.length > 0) window.open(s.location, newTab ? '_blank' : '_self');
-                });
             });
 
             const c_sm = d3.select('#calendar_small');
@@ -251,15 +253,11 @@ function make_cal(name) {
                     cal.setDate(day);
                     cal.on('clickSchedule', e => {
                         const s = e.schedule;
-                        if (s.location.length > 0) {
-                            if (s.location.split("-")[0] === 'tab') {
-                              var location = s.location.split("|");
-                              $('.nav-pills .nav-item .nav-link').eq(location[1]).trigger('click');
-                              $(`#tab-${location[1]} #day .${location[location.length - 1]}`)[0].scrollIntoView();
-                              $('html')[0].scrollTop -= 150;
-                            } else {
-                              window.open(s.location, '_blank');
-                            }
+                        if (isTabLocation(s.location)) {
+                            var location = s.location.split("|");
+                            $('.nav-pills .nav-item .nav-link').eq(location[1]).trigger('click');
+                            $(`#tab-${location[1]} #day .${location[location.length - 1]}`)[0].scrollIntoView();
+                            $('html')[0].scrollTop -= 150;
                         }
                     });
                 });
