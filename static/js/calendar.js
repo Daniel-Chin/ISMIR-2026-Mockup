@@ -150,6 +150,16 @@ function make_cal(name) {
                 el.style.height = (el.offsetHeight + overflow) + 'px';
                 render(cal, container);
             };
+            // tui.Calendar pins a current-time line outside the hour range to the grid's edge, and
+            // rewrites the line's top on every render and minute tick.
+            const hideOutOfRangeHourMarkers = container => {
+                new MutationObserver(() => {
+                    $(container + ' .tui-full-calendar-timegrid-hourmarker').each((_, marker) => {
+                        const display = ['0%', '100%'].includes(marker.style.top) ? 'none' : '';
+                        if (marker.style.display !== display) marker.style.display = display;
+                    });
+                }).observe($(container)[0], { subtree: true, childList: true, attributes: true, attributeFilter: ['style'] });
+            };
             const Calendar = tui.Calendar;
             // tui.Calendar v1 weeks are always 7 days; show only the days with events.
             const firstDay = moment(d3.min(events, e => e.start)).startOf('day').toDate();
@@ -184,6 +194,7 @@ function make_cal(name) {
                     cal.createSchedules(events);
                     const cols = config.calendar.colors;
                     if (cols) cal.setCalendars(Object.keys(cols).map(k => calendarStyle(k, cols[k])));
+                    hideOutOfRangeHourMarkers(container);
                     all_cals.push([cal, container]);
                 });
             };
