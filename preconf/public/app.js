@@ -394,7 +394,7 @@ const paperWallSpec = program => ({
 });
 const lbdWallSpec = program => ({
   // A taller title band: a topic's whole theme, in large type, up to four lines.
-  prefix: 'lbd', rows: 'fit', head: program.lbdGroups?.length ? 460 : undefined,
+  prefix: 'lbd', rows: 'fit', evenRows: true, head: program.lbdGroups?.length ? 460 : undefined,
   groups: program.lbdGroups?.length
     ? program.lbdGroups.map(g => ({ id: 'LBD-' + g.id, group: g.id, theme: g.theme, channelUrl: g.channelUrl, slackChannel: g.slackChannel, uids: g.lbds }))
     : [{ id: 'LBD', group: '', uids: program.lbds.map(l => l.uid) }],

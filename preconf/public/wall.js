@@ -26,6 +26,8 @@ const SLOT_GAP = 20;
  *   groups  its areas in order: { id, uids, ...anything regionHead needs }, e.g. one per session
  *   rows    rows of papers in each area: a number, or 'fit' for whatever fills the screen best
  *   head    optional: the height of each area's title band (default REGION_HEAD)
+ *   evenRows optional: only as many areas per row as share them out evenly over some number of
+ *           rows, so that 7 areas are 4+3, 3+3+1 or 2+2+2+1, and never a crowded 6+1 or 5+2
  */
 
 /**
@@ -66,8 +68,10 @@ export function buildWallLayout(spec, aspect = 2.2) {
   const groups = spec.groups.filter(g => g.uids.length);
   const most = Math.max(1, ...groups.map(g => g.uids.length));
   const rowChoices = spec.rows === 'fit' ? Array.from({ length: most }, (_, i) => i + 1) : [spec.rows || PAPER_ROWS];
+  const areas = Math.max(1, groups.length);
+  const perRowChoices = Array.from({ length: areas }, (_, i) => (spec.evenRows ? Math.ceil(areas / (i + 1)) : i + 1));
   let best = null;
-  for (let perRow = 1; perRow <= Math.max(1, groups.length); perRow++) {
+  for (const perRow of new Set(perRowChoices)) {
     for (const rows of rowChoices) {
       const layout = placeWall(spec, perRow, rows);
       const miss = Math.abs(Math.log(layout.W / layout.H) - Math.log(aspect));
