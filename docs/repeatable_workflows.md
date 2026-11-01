@@ -4,7 +4,8 @@ Nothing is pasted by hand. Every step that changes the Live Database or YouTube 
 first and writes only after you answer `y`.
 
 One-time setup:
-- `.env`:
+- `real.env` (gitignored; `.env` is still read by the scripts that call Google):
+  - `DEPLOYMENT=real`: the pull below refuses to run without it.
   - `PAPERS_SHEET_URL`: the papers tab URL, with its `gid`.
   - `SESSION_ASSIGNMENT_SHEET_URL`: the session matrix ("Session to Papers" tab of the schedule sheet), not the
     pointer tab in the Live Database. YouTube titles (`P{session}-{position} …`) come from it.
@@ -21,7 +22,7 @@ Steps:
 - `git pull`
 - Go to "Upload your presentation materials for ISMIR2026"
 - Download csv to any `$csv_path` (e.g. `local/`, which git ignores)
-- `uv run python pull_from_google_sheet.py`
+- `uv run --env-file real.env python pull_from_google_sheet.py`
   - Always, right before parsing: the parser tells a manual edit from an earlier submission by comparing with
     `sitedata/papers.csv`.
 - `uv run python -m scripts.parse_google_form_author_uploaded_materials --input $csv_path`
