@@ -203,17 +203,19 @@ def read_lbd_groups(sd, lbds):
 def read_lbds(sd, miniconf):
     """All LBDs, in programme order (position, else CMT id). They share one session, so they are not grouped.
 
-    Boards and links use the CMT id (uid), as the miniconf's lbd_<uid>.html pages do.
+    Boards and links use the CMT id (uid), as the miniconf's lbd_<uid>.html pages do. MIREX entries,
+    which have no CMT id, are m<n>, after the LBDs.
     """
     path = sd / "lbds.csv"
     if not path.is_file():
         return []
     with open(path, encoding="utf-8", newline="") as f:
-        rows = [r for r in csv.DictReader(f) if re.fullmatch(r"\d{1,6}", (r.get("uid") or "").strip())]
+        rows = [r for r in csv.DictReader(f) if re.fullmatch(r"m?\d{1,6}", (r.get("uid") or "").strip())]
 
     def order(r):
         pos = (r.get("position") or "").strip()
-        return (int(pos) if pos.isdigit() else 10**9, int(r["uid"]))
+        uid = r["uid"].strip()
+        return (int(pos) if pos.isdigit() else 10**9, uid.startswith("m"), int(uid.lstrip("m")))
     lbds = []
     for r in sorted(rows, key=order):
         uid = r["uid"].strip()
