@@ -266,7 +266,7 @@ const card_image = (openreview, show) => {
 }
 
 const card_detail = (openreview, show) => {
-    if (show)
+    if (show && openreview.content.TLDR.trim())
         return `
      <div class="pp-card-header">
         <p class="card-text"> ${openreview.content.TLDR}</p>`
