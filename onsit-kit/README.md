@@ -68,11 +68,11 @@ time is set per screen, and all screens end around 16:59.
 | Screen | Topic | Plays | Poster | Timetable | Total |
 |---|---|---:|---:|---:|---:|
 | 1 | Music Generation (+682) | 28 | 26 s | 8 s | 118.7 min |
-| 2 | Performance Analysis | 26 | 45 s | 8 s | 118.8 min |
+| 2 | Performance Analysis (+669) | 26 | 45 s | 8 s | 118.8 min |
 | 3 | Symbolic / Notation (+610) | 26 | 19 s | 8 s | 118.7 min |
 | 4 | Representations / Retrieval | 26 | 22 s | 8 s | 118.8 min |
 | 5 | Audio Synthesis / Production (−610, −682) | 24 | 25 s | 8 s | 118.8 min |
-| 6 | Human-Centered MIR | 26 | 15 s | 8 s | 118.8 min |
+| 6 | Human-Centered MIR (−669) | 26 | 15 s | 8 s | 118.8 min |
 | 7 | MIREX | 33 | none | 5 s | 119.2 min |
 
 Every LBD plays once in uid order, then the rest of the plays repeat some of them. The default plans are

@@ -35,5 +35,9 @@ const Kit = {
     const pages = [['index.html', 'Links'], ['posters.html', 'Poster sessions'], ['lbd.html', 'LBD screens'], ['materials.html', 'Materials']];
     document.getElementById('nav').innerHTML = '<b>ISMIR 2026 onsite</b>' + pages.map(([href, label]) =>
       `<a href="${href}"${href === active ? ' class="active"' : ''}>${label}</a>`).join('');
+    if (location.protocol === 'file:') {
+      document.querySelector('main').insertAdjacentHTML('afterbegin',
+        '<div class="notice">This page needs the kit: run python3 onsit-kit/serve.py, then open http://127.0.0.1:8765</div>');
+    }
   },
 };
