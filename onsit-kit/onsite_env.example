@@ -1,0 +1,10 @@
+# Template of .onsite_env. make_env.py copies it, then fills everything under the GENERATED line.
+# Keep it private: it ends up holding every link. The repo is public.
+
+# The camera-ready Drive folders, shared by link:
+DRIVE_FOLDER_LBD=https://drive.google.com/drive/folders/example-LBD-folder
+DRIVE_FOLDER_MIREX=https://drive.google.com/drive/folders/example-MIREX-folder
+
+# Extra rows for the links table:
+#   LINK_<anything>=group | name | url | description
+# LINK_WIFI=Venue | Wi-Fi portal | https://example.com | Conference Wi-Fi sign-in

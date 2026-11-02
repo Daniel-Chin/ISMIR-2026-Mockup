@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Onsite kit: poster sessions</title>
+  <link rel="stylesheet" href="kit.css">
+</head>
+<body>
+  <nav id="nav"></nav>
+  <main>
+    <span class="clock" id="clock"></span>
+    <h1>Poster sessions</h1>
+    <div id="sessions"></div>
+  </main>
+  <script src="kit.js"></script>
+  <script>
+    Kit.nav('posters.html');
+    let info;
+    function render() {
+      const now = Date.now();
+      document.getElementById('clock').textContent = `Venue time ${Kit.clock(now, info.timezone, true)}`;
+      const sessions = info.poster_sessions.map((session) => ({
+        ...session, startMs: Date.parse(session.start), endMs: Date.parse(session.end),
+      }));
+      const next = sessions.find((session) => session.startMs > now);
+      document.getElementById('sessions').innerHTML = sessions.map((session) => {
+        const live = session.startMs <= now && now < session.endMs;
+        const state = live ? 'live' : session === next ? 'next' : session.endMs <= now ? 'past' : '';
+        return `<div class="session ${state}">
+          <div>${Kit.clock(session.startMs, info.timezone, true)}–${Kit.clock(session.endMs, info.timezone)}</div>
+          <div><b>${Kit.esc(session.title)}</b>
+            ${live ? '<span class="badge">LIVE</span>' : session === next ? '<span class="badge">NEXT</span>' : ''}
+            <div class="soft">${Kit.esc(session.location)}</div></div>
+          <div class="nowrap">
+            <a class="button primary" href="${Kit.esc(session.zoom)}" target="_blank" rel="noreferrer">Zoom</a>
+            <a class="button" href="${Kit.esc(session.slack)}" target="_blank" rel="noreferrer">Slack</a>
+            <a class="button" href="${Kit.esc(session.miniconf)}" target="_blank" rel="noreferrer">Miniconf</a>
+          </div></div>`;
+      }).join('');
+    }
+    Kit.get('/api/info').then((data) => {
+      info = data;
+      render();
+      setInterval(render, 30000);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Onsite kit: materials</title>
+  <link rel="stylesheet" href="kit.css">
+</head>
+<body>
+  <nav id="nav"></nav>
+  <main>
+    <div id="notice"></div>
+    <h1>LBD and MIREX materials</h1>
+    <div class="bar">
+      <button id="check" class="primary">Check Drive for updates</button>
+      <span id="summary"></span>
+    </div>
+    <div class="bar" id="job" hidden>
+      <div class="meter"><div id="meter"></div></div>
+      <span id="job-text"></span>
+      <button id="cancel">Cancel</button>
+      <div id="failed" class="warn"></div>
+    </div>
+    <div class="bar">
+      <button id="select-update">Select everything to update</button>
+      <button id="select-all">Select all shown</button>
+      <button id="select-none">Clear</button>
+      <label>Search <input id="search" size="20" placeholder="uid or title"></label>
+      <label>Screen <select id="screen"><option value="">All</option></select></label>
+      <label><input type="checkbox" id="only-update"> Only what needs updating</label>
+    </div>
+    <div class="soft legend">
+      <span class="current">✓ up to date</span>
+      <span class="changed">↻ changed on Drive</span>
+      <span class="missing">↓ not downloaded</span>
+      · tick any file to download it again · click a column title to tick that column
+    </div>
+    <table id="files"></table>
+  </main>
+  <div class="dock"><span id="selected"></span><button id="download" class="primary">Download selected</button></div>
+  <script src="kit.js"></script>
+  <script src="materials.js"></script>
+</body>
+</html>

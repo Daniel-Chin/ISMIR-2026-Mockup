@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Onsite kit: links</title>
+  <link rel="stylesheet" href="kit.css">
+</head>
+<body>
+  <nav id="nav"></nav>
+  <main>
+    <div id="notice"></div>
+    <div id="links"></div>
+  </main>
+  <script src="kit.js"></script>
+  <script>
+    Kit.nav('index.html');
+    Kit.get('/api/info').then((info) => {
+      if (!info.env_found) {
+        document.getElementById('notice').innerHTML =
+          '<div class="notice">onsit-kit/.onsite_env is missing: see README.md.</div>';
+      }
+      const groups = [...new Set(info.links.map((link) => link.group))];
+      document.getElementById('links').innerHTML = groups.map((group) => `<h2>${Kit.esc(group)}</h2>
+        <table>${info.links.filter((link) => link.group === group).map((link) => `<tr>
+          <td style="width:230px"><a href="${Kit.esc(link.url)}" target="_blank" rel="noreferrer">${Kit.esc(link.name)}</a></td>
+          <td class="soft">${Kit.esc(link.description)}</td>
+        </tr>`).join('')}</table>`).join('');
+    });
+  </script>
+</body>
+</html>

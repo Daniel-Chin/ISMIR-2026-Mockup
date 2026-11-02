@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Onsite kit: LBD screens</title>
+  <link rel="stylesheet" href="kit.css">
+</head>
+<body>
+  <nav id="nav"></nav>
+  <main>
+    <h1>LBD screens</h1>
+    <table id="screens"></table>
+    <p class="soft">Missing files? Get them on the <a href="materials.html">Materials</a> page.</p>
+  </main>
+  <script src="kit.js"></script>
+  <script>
+    Kit.nav('lbd.html');
+    Kit.get('/api/lbd').then((screens) => {
+      const missing = (count, what) => (count ? `<span class="warn">${count} ${what} missing</span>` : '');
+      document.getElementById('screens').innerHTML =
+        '<tr><th>Screen</th><th>Topic</th><th>Plays</th><th>Poster</th><th>Media on this MacBook</th><th></th></tr>' +
+        screens.map((screen) => `<tr>
+          <td><b>${screen.screen}</b></td>
+          <td>${Kit.esc(screen.name)}</td>
+          <td>${screen.plays}</td>
+          <td>${screen.poster_s ? `${screen.poster_s} s` : 'none'}</td>
+          <td>${[missing(screen.missing_videos, 'videos'), missing(screen.missing_posters, 'posters')].filter(Boolean).join(', ') || 'complete'}</td>
+          <td class="actions">
+            <a class="button primary" href="lbd-play.html?screen=${screen.screen}">Play</a>
+            <a class="button" href="lbd-manage.html?screen=${screen.screen}">Manage</a>
+          </td></tr>`).join('');
+    });
+  </script>
+</body>
+</html>

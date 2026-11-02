@@ -1,0 +1,5 @@
+# Links and paper media: copied to each MacBook, never committed (this repo is public).
+.onsite_env
+media/
+.state/
+__pycache__/

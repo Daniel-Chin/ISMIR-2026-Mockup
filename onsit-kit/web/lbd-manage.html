@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>LBD schedule</title>
+  <link rel="stylesheet" href="kit.css">
+</head>
+<body>
+  <nav id="nav"></nav>
+  <main>
+    <div id="notice"></div>
+    <span class="clock" id="clock"></span>
+    <h1 id="title"></h1>
+    <div class="bar">
+      <label>Screen <select id="screen"></select></label>
+      <a class="button primary" id="play" target="lbd-player">Open player</a>
+      <span id="summary"></span>
+    </div>
+    <div class="bar">
+      <label>Start (venue time) <input type="datetime-local" id="start"></label>
+      <button id="set-start">Set start</button>
+      <button id="start-now">Play from the beginning now</button>
+      <button id="start-default">Back to the scheduled start</button>
+    </div>
+    <div class="bar">
+      <label>Poster, seconds <input type="number" min="0" id="poster-s"></label>
+      <label>Timetable, seconds <input type="number" min="0" id="timetable-s"></label>
+      <button id="fit">Fit posters to the slot</button>
+      <label>Add <input id="add" list="papers" size="44" placeholder="uid or title"></label>
+      <datalist id="papers"></datalist>
+      <button id="add-next">Play next</button>
+      <button id="add-end">At the end</button>
+      <button id="reset">Reset to default plan</button>
+    </div>
+    <table id="plays"></table>
+  </main>
+  <script src="kit.js"></script>
+  <script src="lbd-timeline.js"></script>
+  <script>
+    Kit.nav('lbd.html');
+    const screen_ = new URLSearchParams(location.search).get('screen') || '1';
+    const SCREENS = ['1', '2', '3', '4', '5', '6', '7'];
+    const $ = (id) => document.getElementById(id);
+    let plan;
+
+    const fail = (error) => { $('notice').innerHTML = `<div class="notice">${Kit.esc(error.message)}</div>`; };
+
+    async function load() {
+      plan = await Kit.get(`/api/lbd/${screen_}`);
+      if (!$('papers').children.length) {
+        $('papers').innerHTML = Object.entries(plan.papers).map(([uid, paper]) =>
+          `<option value="${Kit.esc(uid)}">${Kit.esc(paper.title)}</option>`).join('');
+      }
+      render();
+      measure();
+    }
+
+    async function save(changes) {
+      const edited = { ...plan, ...changes };
+      if (!('start_ms' in changes)) edited.start_ms = Timeline.reanchor(plan, edited, Date.now());
+      try {
+        await Kit.post(`/api/lbd/${screen_}`, {
+          rev: plan.rev, plays: edited.plays, poster_s: edited.poster_s,
+          timetable_s: edited.timetable_s, start_ms: edited.start_ms,
+        });
+        $('notice').innerHTML = '';
+      } catch (error) {
+        fail(error);
+      }
+      await load();
+    }
+
+    // Measures each local video once, so timing follows the real files and a file the browser
+    // cannot play shows up here rather than on the wall.
+    let measuring = false;
+    async function measure() {
+      if (measuring) return;
+      const todo = [...new Set(plan.plays)].filter((uid) => {
+        const media = plan.media[uid];
+        return media && media.video && plan.measured[uid] !== media.size;
+      });
+      if (!todo.length) return;
+      measuring = true;
+      const probe = document.createElement('video');
+      probe.muted = true;
+      probe.preload = 'metadata';
+      const results = {};
+      for (const [index, uid] of todo.entries()) {
+        $('summary').textContent = `Measuring videos ${index + 1}/${todo.length}…`;
+        const seconds = await new Promise((resolve) => {
+          probe.onloadedmetadata = () => resolve(probe.duration);
+          probe.onerror = () => resolve(null);
+          probe.src = plan.media[uid].video;
+        });
+        results[uid] = { size: plan.media[uid].size, seconds };
+      }
+      measuring = false;
+      await Kit.post('/api/measured', results);
+      await load();
+    }
+
+    function status(uid) {
+      const media = plan.media[uid] || {};
+      const problems = [];
+      if (!media.video) problems.push('no video file');
+      if (plan.problems[uid]) problems.push('video will not play');
+      if (!media.poster && plan.poster_s) problems.push('no poster file');
+      return problems.join(', ');
+    }
+
+    function render() {
+      const now = Date.now();
+      const timeline = Timeline.build(plan);
+      const current = Timeline.currentIndex(plan, now);
+      const at = (seconds) => Kit.clock(plan.start_ms + seconds * 1000, plan.timezone);
+      const left = plan.slot_s - timeline.total;
+      $('title').textContent = `Screen ${plan.screen}: ${plan.name}`;
+      $('play').href = `lbd-play.html?screen=${plan.screen}`;
+      $('screen').innerHTML = SCREENS.map((id) => `<option${id === plan.screen ? ' selected' : ''}>${id}</option>`).join('');
+      $('summary').innerHTML = `${plan.plays.length} plays · total ${(timeline.total / 60).toFixed(1)} min · ` +
+        `<span class="${left < 0 ? 'warn' : ''}">${left < 0 ? 'over the slot by' : 'slot left'} ${(Math.abs(left) / 60).toFixed(1)} min</span> · ` +
+        `ends ${at(timeline.total)}`;
+      if (document.activeElement !== $('start')) {
+        const parts = new Intl.DateTimeFormat('sv-SE', {
+          timeZone: plan.timezone, dateStyle: 'short', timeStyle: 'medium',
+        }).format(plan.start_ms);
+        $('start').value = parts.replace(' ', 'T');
+      }
+      if (document.activeElement !== $('poster-s')) $('poster-s').value = plan.poster_s;
+      if (document.activeElement !== $('timetable-s')) $('timetable-s').value = plan.timetable_s;
+      $('plays').innerHTML = '<tr><th>#</th><th>Start</th><th>uid</th><th>Title</th><th>Video</th><th>Files</th><th></th></tr>' +
+        timeline.items.map((item, index) => {
+          const locked = index <= current;
+          const paper = plan.papers[item.uid] || {};
+          return `<tr class="${index === current ? 'current' : locked ? 'locked' : ''}">
+            <td>${index + 1}</td>
+            <td>${at(item.start)}</td>
+            <td>${Kit.esc(item.uid)}</td>
+            <td>${Kit.esc(paper.title)}<div class="soft">${Kit.esc(paper.authors)}</div></td>
+            <td>${Kit.duration(plan.seconds[item.uid] || 0)}</td>
+            <td class="warn">${Kit.esc(status(item.uid))}</td>
+            <td class="actions">${locked ? (index === current ? '<b>on screen</b>' : '') : `
+              <button data-act="next" data-i="${index}" title="Play right after the current one"${index === current + 1 ? ' disabled' : ''}>Next</button>
+              <button data-act="up" data-i="${index}"${index === current + 1 ? ' disabled' : ''}>↑</button>
+              <button data-act="down" data-i="${index}"${index === plan.plays.length - 1 ? ' disabled' : ''}>↓</button>
+              <button data-act="remove" data-i="${index}">✕</button>`}</td></tr>`;
+        }).join('');
+      $('clock').textContent = `Venue time ${Kit.clock(now, plan.timezone, true)}`;
+    }
+
+    function moved(from, to) {
+      const plays = [...plan.plays];
+      plays.splice(to, 0, plays.splice(from, 1)[0]);
+      return plays;
+    }
+
+    $('plays').addEventListener('click', (event) => {
+      const button = event.target.closest('button');
+      if (!button) return;
+      const index = Number(button.dataset.i);
+      const current = Timeline.currentIndex(plan, Date.now());
+      if (index <= current) return;  // it went on screen after the page last drew
+      if (button.dataset.act === 'up') save({ plays: moved(index, index - 1) });
+      if (button.dataset.act === 'down') save({ plays: moved(index, index + 1) });
+      if (button.dataset.act === 'next') save({ plays: moved(index, current + 1) });
+      if (button.dataset.act === 'remove') save({ plays: plan.plays.filter((_, i) => i !== index) });
+    });
+
+    function add(position) {
+      const uid = $('add').value.trim();
+      if (!plan.papers[uid]) return fail(new Error(`No LBD with uid "${uid}"`));
+      const plays = [...plan.plays];
+      plays.splice(position, 0, uid);
+      $('add').value = '';
+      return save({ plays });
+    }
+    $('add-next').onclick = () => add(Timeline.currentIndex(plan, Date.now()) + 1);
+    $('add-end').onclick = () => add(plan.plays.length);
+
+    const number = (input) => Math.max(0, Number(input.value) || 0);
+    $('poster-s').onchange = () => save({ poster_s: number($('poster-s')) });
+    $('timetable-s').onchange = () => save({ timetable_s: number($('timetable-s')) });
+    $('fit').onclick = () => save({ poster_s: Timeline.fitPoster(plan, plan.slot_s, Date.now()) });
+    $('set-start').onclick = () => {
+      const start = Date.parse(`${$('start').value.slice(0, 16)}:00${plan.utc_offset}`);
+      if (Number.isNaN(start)) return fail(new Error('Enter a start time'));
+      return save({ start_ms: start });
+    };
+    $('start-now').onclick = () => save({ start_ms: Date.now() });
+    $('start-default').onclick = () => save({ start_ms: plan.default_start_ms });
+    $('reset').onclick = () => {
+      if (!confirm('Discard every change to this screen?')) return;
+      Kit.post(`/api/lbd/${screen_}`, { rev: plan.rev, reset: true }).then(load, fail);
+    };
+    $('screen').onchange = () => { location.search = `?screen=${$('screen').value}`; };
+
+    load().catch(fail);
+    setInterval(() => { if (plan && !measuring) render(); }, 5000);
+  </script>
+</body>
+</html>
