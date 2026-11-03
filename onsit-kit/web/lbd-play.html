@@ -4,42 +4,76 @@
   <meta charset="utf-8">
   <title>LBD player</title>
   <style>
-    html, body { margin: 0; height: 100%; background: #0d1419; color: #eef3f5; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    /* The look of ismir2026.ismir.net and its program site: white, ink, and the logo's gold. */
+    :root { --gold: #b47500; --gold-light: #f8c44f; --gold-tint: #fdf4e1; --ink: #161616; --soft: #5b5b5b; --line: #e8e8e8; --page: #f9fafb; }
+    html, body { margin: 0; height: 100%; background: var(--page); color: var(--ink); overflow: hidden;
+      font-family: Poppins, "Avenir Next", "Helvetica Neue", Arial, sans-serif; }
     body.idle { cursor: none; }
-    .layer { position: fixed; inset: 0; visibility: hidden; }
+    .layer { position: fixed; inset: 0; visibility: hidden; display: flex; flex-direction: column; }
     .layer.shown { visibility: visible; }
     /* Hidden layers stay rendered under the timetable, so a poster is ready when its turn comes. */
-    #poster, #video-layer { background: #fff; visibility: visible; }
-    #video-layer { background: #000; opacity: 0; }
+    #poster, #video-layer { visibility: visible; }
+    #poster { background: #fff; }
+    #video-layer { background: var(--ink); opacity: 0; }
     #video-layer.shown { opacity: 1; }
-    #poster iframe, #poster img { position: absolute; top: 0; left: 0; width: 100%; height: calc(100% - 7vh); border: 0; object-fit: contain; }
-    #video { position: absolute; top: 0; left: 0; width: 100%; height: calc(100% - 7vh); background: #000; }
-    .strip { position: absolute; left: 0; right: 0; bottom: 0; height: 7vh; display: flex; flex-direction: column; justify-content: center; padding: 0 2.5vw; background: #0d1419; font-size: 2.1vh; overflow: hidden; }
-    .strip b { font-size: 2.6vh; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .strip span { color: #9fb1bb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    #card, #timetable { background: #0d1419; padding: 5vh 4vw; z-index: 2; }
-    #card { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-    #card h1 { font-size: 6vh; margin: 0 0 2vh; }
-    #card p { font-size: 3vh; color: #9fb1bb; margin: 0; }
-    #timetable h1 { font-size: 4.6vh; margin: 0; }
-    #timetable .sub { font-size: 2.4vh; color: #9fb1bb; margin: .6vh 0 3vh; }
-    #rows { columns: 2; column-gap: 4vw; }
-    .row { display: flex; gap: 1.4vw; break-inside: avoid; font-size: 2.3vh; padding: .8vh 0; }
-    .row time { color: #5fc4b4; font-variant-numeric: tabular-nums; }
+    .stage { position: relative; flex: 1; min-height: 0; }
+    .stage iframe, .stage img, .stage video { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; object-fit: contain; }
+    .fallback { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: 0 10vw; text-align: center; }
+    .fallback h2 { font-size: 5vh; margin: 0 0 2vh; }
+    .fallback p { font-size: 2.6vh; color: var(--soft); margin: 0; }
+
+    /* The bar over a poster or a video: what it is and whose it is. */
+    .head { position: relative; display: flex; align-items: center; gap: 1.6vw; padding: 1.6vh 2.2vw 1.9vh; background: #fff;
+      border-bottom: 1px solid var(--line); box-shadow: 0 .4vh 1.2vh #0000001a; z-index: 1; }
+    .kind { flex: none; padding: .7vh 1.1vw; border-radius: 99px; background: var(--gold); color: #fff;
+      font-size: 2vh; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    .kind.video { background: var(--ink); }
+    .who { flex: 1; min-width: 0; }
+    .who b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 3vh; line-height: 1.25; font-weight: 700; }
+    .who span { display: block; margin-top: .4vh; font-size: 2vh; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .logo { flex: none; height: 6.5vh; mix-blend-mode: multiply; }  /* the logo file has a white background */
+    .progress { position: absolute; left: 0; bottom: 0; height: .5vh; width: 100%; background: var(--gold-light);
+      transform-origin: left; transform: scaleX(var(--done, 0)); }
+
+    /* The timetable before each play, in the style of the program site's schedule. */
+    #timetable { padding: 4.5vh 4vw 4vh; z-index: 2; background: var(--page); }
+    .top { display: flex; align-items: center; gap: 2vw; padding-bottom: 2.4vh; margin-bottom: 2.6vh; border-bottom: .35vh solid var(--gold); }
+    .top .logo { height: 9vh; }
+    .eyebrow { font-size: 1.9vh; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
+    #tt-title { font-size: 4.4vh; font-weight: 800; margin: .3vh 0; line-height: 1.15; }
+    #tt-sub { font-size: 2.3vh; color: var(--soft); }
+    #rows { flex: 1; min-height: 0; display: grid; grid-template-rows: repeat(17, 1fr); grid-auto-flow: column; grid-auto-columns: 1fr; gap: .6vh 2.4vw; }
+    .row { display: flex; align-items: center; gap: 1.2vw; min-width: 0; padding: 0 1vw; border-radius: .8vh; background: #fff;
+      border-left: .5vh solid #e6cf9f; font-size: 2.1vh; box-shadow: 0 .1vh .3vh #0000000d; }
+    .row time { flex: none; font-weight: 700; color: var(--gold); font-variant-numeric: tabular-nums; }
     .row div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .row.up { font-weight: 700; color: #fff; }
-    #hint { position: fixed; z-index: 3; right: 1.5vw; top: 1.5vh; padding: .6vh 1vw; background: #000a; border-radius: 6px; font-size: 1.7vh; color: #d7e1e6; transition: opacity .4s; }
+    .row.up { background: var(--gold-tint); border-left-color: var(--gold); font-weight: 700; }
+    .row .tag { flex: none; margin-left: auto; padding: .2vh .7vw; border-radius: 99px; background: var(--gold); color: #fff;
+      font-size: 1.5vh; letter-spacing: .1em; text-transform: uppercase; }
+
+    #card { align-items: center; justify-content: center; text-align: center; background: var(--page); z-index: 2; }
+    #card .logo { height: 22vh; margin-bottom: 4vh; }
+    #card h1 { font-size: 5.5vh; margin: 0 0 2vh; }
+    #card p { font-size: 3vh; color: var(--soft); margin: 0; }
+    #hint { position: fixed; z-index: 3; right: 1.5vw; bottom: 1.5vh; padding: .6vh 1vw; background: #161616cc; border-radius: 99px;
+      font-size: 1.7vh; color: #fff; transition: opacity .4s; }
     body.idle #hint { opacity: 0; }
   </style>
 </head>
 <body>
   <div class="layer" id="poster"></div>
   <div class="layer" id="video-layer">
-    <video id="video" playsinline preload="auto" muted></video>
-    <div class="strip" id="video-strip"></div>
+    <div id="video-head"></div>
+    <div class="stage"><video id="video" playsinline preload="auto" muted></video></div>
   </div>
-  <div class="layer" id="timetable"><h1 id="tt-title"></h1><div class="sub" id="tt-sub"></div><div id="rows"></div></div>
-  <div class="layer shown" id="card"><h1 id="card-title">Loading…</h1><p id="card-text"></p></div>
+  <div class="layer" id="timetable">
+    <div class="top">
+      <img class="logo" src="logo.png" alt="ISMIR 2026">
+      <div><div class="eyebrow">Late-Breaking / Demo</div><h1 id="tt-title"></h1><div id="tt-sub"></div></div>
+    </div>
+    <div id="rows"></div>
+  </div>
+  <div class="layer shown" id="card"><img class="logo" src="logo.png" alt="ISMIR 2026"><h1 id="card-title">Loading…</h1><p id="card-text"></p></div>
   <div id="hint">F fullscreen · M sound: off</div>
   <script src="kit.js"></script>
   <script src="lbd-timeline.js"></script>
@@ -48,15 +82,17 @@
     const TICK_MS = 250;
     const RELOAD_MS = 3000;
     const DRIFT_S = 1.2;
-    const VISIBLE_ROWS = 34;  // two columns; the longest default plan has 33 plays
+    const VISIBLE_ROWS = 34;  // two columns of 17; the longest default plan has 33 plays
     const $ = (id) => document.getElementById(id);
     const video = $('video');
-    let plan, timeline, prepared = '';
+    let plan, timeline, prepared = '', unplayable = false;
 
     const paperOf = (item) => plan.papers[item.uid] || { title: `LBD ${item.uid}`, authors: '' };
-    const stripHtml = (item) => {
+    const headHtml = (item, kind) => {
       const paper = paperOf(item);
-      return `<b>${Kit.esc(paper.title)}</b><span>${Kit.esc(paper.authors)}</span>`;
+      return `<div class="head"><span class="kind ${kind}">${kind}</span>
+        <div class="who"><b>${Kit.esc(paper.title)}</b><span>${Kit.esc(paper.authors)}</span></div>
+        <img class="logo" src="logo.png" alt=""><i class="progress"></i></div>`;
     };
     const atClock = (seconds) => Kit.clock(plan.start_ms + seconds * 1000, plan.timezone);
 
@@ -66,15 +102,15 @@
       const key = [item.index, item.uid, media.video, media.poster, plan.problems[item.uid], plan.poster_s > 0].join();
       if (prepared === key) return;
       prepared = key;
-      const unplayable = plan.problems[item.uid] || !media.video;
-      const strip = `<div class="strip">${stripHtml(item)}</div>`;
+      unplayable = Boolean(plan.problems[item.uid] || !media.video);
+      const paper = paperOf(item);
       const poster = media.poster && plan.poster_s + (unplayable ? 1 : 0)
         ? (media.poster.endsWith('.pdf')
           ? `<iframe src="${media.poster}#toolbar=0&navpanes=0&scrollbar=0&view=Fit"></iframe>`
           : `<img src="${media.poster}" alt="">`)
-        : '';
-      $('poster').innerHTML = poster + strip;
-      $('video-strip').innerHTML = stripHtml(item);
+        : `<div class="fallback"><h2>${Kit.esc(paper.title)}</h2><p>${Kit.esc(paper.authors)}</p></div>`;
+      $('poster').innerHTML = headHtml(item, 'poster') + `<div class="stage">${poster}</div>`;
+      $('video-head').innerHTML = headHtml(item, 'video');
       if (unplayable) {
         video.removeAttribute('src');
         video.load();
@@ -85,16 +121,21 @@
     }
 
     function drawTimetable(from) {
-      $('tt-title').textContent = `LBD screen ${plan.screen}: ${plan.name}`;
+      $('tt-title').textContent = `Screen ${plan.screen}: ${plan.name}`;
       $('tt-sub').textContent = plan.theme;
       const rows = timeline.items.slice(from, from + VISIBLE_ROWS);
       $('rows').innerHTML = rows.map((item, index) => `<div class="row${index ? '' : ' up'}">
-        <time>${atClock(item.start)}</time><div>${Kit.esc(paperOf(item).title)}</div></div>`).join('');
+        <time>${atClock(item.start)}</time><div>${Kit.esc(paperOf(item).title)}</div>${index ? '' : '<span class="tag">Up next</span>'}</div>`).join('');
     }
 
     function show(layer) {
       ['card', 'timetable'].forEach((id) => $(id).classList.toggle('shown', id === layer));
       $('video-layer').classList.toggle('shown', layer === 'video-layer');
+    }
+
+    // How far the poster or video on screen is through its time, for the bar under its title.
+    function setProgress(from, to, elapsed) {
+      document.body.style.setProperty('--done', Math.min(Math.max((elapsed - from) / (to - from || 1), 0), 1));
     }
 
     function syncVideo(position) {
@@ -112,7 +153,8 @@
     }
 
     function tick() {
-      const position = Timeline.locate(timeline, (Date.now() - plan.start_ms) / 1000);
+      const elapsed = (Date.now() - plan.start_ms) / 1000;
+      const position = Timeline.locate(timeline, elapsed);
       if (position.phase === 'before') {
         prepare(position.item);
         const wait = Math.ceil(-position.offset);
@@ -123,7 +165,7 @@
       }
       if (position.phase === 'done') {
         video.pause();
-        $('card-title').textContent = `LBD screen ${plan.screen}: ${plan.name}`;
+        $('card-title').textContent = `Screen ${plan.screen}: ${plan.name}`;
         $('card-text').textContent = 'All videos have played. Thank you!';
         show('card');
         return;
@@ -134,8 +176,10 @@
         drawTimetable(item.index);
         show('timetable');
       } else if (phase === 'poster') {
+        setProgress(item.posterAt, unplayable ? item.end : item.videoAt, elapsed);
         show('poster');
       } else {
+        setProgress(unplayable ? item.posterAt : item.videoAt, item.end, elapsed);
         show('video-layer');
         syncVideo(position);
         return;

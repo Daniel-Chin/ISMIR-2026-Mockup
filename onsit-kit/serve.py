@@ -239,6 +239,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(self.kit.lbd(screen[1]))
         elif path.startswith('/media/'):
             self.send_file(MEDIA, path[len('/media/'):])
+        elif path == '/logo.png':  # the conference logo, as on the program site
+            self.send_file(KIT.parent / 'static' / 'images', 'ismir_tabicon.png')
         else:
             self.send_file(WEB, 'index.html' if path == '/' else path.lstrip('/'))
 
