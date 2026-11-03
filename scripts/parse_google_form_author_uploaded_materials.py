@@ -134,10 +134,12 @@ def parse_materials(path: str | Path = INPUT_PATH) -> tuple[dict[int, AuthorUplo
 
     if not papers:
         raise ValueError('CSV contains no submissions')
-    for paper_id, materials in papers.items():
+    # A paper may still lack some materials: what it has is used, and the rest left to a later submission.
+    for paper_id, materials in sorted(papers.items()):
         missing_values = sorted(name for name in field_names
                          if name != 'fun_facts' and getattr(materials, name) is None)
-        assert not missing_values, f'Paper {paper_id}: missing required values: {missing_values}'
+        if missing_values:
+            print(f'Warning: paper {paper_id} has not submitted {", ".join(missing_values)}')
     return papers, history
 
 

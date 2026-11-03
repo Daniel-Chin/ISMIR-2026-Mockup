@@ -84,11 +84,12 @@ def test_discarded_columns_still_require_correct_row_width(tmp_path, extra_cells
 #     assert papers[3].fun_facts is None
 
 
-def test_missing_required_material(tmp_path):
-    with pytest.raises(AssertionError, match='poster_url'):
-        parse_materials(export(tmp_path, [
-            ['10/06/2026 09:00:00', '3', '', 'thumbnail', 'video', 'captions', ''],
-        ]))
+def test_missing_material_is_a_warning(tmp_path, capsys):
+    papers, _ = parse_materials(export(tmp_path, [
+        ['10/06/2026 09:00:00', '3', 'poster', 'thumbnail', '', '', ''],
+    ]))
+    assert papers[3].poster_url == 'poster' and papers[3].video_url is None and papers[3].captions_url is None
+    assert 'paper 3 has not submitted captions_url, video_url' in capsys.readouterr().out
 
 
 @pytest.mark.parametrize('rows', [
