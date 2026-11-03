@@ -4,12 +4,14 @@ Nothing is pasted by hand. Every step that changes the Live Database or YouTube 
 first and writes only after you answer `y`.
 
 One-time setup:
-- `real.env` (gitignored; `.env` is still read by the scripts that call Google):
-  - `DEPLOYMENT=real`: the pull below refuses to run without it.
-  - `PAPERS_SHEET_URL`: the papers tab URL, with its `gid`.
-  - `SESSION_ASSIGNMENT_SHEET_URL`: the session matrix ("Session to Papers" tab of the schedule sheet), not the
-    pointer tab in the Live Database. YouTube titles (`P{session}-{position} …`) come from it.
-  - `google_client_id`, `google_client_secret`: the OAuth client.
+- Two gitignored env files, loaded together by the commands below:
+  - `low_keys/real.env`: the sheet URLs, with their `gid`s, among them:
+    - `PAPERS_SHEET_URL`: the papers tab.
+    - `SESSION_ASSIGNMENT_SHEET_URL`: the session matrix ("Session to Papers" tab of the schedule sheet), not the
+      pointer tab in the Live Database. YouTube titles (`P{session}-{position} …`) come from it.
+    - `LBDS_GROUPING`: the LBD groups.
+  - `high_keys/real.env`: `DEPLOYMENT=real` (the pull refuses to run without it), the Slack tokens, and
+    `google_client_id`, `google_client_secret` (the OAuth client).
 - In that OAuth client's Google Cloud project, enable the Google Drive API, the Google Sheets API and the
   YouTube Data API.
 - Share the Live Database with zoom.admin.ismir2026@gmail.com as an editor.
@@ -22,10 +24,10 @@ Steps:
 - `git pull`
 - Go to "Upload your presentation materials for ISMIR2026"
 - Download csv to any `$csv_path` (e.g. `local/`, which git ignores)
-- `uv run --env-file real.env python pull_from_google_sheet.py`
+- `uv run --env-file low_keys/real.env --env-file high_keys/real.env python pull_from_google_sheet.py`
   - Always, right before parsing: the parser tells a manual edit from an earlier submission by comparing with
     `sitedata/papers.csv`.
-- `uv run python -m scripts.parse_google_form_author_uploaded_materials --input $csv_path`
+- `uv run --env-file low_keys/real.env --env-file high_keys/real.env python -m scripts.parse_google_form_author_uploaded_materials --input $csv_path`
   - It updates `sitedata/papers.csv` and lists the changed cells per column, then the papers with new videos
     or captions, as a ready `--uids` command.
   - "keeping manual value" lines: a cell that matches no submission is kept. Check that it really was edited
