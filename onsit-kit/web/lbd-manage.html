@@ -17,7 +17,7 @@
       <span id="summary"></span>
     </div>
     <div class="bar">
-      <label>Start (venue time) <input type="datetime-local" id="start"></label>
+      <label>Start (venue time) <input type="date" id="start-date"> <input id="start-time" size="5" placeholder="15:00"></label>
       <button id="set-start">Set start</button>
       <button id="start-now">Play from the beginning now</button>
       <button id="start-default">Back to the scheduled start</button>
@@ -42,6 +42,7 @@
     const SCREENS = ['1', '2', '3', '4', '5', '6', '7'];
     const $ = (id) => document.getElementById(id);
     let plan;
+    let startEdited = false;  // the page redraws every few seconds, and must not undo what is being typed
 
     const fail = (error) => { $('notice').innerHTML = `<div class="notice">${Kit.esc(error.message)}</div>`; };
 
@@ -56,6 +57,7 @@
     }
 
     async function save(changes) {
+      if ('start_ms' in changes) startEdited = false;
       const edited = { ...plan, ...changes };
       if (!('start_ms' in changes)) edited.start_ms = Timeline.reanchor(plan, edited, Date.now());
       try {
@@ -120,11 +122,10 @@
       $('summary').innerHTML = `${plan.plays.length} plays · total ${(timeline.total / 60).toFixed(1)} min · ` +
         `<span class="${left < 0 ? 'warn' : ''}">${left < 0 ? 'over the slot by' : 'slot left'} ${(Math.abs(left) / 60).toFixed(1)} min</span> · ` +
         `ends ${at(timeline.total)}`;
-      if (document.activeElement !== $('start')) {
-        const parts = new Intl.DateTimeFormat('sv-SE', {
-          timeZone: plan.timezone, dateStyle: 'short', timeStyle: 'medium',
-        }).format(plan.start_ms);
-        $('start').value = parts.replace(' ', 'T');
+      if (!startEdited) {
+        [$('start-date').value, $('start-time').value] = new Intl.DateTimeFormat('sv-SE', {
+          timeZone: plan.timezone, dateStyle: 'short', timeStyle: 'short',
+        }).format(plan.start_ms).split(' ');
       }
       if (document.activeElement !== $('poster-s')) $('poster-s').value = plan.poster_s;
       if (document.activeElement !== $('timetable-s')) $('timetable-s').value = plan.timetable_s;
@@ -182,14 +183,16 @@
     $('timetable-s').onchange = () => save({ timetable_s: number($('timetable-s')) });
     $('fit').onclick = () => save({ poster_s: Timeline.fitPoster(plan, plan.slot_s, Date.now()) });
     $('set-start').onclick = () => {
-      const start = Date.parse(`${$('start').value.slice(0, 16)}:00${plan.utc_offset}`);
-      if (Number.isNaN(start)) return fail(new Error('Enter a start time'));
-      return save({ start_ms: start });
+      const time = $('start-time').value.trim().match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+      if (!$('start-date').value || !time) return fail(new Error('Enter the date, and the time like 15:00'));
+      return save({ start_ms: Date.parse(`${$('start-date').value}T${time[1].padStart(2, '0')}:${time[2]}:00${plan.utc_offset}`) });
     };
+    ['start-date', 'start-time'].forEach((id) => { $(id).oninput = () => { startEdited = true; }; });
     $('start-now').onclick = () => save({ start_ms: Date.now() });
     $('start-default').onclick = () => save({ start_ms: plan.default_start_ms });
     $('reset').onclick = () => {
       if (!confirm('Discard every change to this screen?')) return;
+      startEdited = false;
       Kit.post(`/api/lbd/${screen_}`, { rev: plan.rev, reset: true }).then(load, fail);
     };
     $('screen').onchange = () => { location.search = `?screen=${$('screen').value}`; };
