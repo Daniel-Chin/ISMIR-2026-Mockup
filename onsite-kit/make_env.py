@@ -4,7 +4,7 @@
 Reads .env, sitedata/ and local/mirex/ (none of them committed). Rewrites only the part of .onsite_env
 under the GENERATED line, so the lines above it survive.
 
-  uv run python onsit-kit/make_env.py
+  uv run python onsite-kit/make_env.py
 """
 
 import csv

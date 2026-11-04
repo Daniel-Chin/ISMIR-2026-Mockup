@@ -1,4 +1,4 @@
-"""The onsite kit's local server (onsit-kit/serve.py)."""
+"""The onsite kit's local server (onsite-kit/serve.py)."""
 
 import http.client
 import json
@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'onsit-kit'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'onsite-kit'))
 import make_env  # noqa: E402
 import materials  # noqa: E402
 import serve  # noqa: E402

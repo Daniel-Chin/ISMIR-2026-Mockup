@@ -17,7 +17,7 @@
     Kit.get('/api/info').then((info) => {
       if (!info.env_found) {
         document.getElementById('notice').innerHTML =
-          '<div class="notice">onsit-kit/.onsite_env is missing: see README.md.</div>';
+          '<div class="notice">onsite-kit/.onsite_env is missing: see README.md.</div>';
       }
       const groups = [...new Set(info.links.map((link) => link.group))];
       document.getElementById('links').innerHTML = groups.map((group) => `<h2>${Kit.esc(group)}</h2>

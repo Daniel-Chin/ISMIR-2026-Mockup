@@ -18,7 +18,7 @@ The 4 LBD poster monitors are not covered yet.
 
 ```bash
 uv run --env-file low_keys/real.env --env-file high_keys/real.env python pull_from_google_sheet.py
-uv run python onsit-kit/make_env.py
+uv run python onsite-kit/make_env.py
 ```
 
 The first time, copy `onsite_env.example` to `.onsite_env` and fill in `DRIVE_FOLDER_LBD` and
@@ -30,7 +30,7 @@ see the example file.
 
 ```bash
 git clone https://github.com/Daniel-Chin/ISMIR2026-Kit.git
-cp <from your private copy>/.onsite_env ISMIR2026-Kit/onsit-kit/
+cp <from your private copy>/.onsite_env ISMIR2026-Kit/onsite-kit/
 ```
 
 Then start the kit and download everything: **Materials → Select everything to update → Download selected**.
@@ -40,7 +40,7 @@ That is 545 files, 6.1 GB.
 
 ```bash
 cd ISMIR2026-Kit
-caffeinate -d python3 onsit-kit/serve.py      # keeps the MacBook awake
+caffeinate -d python3 onsite-kit/serve.py      # keeps the MacBook awake
 ```
 
 Open <http://127.0.0.1:8765>. The server only answers on this MacBook.
@@ -58,7 +58,7 @@ can be ticked to download it again, and filters narrow the list by search, scree
 can be cancelled, and pick up where they stopped, even after a restart. A new file replaces the old one only
 once it is complete, so a running player is safe; open Manage afterwards if a video changed.
 
-If Drive refuses with a quota error, try later or copy `onsit-kit/media/` from another MacBook. Copied files
+If Drive refuses with a quota error, try later or copy `onsite-kit/media/` from another MacBook. Copied files
 count as up to date.
 
 ## LBD screens
@@ -114,7 +114,7 @@ for that time, so the screens stay in step.
 | `web/` | The pages; `lbd-timeline.js` holds the timing logic |
 | `.onsite_env`, `media/`, `.state/` | Private or local: gitignored |
 
-Tests: `node --test onsit-kit/test_timeline.cjs` and `pytest tests/test_onsite_kit.py`.
+Tests: `node --test onsite-kit/test_timeline.cjs` and `pytest tests/test_onsite_kit.py`.
 
 ## Troubleshooting
 
