@@ -129,6 +129,8 @@ def lbd_rows(rows, folders):
         'authors': re.sub(r'\s*\([^)]*\)|\*', '', r['authors_and_affil_from_pdf']),
         'people': people(r['authors_and_affil_from_pdf']),
         'mode': r['presentation_mode'],
+        'group': r.get('group_id', ''),
+        'slack': r.get('slack_channel', ''),
         'folder': folders.get(r['uid'], r['uid']),
     } for r in rows]
 
@@ -166,6 +168,11 @@ def main():
     sessions = poster_sessions(events, config['miniconf_url'].rstrip('/'), zone)
     lines.append('ONSITE_POSTER_SESSIONS=' + json.dumps(sessions, ensure_ascii=False))
     lines.append('ONSITE_LBDS=' + json.dumps(lbds, ensure_ascii=False))
+    grouping = ROOT / 'sitedata' / 'lbds_grouping.csv'
+    if grouping.exists():  # the groups' names as the sheet has them, for each screen's title
+        groups = read_csv(grouping)
+        lines.append('ONSITE_LBD_GROUPS=' + json.dumps({row['group_id']: row['theme'] for row in groups}, ensure_ascii=False))
+        lines.append('ONSITE_LBD_GROUP_SLACK=' + json.dumps({row['group_id']: row['slack_channel'] for row in groups}))
 
     ENV_FILE.write_text('\n'.join([by_hand, '', GENERATED, *lines, '']), encoding='utf-8')
     print(f'{ENV_FILE.name}: {len(sessions)} poster sessions, {len(lbds)} LBDs')

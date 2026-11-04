@@ -4,6 +4,8 @@
 # The camera-ready Drive folders, shared by link:
 DRIVE_FOLDER_LBD=https://drive.google.com/drive/folders/example-LBD-folder
 DRIVE_FOLDER_MIREX=https://drive.google.com/drive/folders/example-MIREX-folder
+# The Slack channel QR codes for the covers: LBD_<uid>_*.png and LBD_group<n>_*.png
+DRIVE_FOLDER_CHANNELS=https://drive.google.com/drive/folders/example-channels-folder
 
 # Extra rows for the links table:
 #   LINK_<anything>=group | name | url | description

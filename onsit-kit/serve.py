@@ -63,7 +63,7 @@ def write_json(path: Path, data) -> None:
 def media_files() -> dict:
     """uid -> its video and poster under media/, as URLs, with the video's size."""
     found: dict = {}
-    for kind, directory in (('video', 'videos'), ('poster', 'posters')):
+    for kind, directory in (('video', 'videos'), ('poster', 'posters'), ('channel', 'channels')):
         folder = MEDIA / directory
         for file in folder.iterdir() if folder.is_dir() else ():
             if not file.name.endswith('.part'):
@@ -79,8 +79,14 @@ class Kit:
         self.plan = read_json(KIT / 'lbd_schedule.json', {})
         lbds = json.loads(self.env.get('ONSITE_LBDS', '[]'))
         roots = [materials.folder_id(value) for key, value in self.env.items() if key.startswith('DRIVE_FOLDER_')]
-        self.materials = materials.Materials(MEDIA, STATE, roots, lbds, self.plan.get('screens', {}))
-        self.papers = {lbd['uid']: {k: lbd.get(k, '') for k in ('title', 'authors', 'people', 'mode')} for lbd in lbds}
+        self.groups = json.loads(self.env.get('ONSITE_LBD_GROUPS', '{}'))
+        self.group_slack = json.loads(self.env.get('ONSITE_LBD_GROUP_SLACK', '{}'))
+        # Each group's Slack channel QR code is a row of its own in Materials, as g<group>.
+        group_rows = [{'uid': f'g{group}', 'title': f'Group {group} Slack channel: {theme}'}
+                      for group, theme in self.groups.items()]
+        self.materials = materials.Materials(MEDIA, STATE, roots, lbds + group_rows, self.plan.get('screens', {}))
+        self.papers = {lbd['uid']: {k: lbd.get(k, '') for k in ('title', 'authors', 'people', 'mode', 'group', 'slack')}
+                       for lbd in lbds}
         start = self.env.get('ONSITE_LBD_START')
         end = self.env.get('ONSITE_LBD_END')
         self.start_ms = int(datetime.fromisoformat(start).timestamp() * 1000) if start else 0
@@ -114,7 +120,8 @@ class Kit:
                 else:
                     problems[uid] = 'unplayable'
         plan = self.plan['screens'][screen]
-        return {**self.schedule(screen), 'screen': screen, 'name': plan['name'], 'theme': plan['theme'],
+        return {**self.schedule(screen), 'screen': screen, 'name': plan['name'],
+                'theme': self.groups.get(screen, plan['theme']), 'group_slack': self.group_slack,
                 'timezone': self.env.get('ONSITE_TIMEZONE', 'UTC'), 'default_start_ms': self.start_ms,
                 'utc_offset': self.env.get('ONSITE_LBD_START', '+00:00')[-6:], 'slot_s': self.slot_s,
                 'papers': self.papers, 'media': media, 'seconds': seconds, 'problems': problems,

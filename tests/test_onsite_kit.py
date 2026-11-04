@@ -150,7 +150,7 @@ def wait(store):
 
 def test_materials_status_download_and_update(store, tmp_path):
     assert states(store) == {'paper': 'missing', 'poster': 'missing', 'video': 'missing',
-                             'thumbnail': 'none', 'captions': 'missing'}
+                             'thumbnail': 'none', 'captions': 'missing', 'channel': 'none'}
     assert store.download(['m1/video', 'm1/paper', 'm1/captions'])
     wait(store)
     assert store.job['files'] == 2 and store.job['files_done'] == 1  # captions have no known size
@@ -163,6 +163,25 @@ def test_materials_status_download_and_update(store, tmp_path):
     assert store.download(['m1/video'])
     wait(store)
     assert [file.name for file in (tmp_path / 'videos').iterdir()] == ['m1.webm']
+
+
+def test_channel_codes_lie_loose_in_their_folder(tmp_path, monkeypatch):
+    listings = {'root': [{'id': 'f', 'name': '569', 'folder': True},
+                         {'id': 'a', 'name': 'LBD_569_lbd569-groovyui.png', 'folder': False},
+                         {'id': 'b', 'name': 'LBD_group6_lbd-g6-human.png', 'folder': False},
+                         {'id': 'm', 'name': 'LBD_m7_lbd-m7-a-transcription.png', 'folder': False},
+                         {'id': 'c', 'name': 'LBD_999_unknown.png', 'folder': False}],
+                'f': [{'id': 'v', 'name': '569_video.mp4', 'folder': False}]}
+    monkeypatch.setattr(materials, 'list_folder', listings.get)
+    monkeypatch.setattr(materials, 'drive_size', lambda file_id: 1)
+    lbds = [{'uid': '569', 'title': 'T'}, {'uid': 'm7', 'title': 'M'}, {'uid': 'g6', 'title': 'Group 6'}]
+    store = materials.Materials(tmp_path, tmp_path / '.state', ['root'], lbds, {})
+    store.job = {'done': 0, 'total': 0, 'failed': []}
+    store.check_drive()
+    files = store.listing['files']
+    assert sorted(files['569']) == ['channel', 'video'] and files['g6']['channel']['id'] == 'b'
+    assert files['m7']['channel']['id'] == 'm'
+    assert '999' not in files
 
 
 def test_one_materials_job_at_a_time(store):

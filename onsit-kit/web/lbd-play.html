@@ -37,22 +37,26 @@
     .progress { position: absolute; left: 0; bottom: 0; z-index: 1; height: .5vh; width: 100%; background: var(--gold-light);
       transform-origin: left; transform: scaleX(var(--done, 0)); }
 
-    /* The timetable before each play, in the style of the program site's schedule. */
-    #timetable { padding: 4.5vh 4vw 4vh; z-index: 2; background: var(--page); }
-    .top { display: flex; align-items: center; gap: 2vw; padding-bottom: 2.4vh; margin-bottom: 2.6vh; border-bottom: .35vh solid var(--gold); }
+    /* The timetable before the start: the first round in full, later rounds as codes only. */
+    #timetable { padding: 4vh 4vw 3vh; z-index: 2; background: var(--page); }
+    .top { display: flex; align-items: center; gap: 2vw; padding-bottom: 2vh; margin-bottom: 2vh; border-bottom: .35vh solid var(--gold); }
     .top .logo { height: 9vh; }
     .eyebrow { font-size: 1.9vh; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
-    #tt-title { font-size: 4.4vh; font-weight: 800; margin: .3vh 0; line-height: 1.15; }
-    #tt-sub { font-size: 2.3vh; color: var(--soft); }
-    #rows { flex: 1; min-height: 0; display: grid; grid-template-rows: repeat(17, 1fr); grid-auto-flow: column; grid-auto-columns: 1fr; gap: .6vh 2.4vw; }
-    .row { display: flex; align-items: center; gap: 1.2vw; min-width: 0; padding: 0 1vw; border-radius: .8vh; background: #fff;
-      border-left: .5vh solid #e6cf9f; font-size: 2.1vh; box-shadow: 0 .1vh .3vh #0000000d; }
-    .row time { flex: none; font-weight: 700; color: var(--gold); font-variant-numeric: tabular-nums; }
-    .row .code { flex: none; min-width: 5.4em; color: var(--soft); font-size: 1.8vh; font-weight: 600; font-variant-numeric: tabular-nums; }
+    #tt-title { font-size: 4vh; font-weight: 800; margin: .3vh 0; line-height: 1.15; }
+    #tt-sub { font-size: 2.3vh; color: var(--gold); font-variant-numeric: tabular-nums; }
+    /* Sized in em: drawTimetable shrinks #rows' font until the whole timetable fits. */
+    #rows { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: .23em; overflow: hidden; }
+    .row { display: flex; align-items: center; gap: .55em; min-width: 0; padding: .22em .45em; border-radius: .3em; background: #fff;
+      border-left: .5vh solid #e6cf9f; box-shadow: 0 .1vh .3vh #0000000d; }
+    .row time, .chip time { flex: none; font-weight: 700; color: var(--gold); font-variant-numeric: tabular-nums; }
+    .row .code { flex: none; min-width: 5.4em; color: var(--soft); font-size: .85em; font-weight: 600; font-variant-numeric: tabular-nums; }
     .row div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .row.up { background: var(--gold-tint); border-left-color: var(--gold); font-weight: 700; }
-    .row .tag { flex: none; margin-left: auto; padding: .2vh .7vw; border-radius: 99px; background: var(--gold); color: #fff;
-      font-size: 1.5vh; letter-spacing: .1em; text-transform: uppercase; }
+    .round { margin-top: .5em; }
+    .round h2 { margin: 0 0 .35em; font-size: .72em; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
+    .chips { display: flex; flex-wrap: wrap; gap: .25em .3em; }
+    .chip { padding: .2em .4em; border-radius: .3em; background: #fff; border-left: .4vh solid #e6cf9f; font-size: .88em;
+      font-weight: 600; font-variant-numeric: tabular-nums; box-shadow: 0 .1vh .3vh #0000000d; }
+    .chip time { margin-right: .5em; }
 
     /* The cover before each video: code, title, authors and their affiliations. */
     #cover { justify-content: center; padding: 0 9vw; background: var(--page); z-index: 2; }
@@ -67,6 +71,16 @@
     #cover .authors { font-size: 3.2vh; line-height: 1.5; font-weight: 600; }
     #cover .affiliations { margin-top: 2vh; font-size: 2.4vh; line-height: 1.6; color: var(--soft); }
     #cover sup { font-size: .6em; color: var(--gold); margin-left: .1em; }
+    .cover-body { display: flex; align-items: center; gap: 5vw; }
+    .cover-text { flex: 1; min-width: 0; }
+    /* The paper's and the group's Slack channels, as cards of QR codes. */
+    .channels { flex: none; display: flex; flex-direction: column; gap: 2.4vh; }
+    #cover .channels .eyebrow { margin: 0; font-size: 2vh; text-align: center; }
+    .qr { width: 25vh; padding: 1.6vh 1.6vh 1.5vh; border-radius: 1.6vh; background: #fff; border-top: .6vh solid var(--gold);
+      box-shadow: 0 .8vh 2.4vh #0000001f; text-align: center; }
+    .qr img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; object-position: top; }  /* drops the printed name */
+    .qr b { display: block; margin-top: .6vh; font-size: 1.6vh; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
+    .qr span { display: block; margin-top: .3vh; font-size: 1.7vh; font-weight: 600; overflow-wrap: anywhere; }
 
     #card { align-items: center; justify-content: center; text-align: center; background: var(--page); z-index: 2; }
     #card .logo { height: 22vh; margin-bottom: 4vh; }
@@ -101,13 +115,12 @@
     const FADE_OUT_S = 1.2;  // the end of each video fades to dark, sound too
     const RELOAD_MS = 3000;
     const DRIFT_S = 1.2;
-    const VISIBLE_ROWS = 34;  // two columns of 17; the longest default plan has 33 plays
     const $ = (id) => document.getElementById(id);
     const video = $('video');
     let plan, timeline, prepared = '', unplayable = false;
 
     const paperOf = (item) => plan.papers[item.uid] || { title: `LBD ${item.uid}`, authors: '' };
-    const code = (uid) => (uid.startsWith('m') ? `MIREX-${uid.slice(1)}` : `LBD-${uid}`);
+    const code = (uid) => (uid.startsWith('m') ? `MIREX-${uid}` : `LBD-${uid}`);
     // The bar on top: the paper's code and, for a video, how far it has played; and what plays next.
     const markHtml = (item, kind) => {
       const next = timeline.items[item.index + 1];
@@ -123,11 +136,23 @@
       const people = Array.isArray(paper.people) && paper.people.length ? paper.people : [[paper.authors, []]];
       const places = [...new Set(people.flatMap(([, own]) => own))];
       const marks = (own) => (places.length > 1 && own.length ? `<sup>${own.map((place) => places.indexOf(place) + 1).join(',')}</sup>` : '');
-      return `<img class="logo" src="logo.png" alt="ISMIR 2026">
+      const card = (label, image, channel) => (image ? `<div class="qr"><img src="${image}" alt="">
+        <b>${label}</b><span>#${Kit.esc(channel)}</span></div>` : '');
+      const channels = card('Paper channel', (plan.media[item.uid] || {}).channel, paper.slack) +
+        card('Group channel', (plan.media[`g${paper.group}`] || {}).channel, (plan.group_slack || {})[paper.group]);
+      return `<img class="logo" src="logo.png" alt="ISMIR 2026"><div class="cover-body"><div class="cover-text">
         <div class="eyebrow">${code(item.uid)}</div><h1>${Kit.esc(paper.title)}</h1>
         <div class="authors">${people.map(([name, own]) => `${Kit.esc(name)}${marks(own)}`).join(', ')}</div>
-        <div class="affiliations">${places.map((place, index) => `${places.length > 1 ? `<sup>${index + 1}</sup> ` : ''}${Kit.esc(place)}`).join('<br>')}</div>`;
+        <div class="affiliations">${places.map((place, index) => `${places.length > 1 ? `<sup>${index + 1}</sup> ` : ''}${Kit.esc(place)}`).join('<br>')}</div>
+        </div>${channels ? `<div class="channels"><div class="eyebrow">Join on Slack</div>${channels}</div>` : ''}</div>`;
     }
+    const countdown = (seconds) => {
+      const pad = (value) => String(value).padStart(2, '0');
+      const days = Math.floor(seconds / 86400);
+      const hours = Math.floor(seconds / 3600) % 24;
+      const clock = `${pad(hours)}h ${pad(Math.floor(seconds / 60) % 60)}m ${pad(seconds % 60)}s`;
+      return days ? `${days}d ${clock}` : clock;
+    };
     const atClock = (seconds) => Kit.clock(plan.start_ms + seconds * 1000, plan.timezone);
 
     function prepare(item) {
@@ -155,12 +180,28 @@
       }
     }
 
-    function drawTimetable(from) {
-      $('tt-title').textContent = plan.name;
-      $('tt-sub').textContent = plan.theme;
-      const rows = timeline.items.slice(from, from + VISIBLE_ROWS);
-      $('rows').innerHTML = rows.map((item, index) => `<div class="row${index ? '' : ' up'}">
-        <time>${atClock(item.start)}</time><span class="code">${code(item.uid)}</span><div>${Kit.esc(paperOf(item).title)}</div>${index ? '' : '<span class="tag">Up next</span>'}</div>`).join('');
+    // A play's round is how many times its video has come up so far.
+    let drawnTimetable = '';
+    function drawTimetable() {
+      const key = [plan.rev, plan.start_ms, timeline.items.length, innerHeight, innerWidth].join();
+      if (drawnTimetable === key) return;
+      drawnTimetable = key;
+      $('tt-title').textContent = plan.theme;
+      const seen = {};
+      const rounds = [];
+      timeline.items.forEach((item) => {
+        seen[item.uid] = (seen[item.uid] || 0) + 1;
+        (rounds[seen[item.uid] - 1] = rounds[seen[item.uid] - 1] || []).push(item);
+      });
+      $('rows').innerHTML = (rounds[0] || []).map((item) => `<div class="row"><time>${atClock(item.start)}</time>
+        <span class="code">${code(item.uid)}</span><div>${Kit.esc(paperOf(item).title)}</div></div>`).join('') +
+        rounds.slice(1).map((items, index) => `<div class="round"><h2>Play back${index ? ` ${index + 1}` : ''}</h2>
+          <div class="chips">${items.map((item) => `<span class="chip"><time>${atClock(item.start)}</time>${code(item.uid)}</span>`).join('')}</div></div>`).join('');
+      const rows = $('rows');
+      for (let size = 2.8; size >= 1.4; size -= 0.1) {
+        rows.style.fontSize = `${size}vh`;
+        if (rows.scrollHeight <= rows.clientHeight) break;
+      }
     }
 
     function show(layer) {
@@ -193,9 +234,9 @@
       if (position.phase === 'before') {
         prepare(position.item);
         const wait = Math.ceil(-position.offset);
-        drawTimetable(0);
+        drawTimetable();
         show('timetable');
-        $('tt-sub').textContent = `Starts at ${Kit.clock(plan.start_ms, plan.timezone)}, in ${Kit.duration(wait)}`;
+        $('tt-sub').textContent = `Starts in ${countdown(wait)}`;
         return;
       }
       if (position.phase === 'done') {

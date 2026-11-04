@@ -13,7 +13,7 @@
     <h1 id="title"></h1>
     <div class="bar">
       <label>Screen <select id="screen"></select></label>
-      <a class="button primary" id="play" target="lbd-player">Open player</a>
+      <a class="button primary" id="play">Open player</a>
       <span id="summary"></span>
     </div>
     <div class="bar">
@@ -118,6 +118,7 @@
       const left = plan.slot_s - timeline.total;
       $('title').textContent = `Screen ${plan.screen}: ${plan.name}`;
       $('play').href = `lbd-play.html?screen=${plan.screen}`;
+      $('play').target = `lbd-player-${plan.screen}`;  // one player tab per screen, the same one as from LBD screens
       $('screen').innerHTML = SCREENS.map((id) => `<option${id === plan.screen ? ' selected' : ''}>${id}</option>`).join('');
       $('summary').innerHTML = `${plan.plays.length} plays · total ${(timeline.total / 60).toFixed(1)} min · ` +
         `<span class="${left < 0 ? 'warn' : ''}">${left < 0 ? 'over the slot by' : 'slot left'} ${(Math.abs(left) / 60).toFixed(1)} min</span> · ` +

@@ -1,6 +1,6 @@
 Kit.nav('materials.html');
 const $ = (id) => document.getElementById(id);
-const LABELS = { paper: 'Paper', poster: 'Poster', video: 'Video', thumbnail: 'Thumbnail', captions: 'Captions' };
+const LABELS = { paper: 'Paper', poster: 'Poster', video: 'Video', thumbnail: 'Thumbnail', captions: 'Captions', channel: 'Channel' };
 const MARKS = { current: '✓', changed: '↻', missing: '↓', unknown: '?', local: '✓' };
 const POLL_MS = 1000;
 const selected = new Set();

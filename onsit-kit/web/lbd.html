@@ -26,7 +26,7 @@
           <td>${screen.poster_s ? `${screen.poster_s} s` : 'none'}</td>
           <td>${[missing(screen.missing_videos, 'videos'), missing(screen.missing_posters, 'posters')].filter(Boolean).join(', ') || 'complete'}</td>
           <td class="actions">
-            <a class="button primary" href="lbd-play.html?screen=${screen.screen}">Play</a>
+            <a class="button primary" href="lbd-play.html?screen=${screen.screen}" target="lbd-player-${screen.screen}">Play</a>
             <a class="button" href="lbd-manage.html?screen=${screen.screen}">Manage</a>
           </td></tr>`).join('');
     });

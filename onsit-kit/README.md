@@ -22,7 +22,7 @@ uv run python onsit-kit/make_env.py
 ```
 
 The first time, copy `onsite_env.example` to `.onsite_env` and fill in `DRIVE_FOLDER_LBD` and
-`DRIVE_FOLDER_MIREX` (the camera-ready folders). `make_env.py` generates the rest.
+`DRIVE_FOLDER_MIREX` (the camera-ready folders) and `DRIVE_FOLDER_CHANNELS` (the Slack channel QR codes). `make_env.py` generates the rest.
 Rerun it after any change in the sheets: it keeps the lines you wrote. To add rows to the links table,
 see the example file.
 
@@ -34,7 +34,7 @@ cp <from your private copy>/.onsite_env ISMIR2026-Kit/onsit-kit/
 ```
 
 Then start the kit and download everything: **Materials → Select everything to update → Download selected**.
-That is 442 files, 6.1 GB.
+That is 545 files, 6.1 GB.
 
 ## Every day
 
@@ -47,7 +47,8 @@ Open <http://127.0.0.1:8765>. The server only answers on this MacBook.
 
 ## Materials
 
-Files go to `media/{papers,posters,videos,thumbnails,captions}/<uid>.<ext>`.
+Files go to `media/{papers,posters,videos,thumbnails,captions,channels}/<uid>.<ext>`; the groups' channel
+codes are the rows `g1` to `g7`.
 
 *Check Drive for updates* takes about 2 minutes and compares each file's size with Drive's. It runs by
 itself the first time. The result stays, so the page works offline.
@@ -62,23 +63,25 @@ count as up to date.
 
 ## LBD screens
 
-Each screen plays its videos back to back, each after a 5 s cover with its code, title, authors and
-affiliations; there are no posters. Each video fades out over its last second, and the cover fades
+Each screen plays its videos back to back, each after a cover with its code, title, authors,
+affiliations and the QR codes of its paper and group Slack channels; there are no posters. Each video fades out over its last second, and the cover fades
 in over it and out over the next video. A bar on top shows the code and how far the video has played, and
 scrolls the titles of this video and the next. Before the start, the screen shows its timetable.
 
-| Screen | Topic | Videos | Plays | Total |
-|---|---|---:|---:|---:|
-| 1 | Music Generation (+666, +682) | 15 | 30 | 114.9 min |
-| 2 | Performance Analysis (+669) | 14 | 28 | 107.3 min |
-| 3 | Symbolic / Notation (+610) | 13 | 26 | 109.2 min |
-| 4 | Representations / Retrieval (−666) | 13 | 26 | 108.0 min |
-| 5 | Audio Synthesis / Production (−610, −682) | 12 | 24 | 107.7 min |
-| 6 | Human-Centered MIR (−669) | 13 | 26 | 110.9 min |
-| 7 | MIREX | 11 | 22 | 79.6 min |
+| Screen | Topic | Videos | Plays | Cover | Total |
+|---|---|---:|---:|---:|---:|
+| 1 | Music Generation (+666, +682) | 15 | 30 | 15 s | 119.9 min |
+| 2 | Performance Analysis (+669) | 14 | 28 | 20 s | 114.3 min |
+| 3 | Symbolic / Notation (+610) | 13 | 26 | 20 s | 115.7 min |
+| 4 | Representations / Retrieval (−666) | 13 | 26 | 20 s | 114.5 min |
+| 5 | Audio Synthesis / Production (−610, −682) | 12 | 24 | 20 s | 113.7 min |
+| 6 | Human-Centered MIR (−669) | 13 | 26 | 20 s | 117.5 min |
+| 7 | MIREX | 11 | 33 | 6 s | 119.9 min |
+
+The cover takes what the slot leaves, up to 20 s.
 
 Only virtual LBDs play: in-person ones present at their poster; the MIREX overview, m1, plays too. Each
-video plays twice: once through in uid order, then again. The default plans are
+video plays twice, MIREX three times: once through in uid order, then again. The default plans are
 in `lbd_schedule.json`, with the YouTube lengths. These lengths are replaced by the real ones when you
 open a screen's Manage page.
 

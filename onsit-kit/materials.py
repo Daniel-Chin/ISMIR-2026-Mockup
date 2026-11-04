@@ -19,7 +19,11 @@ from pathlib import Path
 FOLDER_PAGE = 'https://drive.google.com/embeddedfolderview?id={}'
 DOWNLOAD = 'https://drive.usercontent.google.com/download?id={}&export=download&confirm=t'
 ENTRY = re.compile(r'id="entry-([\w-]+)".*?<a href="([^"]+)".*?flip-entry-title">([^<]+)<', re.S)
-KINDS = {'paper': 'papers', 'poster': 'posters', 'video': 'videos', 'thumbnail': 'thumbnails', 'captions': 'captions'}
+KINDS = {'paper': 'papers', 'poster': 'posters', 'video': 'videos', 'thumbnail': 'thumbnails', 'captions': 'captions',
+         'channel': 'channels'}
+# Slack channel QR codes lie loose in their folder: LBD_569_lbd569-groovyui.png, LBD_m7_lbd-m7-a.png (MIREX),
+# LBD_group5_lbd-g5-audio.png.
+CHANNEL = re.compile(r'LBD_(group)?(m?\d+)_')
 VIDEO_SUFFIXES = {'.mp4', '.mov', '.m4v', '.webm'}
 LOOKUPS_AT_ONCE = 8
 DOWNLOADS_AT_ONCE = 3
@@ -139,7 +143,8 @@ class Materials:
         return self.begin({'action': 'check', 'done': 0, 'total': 0}, self.check_drive)
 
     def check_drive(self) -> None:
-        subfolders = [entry for root in self.roots for entry in list_folder(root) if entry['folder']]
+        entries = [entry for root in self.roots for entry in list_folder(root)]
+        subfolders = [entry for entry in entries if entry['folder']]
         matched = [entry for entry in subfolders if entry['name'] in self.uids]
         self.job['total'] = len(matched)
 
@@ -151,6 +156,12 @@ class Materials:
         with ThreadPoolExecutor(LOOKUPS_AT_ONCE) as pool:
             folders = list(pool.map(contents, matched))
         found = [(self.uids[entry['name']], file) for entry, names in folders for file in names if not file['folder']]
+        known = set(self.uids.values())
+        for entry in entries:
+            match = None if entry['folder'] else CHANNEL.match(entry['name'])
+            uid = match and ('g' if match[1] else '') + match[2]
+            if uid in known:
+                found.append((uid, {**entry, 'kind': 'channel'}))
         self.job.update(done=0, total=len(found))
 
         def measure(pair):
@@ -165,7 +176,7 @@ class Materials:
             list(pool.map(measure, found))
         files: dict = {}
         for uid, file in found:
-            files.setdefault(uid, {})[kind_of(file['name'])] = {key: file.get(key) for key in ('id', 'name', 'size')}
+            files.setdefault(uid, {})[file.get('kind') or kind_of(file['name'])] = {key: file.get(key) for key in ('id', 'name', 'size')}
         self.listing = {'checked_ms': int(time.time() * 1000), 'files': files,
                         'unmatched': sorted(entry['name'] for entry in subfolders if entry['name'] not in self.uids)}
         self.state.mkdir(exist_ok=True)
