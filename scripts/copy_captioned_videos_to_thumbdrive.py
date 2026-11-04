@@ -1,6 +1,7 @@
 '''
-uv run python -m scripts.copy_all_videos_to_thumbdrive /run/media/dan/THUMBDRIVE
-Writes <drive>/videos/session-xx/Pxx-yy.{ext}, xx = session index, yy = position.
+uv run python -m scripts.copy_captioned_videos_to_thumbdrive /run/media/dan/THUMBDRIVE
+Copies output of scripts.bake_captions.
+Writes <drive>/videos_w_caption/session-xx/Pxx-yy.{ext}, xx = session index, yy = position.
 `*-too-long.*` files are skipped; each has a plain (trimmed) counterpart.
 '''
 import os
@@ -10,7 +11,7 @@ import shutil
 from utils.session_assignment import parse_file
 
 SITEDATA = './sitedata/'
-VIDEOS_DIR = './tmp/videos/'
+VIDEOS_DIR = './tmp/videos_w_caption/'
 
 def find_video(uid: str) -> str | None:
     for name in os.listdir(VIDEOS_DIR):
@@ -30,7 +31,7 @@ def main(drive: str):
             missing.append(paper.uid)
             continue
         ext = os.path.splitext(src)[1]
-        session_dir = os.path.join(drive, 'videos', f'session-{paper.session_index:02d}')
+        session_dir = os.path.join(drive, 'videos_w_caption', f'session-{paper.session_index:02d}')
         os.makedirs(session_dir, exist_ok=True)
         dst = os.path.join(session_dir, f'P{paper.session_index:02d}-{paper.position:02d}{ext}')
         if os.path.exists(dst) and os.path.getsize(dst) == os.path.getsize(src):

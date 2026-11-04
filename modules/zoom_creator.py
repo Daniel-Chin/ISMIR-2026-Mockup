@@ -15,7 +15,7 @@ class ZoomCreator:
     """
 
     # Tutorials are created manually; the other skipped categories need no call.
-    SKIP_CATEGORIES = ("Tutorials", "Social", "Registration", "Majlis")
+    SKIP_CATEGORIES = ("Tutorials", "Social", "Registration", "Majlis", "Lunch")
 
     POSTER_SESSION_RE = re.compile(r"Poster Session - (\d+)")
 
