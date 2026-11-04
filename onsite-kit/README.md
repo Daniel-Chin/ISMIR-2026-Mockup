@@ -64,7 +64,8 @@ count as up to date.
 ## LBD screens
 
 Each screen plays its videos back to back, each after a cover with its code, title, authors,
-affiliations and the QR codes of its paper and group Slack channels; there are no posters. Each video fades out over its last second, and the cover fades
+affiliations and the QR codes of its paper and group Slack channels, and a faint ring in its top right
+corner that fills as the cover's time runs out; there are no posters. Each video fades out over its last second, and the cover fades
 in over it and out over the next video. A bar on top shows the code and how far the video has played, and
 scrolls the titles of this video and the next. Before the start, the screen shows its timetable.
 

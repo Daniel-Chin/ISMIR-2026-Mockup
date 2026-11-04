@@ -64,11 +64,17 @@
     /* The cover before each video: code, title, authors and their affiliations. */
     #cover { justify-content: center; padding: 0 9vw; background: var(--page); z-index: 2; }
     /* The cover fades in over the faded-out video, and fades out over the next one as it starts. */
-    #cover { opacity: 0; transition: opacity .8s ease, visibility 0s linear .8s; }
-    #cover.shown { opacity: 1; transition: opacity .8s ease, visibility 0s; }
+    #cover { opacity: 0; transition: opacity .8s ease, visibility 0s linear .8s, --cover-done .25s linear; }
+    #cover.shown { opacity: 1; transition: opacity .8s ease, visibility 0s, --cover-done .25s linear; }
     #video { transition: opacity .25s linear; }
     #video-mark { transition: opacity .4s ease; }
     #cover .logo { position: absolute; top: 5vh; left: 9vw; height: 9vh; }
+    /* A faint ring in the top right corner fills as the cover's time runs out. */
+    @property --cover-done { syntax: '<number>'; inherits: true; initial-value: 0; }
+    #cover .ring { position: absolute; top: 5vh; right: 4vw; width: 7vh; height: 7vh; border-radius: 50%; opacity: .45;
+      background: conic-gradient(var(--gold) calc(var(--cover-done) * 1turn), var(--line) 0);
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - .8vh), #000 calc(100% - .8vh + 1px));
+      mask: radial-gradient(farthest-side, transparent calc(100% - .8vh), #000 calc(100% - .8vh + 1px)); }
     #cover .eyebrow { font-size: 3vh; margin-bottom: 2.5vh; }
     #cover h1 { font-size: 6vh; line-height: 1.2; margin: 0 0 4vh; padding-bottom: 3vh; border-bottom: .35vh solid var(--gold); }
     #cover .authors { font-size: 3.2vh; line-height: 1.5; font-weight: 600; }
@@ -149,7 +155,7 @@
       const marks = (own) => (places.length > 1 && own.length ? `<sup>${own.map((place) => places.indexOf(place) + 1).join(',')}</sup>` : '');
       const channels = qrCard('Paper channel', (plan.media[item.uid] || {}).channel, paper.slack) +
         qrCard('Group channel', (plan.media[`g${paper.group}`] || {}).channel, (plan.group_slack || {})[paper.group]);
-      return `<img class="logo" src="logo.png" alt="ISMIR 2026"><div class="cover-body"><div class="cover-text">
+      return `<img class="logo" src="logo.png" alt="ISMIR 2026"><div class="ring"></div><div class="cover-body"><div class="cover-text">
         <div class="eyebrow">${code(item.uid)}</div><h1>${Kit.esc(paper.title)}</h1>
         <div class="authors">${people.map(([name, own]) => `${Kit.esc(name)}${marks(own)}`).join(', ')}</div>
         <div class="affiliations">${places.map((place, index) => `${places.length > 1 ? `<sup>${index + 1}</sup> ` : ''}${Kit.esc(place)}`).join('<br>')}</div>
@@ -262,6 +268,7 @@
         // The timetable phase is each video's cover now; the full timetable shows before the start.
         // The dark video layer stays under the cover, so it fades in from the faded-out video.
         show('cover');
+        $('cover').style.setProperty('--cover-done', Math.min((elapsed - item.start) / (item.posterAt - item.start || 1), 1));
         $('video-layer').classList.add('shown');
         video.style.opacity = 0;
         $('video-mark').style.opacity = 0;
@@ -276,6 +283,8 @@
         video.style.opacity = level;
         video.volume = level;
         $('video-mark').style.opacity = 1;
+        // The ring empties once the cover has faded out, so it never runs backwards in sight.
+        if (position.offset > 1) $('cover').style.setProperty('--cover-done', 0);
         show('video-layer');
         syncVideo(position);
         return;
