@@ -158,7 +158,12 @@ $('files').addEventListener('click', (event) => {
 $('select-update').onclick = () => { setMany(data.rows, (kind, file) => needsUpdate(file)); };
 $('select-all').onclick = () => setMany(shownRows(), () => true);
 $('select-none').onclick = () => { selected.clear(); drawTable(); drawSelection(); };
-['search', 'screen', 'only-update'].forEach((id) => { $(id).oninput = drawTable; });
+['search', 'screen'].forEach((id) => { $(id).oninput = drawTable; });
+// Narrowing the list to what needs updating also selects all of it, Slack channel codes included.
+$('only-update').oninput = () => {
+  if ($('only-update').checked) setMany(data.rows, (kind, file) => needsUpdate(file));
+  else drawTable();
+};
 $('check').onclick = () => act({ action: 'check' });
 $('cancel').onclick = () => act({ action: 'cancel' });
 $('download').onclick = async () => {

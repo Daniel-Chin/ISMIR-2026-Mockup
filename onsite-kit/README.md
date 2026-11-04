@@ -52,7 +52,8 @@ codes are the rows `g1` to `g7`.
 *Check Drive for updates* takes about 2 minutes and compares each file's size with Drive's. It runs by
 itself the first time. The result stays, so the page works offline.
 
-Tick single files, a row, or a whole column (click its title), or use *Select everything to update*. Any file
+Tick single files, a row, or a whole column (click its title), or use *Select everything to update*; ticking
+*Only what needs updating* lists those files and selects them all, Slack channel codes included. Any file
 can be ticked to download it again, and filters narrow the list by search, screen or status. Downloads
 can be cancelled, and pick up where they stopped, even after a restart. A new file replaces the old one only
 once it is complete, so a running player is safe; open Manage afterwards if a video changed.
