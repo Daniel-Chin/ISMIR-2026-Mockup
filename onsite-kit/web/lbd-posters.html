@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Onsite kit: LBD posters</title>
+  <link rel="stylesheet" href="kit.css">
+</head>
+<body>
+  <nav id="nav"></nav>
+  <main>
+    <h1>LBD posters</h1>
+    <p class="soft">Every poster, in group order, split over the poster screens; each shows for the same time, and never
+      while its own video or cover is on a video screen.</p>
+    <div id="conflicts"></div>
+    <table id="screens"></table>
+    <p class="soft">Missing files? Get them on the <a href="materials.html">Materials</a> page.
+      Start times, order and poster times are set on each screen's Manage page.</p>
+  </main>
+  <script src="kit.js"></script>
+  <script>
+    Kit.nav('lbd-posters.html');
+    Kit.showConflicts(document.getElementById('conflicts'));
+    Kit.get('/api/posters').then((screens) => {
+      document.getElementById('screens').innerHTML =
+        '<tr><th>Screen</th><th>Groups</th><th>Posters</th><th>Each</th><th>Ends</th><th>On this MacBook</th><th></th></tr>' +
+        screens.map((screen) => `<tr>
+          <td><b>${screen.screen}</b></td>
+          <td>${screen.groups.map(Kit.esc).join('<br>')}
+            <div class="soft">${screen.first.map(Kit.code).join('')} – ${screen.last.map(Kit.code).join('')}</div></td>
+          <td>${screen.posters}</td>
+          <td>${Kit.duration(screen.poster_s)}</td>
+          <td>${Kit.clock(screen.start_ms + screen.posters * screen.poster_s * 1000, screen.timezone)}</td>
+          <td>${screen.missing ? `<span class="warn">${screen.missing} posters missing</span>` : 'complete'}</td>
+          <td class="actions">
+            <a class="button primary" href="lbd-poster-play.html?screen=${screen.screen.slice(1)}" target="lbd-poster-player-${screen.screen}">Play</a>
+            <a class="button" href="lbd-manage.html?screen=${screen.screen}">Manage</a>
+          </td></tr>`).join('');
+    });
+  </script>
+</body>
+</html>

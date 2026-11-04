@@ -27,6 +27,10 @@ MEDIA = KIT / 'media'
 STATE = KIT / '.state'
 PROBES = STATE / 'probes.json'
 LOCAL_HOSTS = {'127.0.0.1', 'localhost'}
+mimetypes.add_type('text/javascript', '.mjs')  # pdf.js; older Pythons do not know the extension
+POSTER_SCREENS = [f'P{n}' for n in range(1, 5)]  # screens of posters only, alongside the video screens
+CLEAR_MS = 30_000  # a poster keeps this far from its own video, as measured lengths differ a little from YouTube's
+NO_POSTER_SCREEN = {'m1'}  # the MIREX overview: on the video screen only
 
 
 def load_env(path=ENV_FILE) -> dict:
@@ -85,6 +89,10 @@ class Kit:
         group_rows = [{'uid': f'g{group}', 'title': f'Group {group} Slack channel: {theme}'}
                       for group, theme in self.groups.items()]
         self.materials = materials.Materials(MEDIA, STATE, roots, lbds + group_rows, self.plan.get('screens', {}))
+        # Every poster, in group order then uid order, for the poster screens to split between them.
+        self.poster_order = [lbd['uid'] for lbd in sorted(lbds, key=lambda lbd: (
+            int(lbd.get('group') or 99), lbd['uid'].startswith('m'), int(lbd['uid'].lstrip('m'))))
+            if lbd['uid'] not in NO_POSTER_SCREEN]
         self.papers = {lbd['uid']: {k: lbd.get(k, '') for k in ('title', 'authors', 'people', 'mode', 'group', 'slack')}
                        for lbd in lbds}
         start = self.env.get('ONSITE_LBD_START')
@@ -100,15 +108,91 @@ class Kit:
             'poster_sessions': json.loads(self.env.get('ONSITE_POSTER_SESSIONS', '[]')),
         }
 
+    def has_screen(self, screen: str) -> bool:
+        return screen in self.plan.get('screens', {}) or screen in POSTER_SCREENS
+
     def default_schedule(self, screen: str) -> dict:
+        if screen in POSTER_SCREENS:
+            # The plan made by plan_posters.py, the same on every MacBook; worked out here only without one.
+            plan = self.plan.get('posters', {}).get(screen) or self.plan_posters(screen)
+            return {'rev': 0, 'plays': plan['plays'], 'poster_s': plan['poster_s'], 'timetable_s': 0,
+                    'start_ms': self.start_ms}
         plan = self.plan['screens'][screen]
         return {'rev': 0, 'plays': plan['plays'], 'poster_s': plan['poster_s'],
                 'timetable_s': plan['timetable_s'], 'start_ms': self.start_ms}
 
+    def plan_posters(self, screen: str) -> dict:
+        """A consecutive run of the posters in group order, every poster for the same time, reordered so
+        that none is up while its own video or cover is on a video screen."""
+        per_screen = -(-len(self.poster_order) // len(POSTER_SCREENS))
+        first = POSTER_SCREENS.index(screen) * per_screen
+        poster_s = self.slot_s // max(per_screen, 1)
+        on_video = self.video_times()
+
+        def free(uid, place):
+            begin = self.start_ms + place * poster_s * 1000
+            finish = begin + poster_s * 1000
+            return not any(begin - CLEAR_MS < end and start < finish + CLEAR_MS for start, end in on_video.get(uid, []))
+
+        return {'plays': arrange(self.poster_order[first:first + per_screen], free), 'poster_s': poster_s}
+
     def schedule(self, screen: str) -> dict:
         return read_json(STATE / f'screen_{screen}.json', self.default_schedule(screen))
 
+    def video_seconds(self) -> dict:
+        """uid -> its video's length: measured on this MacBook where it has been, else the YouTube length."""
+        media = media_files()
+        seconds = dict(self.plan.get('video_s', {}))
+        for uid, probe in read_json(PROBES, {}).items():
+            if media.get(uid, {}).get('size') == probe['size'] and probe['seconds']:
+                seconds[uid] = probe['seconds']
+        return seconds
+
+    def runs(self, screens) -> list:
+        """(screen, uid, from ms, to ms) for every play: a video's from its cover to its end, a poster's whole time."""
+        seconds = self.video_seconds()
+        found = []
+        for screen in screens:
+            schedule = self.schedule(screen)
+            cursor = schedule['start_ms']
+            for uid in schedule['plays']:
+                length = schedule['timetable_s'] + schedule['poster_s']
+                length += 0 if screen in POSTER_SCREENS else seconds.get(uid, 0)
+                found.append((screen, uid, cursor, cursor + length * 1000))
+                cursor += length * 1000
+        return found
+
+    def video_times(self) -> dict:
+        times: dict = {}
+        for _, uid, start, end in self.runs(self.plan.get('screens', {})):
+            times.setdefault(uid, []).append((start, end))
+        return times
+
+    def conflicts(self) -> list:
+        """Each time a paper's poster is up on a poster screen while its video or cover is on a video screen."""
+        on_video = {}
+        for screen, uid, start, end in self.runs(self.plan.get('screens', {})):
+            on_video.setdefault(uid, []).append((screen, start, end))
+        found = []
+        for poster_screen, uid, start, end in self.runs(POSTER_SCREENS):
+            for video_screen, video_start, video_end in on_video.get(uid, []):
+                if start < video_end and video_start < end:
+                    found.append({'uid': uid, 'poster_screen': poster_screen, 'video_screen': video_screen,
+                                  'from_ms': max(start, video_start), 'to_ms': min(end, video_end)})
+        return found
+
     def lbd(self, screen: str) -> dict:
+        if screen in POSTER_SCREENS:
+            schedule = self.schedule(screen)
+            groups = sorted({self.papers[uid]['group'] for uid in schedule['plays'] if uid in self.papers},
+                            key=lambda group: int(group or 99))
+            return {**schedule, 'screen': screen, 'kind': 'posters', 'name': f'Poster screen {screen[1:]}',
+                    'theme': ' · '.join(self.groups.get(group, group) for group in groups), 'groups': self.groups,
+                    'group_slack': self.group_slack,
+                    'timezone': self.env.get('ONSITE_TIMEZONE', 'UTC'), 'default_start_ms': self.start_ms,
+                    'utc_offset': self.env.get('ONSITE_LBD_START', '+00:00')[-6:], 'slot_s': self.slot_s,
+                    'papers': self.papers, 'media': media_files(), 'seconds': dict.fromkeys(self.papers, 0),
+                    'problems': {}, 'measured': {}}
         media = media_files()
         probes = read_json(PROBES, {})
         seconds = dict(self.plan['video_s'])
@@ -120,7 +204,7 @@ class Kit:
                 else:
                     problems[uid] = 'unplayable'
         plan = self.plan['screens'][screen]
-        return {**self.schedule(screen), 'screen': screen, 'name': plan['name'],
+        return {**self.schedule(screen), 'screen': screen, 'kind': 'videos', 'name': plan['name'],
                 'theme': self.groups.get(screen, plan['theme']), 'group_slack': self.group_slack,
                 'timezone': self.env.get('ONSITE_TIMEZONE', 'UTC'), 'default_start_ms': self.start_ms,
                 'utc_offset': self.env.get('ONSITE_LBD_START', '+00:00')[-6:], 'slot_s': self.slot_s,
@@ -140,6 +224,21 @@ class Kit:
                                                 if schedule['poster_s'])})
         return rows
 
+    def poster_screens(self) -> list:
+        media = media_files()
+        rows = []
+        for screen in POSTER_SCREENS:
+            schedule = self.schedule(screen)
+            plays = schedule['plays']
+            groups = sorted({self.papers[uid]['group'] for uid in plays if uid in self.papers},
+                            key=lambda group: int(group or 99))
+            rows.append({'screen': screen, 'posters': len(plays), 'poster_s': schedule['poster_s'],
+                         'start_ms': schedule['start_ms'], 'timezone': self.env.get('ONSITE_TIMEZONE', 'UTC'),
+                         'groups': [self.groups.get(group, group) for group in groups],
+                         'first': plays[:1], 'last': plays[-1:],
+                         'missing': sum('poster' not in media.get(uid, {}) for uid in plays)})
+        return rows
+
     def save(self, screen: str, body: dict) -> dict:
         """The new schedule, or None when another tab saved first."""
         current = self.schedule(screen)
@@ -157,6 +256,29 @@ class Kit:
 
     def measure(self, measured: dict) -> None:
         write_json(PROBES, {**read_json(PROBES, {}), **measured})
+
+
+def arrange(uids: list, free) -> list:
+    """uids ordered so each sits at a place where free(uid, place), as near its own place as can be.
+
+    A matching of papers to places, by augmenting paths; a paper with no free place left takes an empty one.
+    """
+    holder: list = [None] * len(uids)
+
+    def place(index, tried):
+        for spot in sorted(range(len(uids)), key=lambda spot: abs(spot - index)):
+            if spot not in tried and free(uids[index], spot):
+                tried.add(spot)
+                if holder[spot] is None or place(holder[spot], tried):
+                    holder[spot] = index
+                    return True
+        return False
+
+    stuck = [index for index in range(len(uids)) if not place(index, set())]
+    for spot in range(len(uids)):
+        if holder[spot] is None:
+            holder[spot] = stuck.pop(0)
+    return [uids[index] for index in holder]
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -242,7 +364,11 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(self.kit.screens())
         elif path == '/api/materials':
             self.send_json(self.kit.materials.snapshot())
-        elif screen and screen[1] in self.kit.plan['screens']:
+        elif path == '/api/posters':
+            self.send_json(self.kit.poster_screens())
+        elif path == '/api/conflicts':
+            self.send_json({'timezone': self.kit.env.get('ONSITE_TIMEZONE', 'UTC'), 'conflicts': self.kit.conflicts()})
+        elif screen and self.kit.has_screen(screen[1]):
             self.send_json(self.kit.lbd(screen[1]))
         elif path.startswith('/media/'):
             self.send_file(MEDIA, path[len('/media/'):])
@@ -262,7 +388,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({})
         elif path == '/api/materials':
             self.materials_action(body)
-        elif screen and screen[1] in self.kit.plan['screens']:
+        elif screen and self.kit.has_screen(screen[1]):
             try:
                 saved = self.kit.save(screen[1], body)
             except (KeyError, TypeError, ValueError) as error:

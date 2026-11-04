@@ -9,12 +9,14 @@
   <nav id="nav"></nav>
   <main>
     <h1>LBD screens</h1>
+    <div id="conflicts"></div>
     <table id="screens"></table>
     <p class="soft">Missing files? Get them on the <a href="materials.html">Materials</a> page.</p>
   </main>
   <script src="kit.js"></script>
   <script>
     Kit.nav('lbd.html');
+    Kit.showConflicts(document.getElementById('conflicts'));
     Kit.get('/api/lbd').then((screens) => {
       const missing = (count, what) => (count ? `<span class="warn">${count} ${what} missing</span>` : '');
       document.getElementById('screens').innerHTML =

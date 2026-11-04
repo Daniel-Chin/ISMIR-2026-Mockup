@@ -39,6 +39,9 @@
 
     /* The timetable before the start: the first round in full, later rounds as codes only. */
     #timetable { padding: 4vh 4vw 3vh; z-index: 2; background: var(--page); }
+    /* At the start the timetable stays under the first cover until that has faded in. */
+    #timetable { transition: visibility 0s linear .8s; }
+    #timetable.shown { transition: none; }
     .top { display: flex; align-items: center; gap: 2vw; padding-bottom: 2vh; margin-bottom: 2vh; border-bottom: .35vh solid var(--gold); }
     .top .logo { height: 9vh; }
     .eyebrow { font-size: 1.9vh; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
@@ -83,9 +86,13 @@
     .qr span { display: block; margin-top: .3vh; font-size: 1.7vh; font-weight: 600; overflow-wrap: anywhere; }
 
     #card { align-items: center; justify-content: center; text-align: center; background: var(--page); z-index: 2; }
-    #card .logo { height: 22vh; margin-bottom: 4vh; }
-    #card h1 { font-size: 5.5vh; margin: 0 0 2vh; }
+    #card .logo { height: 16vh; margin-bottom: 3.5vh; }
+    #card h1 { max-width: 80vw; font-size: 5vh; line-height: 1.2; margin: 0 0 2vh; }
     #card p { font-size: 3vh; color: var(--soft); margin: 0; }
+    #card-channel { margin-top: 4vh; display: flex; flex-direction: column; align-items: center; gap: 1.6vh; }
+    #card-channel:empty { display: none; }
+    #card-channel .eyebrow { font-size: 2vh; }
+    #card .card-eyebrow { font-size: 2.4vh; margin-bottom: 1.6vh; }
     #hint { position: fixed; z-index: 3; right: 1.5vw; bottom: 1.5vh; padding: .6vh 1vw; background: #161616cc; border-radius: 99px;
       font-size: 1.7vh; color: #fff; transition: opacity .4s; }
     body.idle #hint { opacity: 0; }
@@ -105,7 +112,7 @@
     <div id="rows"></div>
   </div>
   <div class="layer" id="cover"></div>
-  <div class="layer shown" id="card"><img class="logo" src="logo.png" alt="ISMIR 2026"><h1 id="card-title">Loading…</h1><p id="card-text"></p></div>
+  <div class="layer shown" id="card"><img class="logo" src="logo.png" alt="ISMIR 2026"><div class="eyebrow card-eyebrow">Late-Breaking / Demo</div><h1 id="card-title">Loading…</h1><p id="card-text"></p><div id="card-channel"></div></div>
   <div id="hint">F fullscreen · M sound: off</div>
   <script src="kit.js"></script>
   <script src="lbd-timeline.js"></script>
@@ -117,10 +124,10 @@
     const DRIFT_S = 1.2;
     const $ = (id) => document.getElementById(id);
     const video = $('video');
-    let plan, timeline, prepared = '', unplayable = false;
+    let plan, timeline, prepared = '', unplayable = false, cardChannel = '';
 
     const paperOf = (item) => plan.papers[item.uid] || { title: `LBD ${item.uid}`, authors: '' };
-    const code = (uid) => (uid.startsWith('m') ? `MIREX-${uid}` : `LBD-${uid}`);
+    const code = Kit.code;
     // The bar on top: the paper's code and, for a video, how far it has played; and what plays next.
     const markHtml = (item, kind) => {
       const next = timeline.items[item.index + 1];
@@ -130,29 +137,24 @@
         `<div class="next"><div><span style="--scroll:${10 + length * 0.18}s">${line('NOW', item)}` +
         `${next ? `<i></i>${line('NEXT', next)}` : ''}</span></div></div></div><i class="progress"></i>`;
     };
+    // A Slack channel's QR code with its name, or nothing when this MacBook has no code for it.
+    const qrCard = (label, image, channel) => (image ? `<div class="qr"><img src="${image}" alt="">
+      <b>${label}</b><span>#${Kit.esc(channel)}</span></div>` : '');
+
     // Authors with a mark for each affiliation, numbered only when they differ.
     function coverHtml(item) {
       const paper = paperOf(item);
       const people = Array.isArray(paper.people) && paper.people.length ? paper.people : [[paper.authors, []]];
       const places = [...new Set(people.flatMap(([, own]) => own))];
       const marks = (own) => (places.length > 1 && own.length ? `<sup>${own.map((place) => places.indexOf(place) + 1).join(',')}</sup>` : '');
-      const card = (label, image, channel) => (image ? `<div class="qr"><img src="${image}" alt="">
-        <b>${label}</b><span>#${Kit.esc(channel)}</span></div>` : '');
-      const channels = card('Paper channel', (plan.media[item.uid] || {}).channel, paper.slack) +
-        card('Group channel', (plan.media[`g${paper.group}`] || {}).channel, (plan.group_slack || {})[paper.group]);
+      const channels = qrCard('Paper channel', (plan.media[item.uid] || {}).channel, paper.slack) +
+        qrCard('Group channel', (plan.media[`g${paper.group}`] || {}).channel, (plan.group_slack || {})[paper.group]);
       return `<img class="logo" src="logo.png" alt="ISMIR 2026"><div class="cover-body"><div class="cover-text">
         <div class="eyebrow">${code(item.uid)}</div><h1>${Kit.esc(paper.title)}</h1>
         <div class="authors">${people.map(([name, own]) => `${Kit.esc(name)}${marks(own)}`).join(', ')}</div>
         <div class="affiliations">${places.map((place, index) => `${places.length > 1 ? `<sup>${index + 1}</sup> ` : ''}${Kit.esc(place)}`).join('<br>')}</div>
         </div>${channels ? `<div class="channels"><div class="eyebrow">Join on Slack</div>${channels}</div>` : ''}</div>`;
     }
-    const countdown = (seconds) => {
-      const pad = (value) => String(value).padStart(2, '0');
-      const days = Math.floor(seconds / 86400);
-      const hours = Math.floor(seconds / 3600) % 24;
-      const clock = `${pad(hours)}h ${pad(Math.floor(seconds / 60) % 60)}m ${pad(seconds % 60)}s`;
-      return days ? `${days}d ${clock}` : clock;
-    };
     const atClock = (seconds) => Kit.clock(plan.start_ms + seconds * 1000, plan.timezone);
 
     function prepare(item) {
@@ -233,16 +235,24 @@
       const position = Timeline.locate(timeline, elapsed);
       if (position.phase === 'before') {
         prepare(position.item);
+        video.style.opacity = 0;  // so the first video's opening frame never shows as the first cover fades in
+        $('video-mark').style.opacity = 0;
         const wait = Math.ceil(-position.offset);
         drawTimetable();
         show('timetable');
-        $('tt-sub').textContent = `Starts in ${countdown(wait)}`;
+        $('tt-sub').textContent = `Starts in ${Kit.countdown(wait)}`;
         return;
       }
       if (position.phase === 'done') {
         video.pause();
-        $('card-title').textContent = plan.name;
+        $('card-title').textContent = plan.theme;
         $('card-text').textContent = 'All videos have played. Thank you!';
+        const group = qrCard('Group channel', (plan.media[`g${plan.screen}`] || {}).channel, (plan.group_slack || {})[plan.screen]);
+        const channel = group && `<div class="eyebrow">Continue the discussion on Slack</div>${group}`;
+        if (cardChannel !== channel) {  // redrawn only on change, so the image does not reload
+          cardChannel = channel;
+          $('card-channel').innerHTML = channel;
+        }
         show('card');
         return;
       }

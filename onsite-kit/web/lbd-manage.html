@@ -9,6 +9,7 @@
   <nav id="nav"></nav>
   <main>
     <div id="notice"></div>
+    <div id="conflicts"></div>
     <span class="clock" id="clock"></span>
     <h1 id="title"></h1>
     <div class="bar">
@@ -37,9 +38,11 @@
   <script src="kit.js"></script>
   <script src="lbd-timeline.js"></script>
   <script>
-    Kit.nav('lbd.html');
     const screen_ = new URLSearchParams(location.search).get('screen') || '1';
-    const SCREENS = ['1', '2', '3', '4', '5', '6', '7'];
+    const posters = screen_.startsWith('P');  // a poster screen: posters only, no videos and no covers
+    Kit.nav(posters ? 'lbd-posters.html' : 'lbd.html');
+    const SCREENS = posters ? ['P1', 'P2', 'P3', 'P4'] : ['1', '2', '3', '4', '5', '6', '7'];
+    document.getElementById('timetable-s').parentElement.hidden = posters;
     const $ = (id) => document.getElementById(id);
     let plan;
     let startEdited = false;  // the page redraws every few seconds, and must not undo what is being typed
@@ -54,6 +57,7 @@
       }
       render();
       measure();
+      Kit.showConflicts($('conflicts'), (c) => (posters ? c.poster_screen : String(c.video_screen)) === screen_).catch(() => {});
     }
 
     async function save(changes) {
@@ -76,7 +80,7 @@
     // cannot play shows up here rather than on the wall.
     let measuring = false;
     async function measure() {
-      if (measuring) return;
+      if (measuring || posters) return;
       const todo = [...new Set(plan.plays)].filter((uid) => {
         const media = plan.media[uid];
         return media && media.video && plan.measured[uid] !== media.size;
@@ -104,7 +108,7 @@
     function status(uid) {
       const media = plan.media[uid] || {};
       const problems = [];
-      if (!media.video) problems.push('no video file');
+      if (!media.video && !posters) problems.push('no video file');
       if (plan.problems[uid]) problems.push('video will not play');
       if (!media.poster && plan.poster_s) problems.push('no poster file');
       return problems.join(', ');
@@ -116,9 +120,10 @@
       const current = Timeline.currentIndex(plan, now);
       const at = (seconds) => Kit.clock(plan.start_ms + seconds * 1000, plan.timezone);
       const left = plan.slot_s - timeline.total;
-      $('title').textContent = `Screen ${plan.screen}: ${plan.name}`;
-      $('play').href = `lbd-play.html?screen=${plan.screen}`;
-      $('play').target = `lbd-player-${plan.screen}`;  // one player tab per screen, the same one as from LBD screens
+      $('title').textContent = posters ? plan.name : `Screen ${plan.screen}: ${plan.name}`;
+      // One player tab per screen, the same one as from the list of screens.
+      $('play').href = posters ? `lbd-poster-play.html?screen=${plan.screen.slice(1)}` : `lbd-play.html?screen=${plan.screen}`;
+      $('play').target = posters ? `lbd-poster-player-${plan.screen}` : `lbd-player-${plan.screen}`;
       $('screen').innerHTML = SCREENS.map((id) => `<option${id === plan.screen ? ' selected' : ''}>${id}</option>`).join('');
       $('summary').innerHTML = `${plan.plays.length} plays · total ${(timeline.total / 60).toFixed(1)} min · ` +
         `<span class="${left < 0 ? 'warn' : ''}">${left < 0 ? 'over the slot by' : 'slot left'} ${(Math.abs(left) / 60).toFixed(1)} min</span> · ` +
@@ -139,7 +144,7 @@
             <td>${at(item.start)}</td>
             <td>${Kit.esc(item.uid)}</td>
             <td>${Kit.esc(paper.title)}<div class="soft">${Kit.esc(paper.authors)}</div></td>
-            <td>${Kit.duration(plan.seconds[item.uid] || 0)}</td>
+            <td>${posters ? '–' : Kit.duration(plan.seconds[item.uid] || 0)}</td>
             <td class="warn">${Kit.esc(status(item.uid))}</td>
             <td class="actions">${locked ? (index === current ? '<b>on screen</b>' : '') : `
               <button data-act="next" data-i="${index}" title="Play right after the current one"${index === current + 1 ? ' disabled' : ''}>Next</button>

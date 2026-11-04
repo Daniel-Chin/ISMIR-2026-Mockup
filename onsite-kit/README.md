@@ -8,9 +8,8 @@ screens, and the LBD and MIREX materials. It runs on Python 3.9+ with no package
 | **Links** | Miniconf, Zoom, Slack, YouTube, Live Database and operations links |
 | **Poster sessions** | Zoom, Slack and miniconf links of all 14 sessions; the live and next ones are marked |
 | **LBD screens** | The 7 video screens: Play and Manage for each |
+| **LBD posters** | The 4 poster screens: Play and Manage for each |
 | **Materials** | Every LBD and MIREX file on Drive against this MacBook: choose what to download or update |
-
-The 4 LBD poster monitors are not covered yet.
 
 ## Before the conference
 
@@ -103,6 +102,22 @@ for that time, so the screens stay in step.
 - *Fit posters to the slot* picks the poster time that makes the remaining plays end by the end of the slot.
 - *Reset to default plan* discards this screen's changes.
 
+## LBD posters
+
+The 4 poster screens show every LBD and MIREX poster but the MIREX overview (m1), in group order, split into
+4 runs of 27, 27, 27 and 26 posters: 4:26 each, from 15:00 to 16:59 (16:55 on the last screen).
+Within each run the posters are ordered so that none is up while its own video or cover is on a video
+screen, with 30 s to spare. `plan_posters.py` works this out against the video screens' default plans and fixes
+it in `lbd_schedule.json`, so every MacBook shows the same; rerun it on an organizer's machine and commit
+whenever the video plans or the LBDs change. The LBD screens, LBD posters and Manage pages warn of any clash
+that edits on the day make; *Reset to default plan* brings a poster screen back to the fixed plan.
+
+Posters are drawn whole, scaled to the screen, by pdf.js (`web/vendor/pdfjs`), not shown in Chrome's PDF
+viewer. The poster takes the screen's height; a column on its right shows its code and time, title, authors,
+the QR codes of its paper and group Slack channels, and the next poster; the next poster loads in the background and fades in. Before the start the screen
+lists its posters by group, with a countdown. Each screen has a Manage page like the video screens: start time,
+order, adding or removing posters, and the time per poster.
+
 ## Files
 
 | File | Role |
@@ -110,8 +125,9 @@ for that time, so the screens stay in step.
 | `make_env.py` | Fills `.onsite_env` from the private data |
 | `serve.py` | The local server, and the store of each screen's schedule |
 | `materials.py` | Compares Drive with `media/` and downloads files |
-| `lbd_schedule.json` | Default plan per screen |
-| `web/` | The pages; `lbd-timeline.js` holds the timing logic |
+| `lbd_schedule.json` | Default plan per screen, video and poster |
+| `plan_posters.py` | Fixes the poster screens' plans so that no poster meets its own video |
+| `web/` | The pages; `lbd-timeline.js` holds the timing logic, `vendor/pdfjs/` draws the posters |
 | `.onsite_env`, `media/`, `.state/` | Private or local: gitignored |
 
 Tests: `node --test onsite-kit/test_timeline.cjs` and `pytest tests/test_onsite_kit.py`.

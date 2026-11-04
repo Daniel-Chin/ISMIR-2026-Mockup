@@ -126,7 +126,8 @@ def lbd_rows(rows, folders):
     return [{
         'uid': r['uid'],
         'title': r['title'],
-        'authors': re.sub(r'\s*\([^)]*\)|\*', '', r['authors_and_affil_from_pdf']),
+        # From the parsed people, as affiliations can hold parentheses of their own: (... (UIUC)).
+        'authors': '; '.join(name for name, _ in people(r['authors_and_affil_from_pdf'])),
         'people': people(r['authors_and_affil_from_pdf']),
         'mode': r['presentation_mode'],
         'group': r.get('group_id', ''),

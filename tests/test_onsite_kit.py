@@ -54,6 +54,35 @@ def test_env_rows_keep_extra_pipes_in_the_last_column(server):
     assert info['links'] == [{'group': 'Group', 'name': 'Name', 'url': 'https://example.com/?a=1', 'description': 'About | more'}]
 
 
+def test_poster_screens_split_every_poster_in_group_order(server, monkeypatch):
+    lbds = [{'uid': uid, 'title': uid, 'group': group} for uid, group in
+            [('m2', '7'), ('m1', '7'), ('600', '2'), ('569', '1'), ('601', '2'), ('570', '1')]]
+    monkeypatch.setattr(serve, 'load_env', lambda: {'ONSITE_LBDS': json.dumps(lbds)})
+    serve.Handler.kit = serve.Kit()
+    serve.Handler.kit.plan.pop('posters', None)  # worked out here, not the fixed plan in lbd_schedule.json
+    screens = [json.loads(request(server, 'GET', f'/api/lbd/P{n}')[1]) for n in range(1, 5)]
+    assert [uid for screen in screens for uid in screen['plays']] == ['569', '570', '600', '601', 'm2']  # no m1
+    assert {screen['poster_s'] for screen in screens} == {3600}  # two posters a screen at most, 7200 s
+    assert request(server, 'GET', '/api/lbd/P5')[0].status == 404
+    serve.Handler.kit.plan['posters'] = {'P2': {'plays': ['601', '600'], 'poster_s': 90}}  # as plan_posters.py fixes it
+    fixed = json.loads(request(server, 'GET', '/api/lbd/P2')[1])
+    assert (fixed['plays'], fixed['poster_s']) == (['601', '600'], 90)
+    change = {'rev': 0, 'plays': ['569'], 'poster_s': 60, 'timetable_s': 0, 'start_ms': 1}
+    assert request(server, 'POST', '/api/lbd/P1', change)[0].status == 200
+    assert json.loads(request(server, 'GET', '/api/posters')[1])[0]['posters'] == 1
+
+
+def test_posters_keep_clear_of_their_own_videos(server):
+    blocked = {('a', 0), ('a', 1), ('b', 1)}
+    order = serve.arrange(['a', 'b', 'c'], lambda uid, spot: (uid, spot) not in blocked)
+    assert all((uid, spot) not in blocked for spot, uid in enumerate(order)) and sorted(order) == ['a', 'b', 'c']
+    video = json.loads(request(server, 'GET', '/api/lbd/6')[1])
+    change = {'rev': 0, 'plays': ['569'], 'poster_s': 60, 'timetable_s': 0, 'start_ms': video['start_ms']}
+    assert request(server, 'POST', '/api/lbd/P1', change)[0].status == 200
+    found = json.loads(request(server, 'GET', '/api/conflicts')[1])['conflicts']
+    assert [(c['uid'], c['poster_screen'], c['video_screen']) for c in found] == [('569', 'P1', '6')]
+
+
 def test_sheet_wins_over_the_local_mirex_list():
     sheet = [{'uid': '569'}, {'uid': 'm1', 'title': 'sheet'}]
     mirex = [{'uid': 'm1', 'title': 'local'}, {'uid': 'm2', 'title': 'local'}]
@@ -61,9 +90,11 @@ def test_sheet_wins_over_the_local_mirex_list():
 
 
 def test_authors_keep_every_affiliation():
-    text = 'Ann Lee (Zayed University; NYU Abu Dhabi)*; Bo Li (KTH); Future MIREX Team'
-    assert make_env.people(text) == [['Ann Lee', ['Zayed University', 'NYU Abu Dhabi']], ['Bo Li', ['KTH']],
-                                      ['Future MIREX Team', []]]
+    text = 'Ann Lee (Zayed University; NYU Abu Dhabi)*; Bo Li (University of Illinois (UIUC)); Future MIREX Team'
+    assert make_env.people(text) == [['Ann Lee', ['Zayed University', 'NYU Abu Dhabi']],
+                                      ['Bo Li', ['University of Illinois (UIUC)']], ['Future MIREX Team', []]]
+    row = {'uid': '1', 'title': 'T', 'authors_and_affil_from_pdf': text, 'presentation_mode': 'Virtual'}
+    assert make_env.lbd_rows([row], {})[0]['authors'] == 'Ann Lee; Bo Li; Future MIREX Team'
 
 
 def test_refuses_other_hosts(server):
