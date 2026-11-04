@@ -80,7 +80,7 @@ class Kit:
         lbds = json.loads(self.env.get('ONSITE_LBDS', '[]'))
         roots = [materials.folder_id(value) for key, value in self.env.items() if key.startswith('DRIVE_FOLDER_')]
         self.materials = materials.Materials(MEDIA, STATE, roots, lbds, self.plan.get('screens', {}))
-        self.papers = {lbd['uid']: {k: lbd[k] for k in ('title', 'authors', 'mode')} for lbd in lbds}
+        self.papers = {lbd['uid']: {k: lbd.get(k, '') for k in ('title', 'authors', 'people', 'mode')} for lbd in lbds}
         start = self.env.get('ONSITE_LBD_START')
         end = self.env.get('ONSITE_LBD_END')
         self.start_ms = int(datetime.fromisoformat(start).timestamp() * 1000) if start else 0

@@ -60,6 +60,12 @@ def test_sheet_wins_over_the_local_mirex_list():
     assert make_env.merge_mirex(sheet, mirex) == sheet + [mirex[1]]
 
 
+def test_authors_keep_every_affiliation():
+    text = 'Ann Lee (Zayed University; NYU Abu Dhabi)*; Bo Li (KTH); Future MIREX Team'
+    assert make_env.people(text) == [['Ann Lee', ['Zayed University', 'NYU Abu Dhabi']], ['Bo Li', ['KTH']],
+                                      ['Future MIREX Team', []]]
+
+
 def test_refuses_other_hosts(server):
     response, _ = request(server, 'GET', '/api/info', headers={'Host': 'evil.example:8765'})
     assert response.status == 403
@@ -90,7 +96,7 @@ def test_schedule_saves_and_rejects_stale_tabs(server):
     assert response.status == 400
     request(server, 'POST', '/api/lbd/7', {'rev': 1, 'reset': True})
     _, data = request(server, 'GET', '/api/lbd/7')
-    assert len(json.loads(data)['plays']) == 33
+    assert json.loads(data)['plays'] == serve.Handler.kit.plan['screens']['7']['plays']
 
 
 def test_measured_length_replaces_the_default(server):

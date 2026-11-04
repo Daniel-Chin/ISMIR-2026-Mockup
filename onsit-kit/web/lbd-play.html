@@ -22,17 +22,19 @@
     .fallback h2 { font-size: 5vh; margin: 0 0 2vh; }
     .fallback p { font-size: 2.6vh; color: var(--soft); margin: 0; }
 
-    /* The bar over a poster or a video: what it is and whose it is. */
-    .head { position: relative; display: flex; align-items: center; gap: 1.6vw; padding: 1.6vh 2.2vw 1.9vh; background: #fff;
-      border-bottom: 1px solid var(--line); box-shadow: 0 .4vh 1.2vh #0000001a; z-index: 1; }
-    .kind { flex: none; padding: .7vh 1.1vw; border-radius: 99px; background: var(--gold); color: #fff;
-      font-size: 2vh; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
-    .kind.video { background: var(--ink); }
-    .who { flex: 1; min-width: 0; }
-    .who b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 3vh; line-height: 1.25; font-weight: 700; }
-    .who span { display: block; margin-top: .4vh; font-size: 2vh; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .logo { flex: none; height: 6.5vh; mix-blend-mode: multiply; }  /* the logo file has a white background */
-    .progress { position: absolute; left: 0; bottom: 0; height: .5vh; width: 100%; background: var(--gold-light);
+    /* The row above a poster or a video: whose it is, how far it has played, and what plays next. */
+    .bar { flex: none; display: flex; align-items: center; gap: 2vw; padding: 1.2vh 2vw; background: var(--ink); color: #fff; }
+    .mark { flex: none; font-size: 3.2vh; font-weight: 700; letter-spacing: .06em; }
+    .mark span { margin-left: .6em; color: var(--gold-light); letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+    .next { flex: 1; min-width: 0; display: flex; align-items: center; border-radius: 1vh; background: #ffffff17;
+      font-size: 2.6vh; font-weight: 600; white-space: nowrap; overflow: hidden; }
+    .next div { flex: 1; overflow: hidden; padding: 1vh 0; margin: 0 1.2vw; }
+    .next span { display: inline-block; padding-left: 100%; animation: ticker var(--scroll, 20s) linear infinite; }
+    .next b { color: var(--gold-light); letter-spacing: .12em; margin-right: .6em; }
+    .next i { display: inline-block; width: 4em; }
+    @keyframes ticker { to { transform: translateX(-100%); } }
+    .logo { flex: none; mix-blend-mode: multiply; }  /* the logo file has a white background */
+    .progress { position: absolute; left: 0; bottom: 0; z-index: 1; height: .5vh; width: 100%; background: var(--gold-light);
       transform-origin: left; transform: scaleX(var(--done, 0)); }
 
     /* The timetable before each play, in the style of the program site's schedule. */
@@ -46,10 +48,25 @@
     .row { display: flex; align-items: center; gap: 1.2vw; min-width: 0; padding: 0 1vw; border-radius: .8vh; background: #fff;
       border-left: .5vh solid #e6cf9f; font-size: 2.1vh; box-shadow: 0 .1vh .3vh #0000000d; }
     .row time { flex: none; font-weight: 700; color: var(--gold); font-variant-numeric: tabular-nums; }
+    .row .code { flex: none; min-width: 5.4em; color: var(--soft); font-size: 1.8vh; font-weight: 600; font-variant-numeric: tabular-nums; }
     .row div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .row.up { background: var(--gold-tint); border-left-color: var(--gold); font-weight: 700; }
     .row .tag { flex: none; margin-left: auto; padding: .2vh .7vw; border-radius: 99px; background: var(--gold); color: #fff;
       font-size: 1.5vh; letter-spacing: .1em; text-transform: uppercase; }
+
+    /* The cover before each video: code, title, authors and their affiliations. */
+    #cover { justify-content: center; padding: 0 9vw; background: var(--page); z-index: 2; }
+    /* The cover fades in over the faded-out video, and fades out over the next one as it starts. */
+    #cover { opacity: 0; transition: opacity .8s ease, visibility 0s linear .8s; }
+    #cover.shown { opacity: 1; transition: opacity .8s ease, visibility 0s; }
+    #video { transition: opacity .25s linear; }
+    #video-mark { transition: opacity .4s ease; }
+    #cover .logo { position: absolute; top: 5vh; left: 9vw; height: 9vh; }
+    #cover .eyebrow { font-size: 3vh; margin-bottom: 2.5vh; }
+    #cover h1 { font-size: 6vh; line-height: 1.2; margin: 0 0 4vh; padding-bottom: 3vh; border-bottom: .35vh solid var(--gold); }
+    #cover .authors { font-size: 3.2vh; line-height: 1.5; font-weight: 600; }
+    #cover .affiliations { margin-top: 2vh; font-size: 2.4vh; line-height: 1.6; color: var(--soft); }
+    #cover sup { font-size: .6em; color: var(--gold); margin-left: .1em; }
 
     #card { align-items: center; justify-content: center; text-align: center; background: var(--page); z-index: 2; }
     #card .logo { height: 22vh; margin-bottom: 4vh; }
@@ -63,7 +80,7 @@
 <body>
   <div class="layer" id="poster"></div>
   <div class="layer" id="video-layer">
-    <div id="video-head"></div>
+    <div id="video-mark"></div>
     <div class="stage"><video id="video" playsinline preload="auto" muted></video></div>
   </div>
   <div class="layer" id="timetable">
@@ -73,6 +90,7 @@
     </div>
     <div id="rows"></div>
   </div>
+  <div class="layer" id="cover"></div>
   <div class="layer shown" id="card"><img class="logo" src="logo.png" alt="ISMIR 2026"><h1 id="card-title">Loading…</h1><p id="card-text"></p></div>
   <div id="hint">F fullscreen · M sound: off</div>
   <script src="kit.js"></script>
@@ -80,6 +98,7 @@
   <script>
     const screen_ = new URLSearchParams(location.search).get('screen') || '1';
     const TICK_MS = 250;
+    const FADE_OUT_S = 1.2;  // the end of each video fades to dark, sound too
     const RELOAD_MS = 3000;
     const DRIFT_S = 1.2;
     const VISIBLE_ROWS = 34;  // two columns of 17; the longest default plan has 33 plays
@@ -88,12 +107,27 @@
     let plan, timeline, prepared = '', unplayable = false;
 
     const paperOf = (item) => plan.papers[item.uid] || { title: `LBD ${item.uid}`, authors: '' };
-    const headHtml = (item, kind) => {
-      const paper = paperOf(item);
-      return `<div class="head"><span class="kind ${kind}">${kind}</span>
-        <div class="who"><b>${Kit.esc(paper.title)}</b><span>${Kit.esc(paper.authors)}</span></div>
-        <img class="logo" src="logo.png" alt=""><i class="progress"></i></div>`;
+    const code = (uid) => (uid.startsWith('m') ? `MIREX-${uid.slice(1)}` : `LBD-${uid}`);
+    // The bar on top: the paper's code and, for a video, how far it has played; and what plays next.
+    const markHtml = (item, kind) => {
+      const next = timeline.items[item.index + 1];
+      const line = (label, it) => `<b>${label}</b>${code(it.uid)} · ${Kit.esc(paperOf(it).title)}`;
+      const length = paperOf(item).title.length + (next ? paperOf(next).title.length + 40 : 0);
+      return `<div class="bar"><div class="mark">${code(item.uid)}<span class="state">${kind === 'video' ? '' : 'POSTER'}</span></div>` +
+        `<div class="next"><div><span style="--scroll:${10 + length * 0.18}s">${line('NOW', item)}` +
+        `${next ? `<i></i>${line('NEXT', next)}` : ''}</span></div></div></div><i class="progress"></i>`;
     };
+    // Authors with a mark for each affiliation, numbered only when they differ.
+    function coverHtml(item) {
+      const paper = paperOf(item);
+      const people = Array.isArray(paper.people) && paper.people.length ? paper.people : [[paper.authors, []]];
+      const places = [...new Set(people.flatMap(([, own]) => own))];
+      const marks = (own) => (places.length > 1 && own.length ? `<sup>${own.map((place) => places.indexOf(place) + 1).join(',')}</sup>` : '');
+      return `<img class="logo" src="logo.png" alt="ISMIR 2026">
+        <div class="eyebrow">${code(item.uid)}</div><h1>${Kit.esc(paper.title)}</h1>
+        <div class="authors">${people.map(([name, own]) => `${Kit.esc(name)}${marks(own)}`).join(', ')}</div>
+        <div class="affiliations">${places.map((place, index) => `${places.length > 1 ? `<sup>${index + 1}</sup> ` : ''}${Kit.esc(place)}`).join('<br>')}</div>`;
+    }
     const atClock = (seconds) => Kit.clock(plan.start_ms + seconds * 1000, plan.timezone);
 
     function prepare(item) {
@@ -109,8 +143,9 @@
           ? `<iframe src="${media.poster}#toolbar=0&navpanes=0&scrollbar=0&view=Fit"></iframe>`
           : `<img src="${media.poster}" alt="">`)
         : `<div class="fallback"><h2>${Kit.esc(paper.title)}</h2><p>${Kit.esc(paper.authors)}</p></div>`;
-      $('poster').innerHTML = headHtml(item, 'poster') + `<div class="stage">${poster}</div>`;
-      $('video-head').innerHTML = headHtml(item, 'video');
+      $('poster').innerHTML = markHtml(item, 'poster') + `<div class="stage">${poster}</div>`;
+      $('video-mark').innerHTML = markHtml(item, 'video');
+      $('cover').innerHTML = coverHtml(item);
       if (unplayable) {
         video.removeAttribute('src');
         video.load();
@@ -121,19 +156,19 @@
     }
 
     function drawTimetable(from) {
-      $('tt-title').textContent = `Screen ${plan.screen}: ${plan.name}`;
+      $('tt-title').textContent = plan.name;
       $('tt-sub').textContent = plan.theme;
       const rows = timeline.items.slice(from, from + VISIBLE_ROWS);
       $('rows').innerHTML = rows.map((item, index) => `<div class="row${index ? '' : ' up'}">
-        <time>${atClock(item.start)}</time><div>${Kit.esc(paperOf(item).title)}</div>${index ? '' : '<span class="tag">Up next</span>'}</div>`).join('');
+        <time>${atClock(item.start)}</time><span class="code">${code(item.uid)}</span><div>${Kit.esc(paperOf(item).title)}</div>${index ? '' : '<span class="tag">Up next</span>'}</div>`).join('');
     }
 
     function show(layer) {
-      ['card', 'timetable'].forEach((id) => $(id).classList.toggle('shown', id === layer));
+      ['card', 'timetable', 'cover'].forEach((id) => $(id).classList.toggle('shown', id === layer));
       $('video-layer').classList.toggle('shown', layer === 'video-layer');
     }
 
-    // How far the poster or video on screen is through its time, for the bar under its title.
+    // How far the poster or video on screen is through its time, for the bar along the bottom.
     function setProgress(from, to, elapsed) {
       document.body.style.setProperty('--done', Math.min(Math.max((elapsed - from) / (to - from || 1), 0), 1));
     }
@@ -165,7 +200,7 @@
       }
       if (position.phase === 'done') {
         video.pause();
-        $('card-title').textContent = `Screen ${plan.screen}: ${plan.name}`;
+        $('card-title').textContent = plan.name;
         $('card-text').textContent = 'All videos have played. Thank you!';
         show('card');
         return;
@@ -173,13 +208,23 @@
       const { item, phase } = position;
       prepare(item);
       if (phase === 'timetable') {
-        drawTimetable(item.index);
-        show('timetable');
+        // The timetable phase is each video's cover now; the full timetable shows before the start.
+        // The dark video layer stays under the cover, so it fades in from the faded-out video.
+        show('cover');
+        $('video-layer').classList.add('shown');
+        video.style.opacity = 0;
+        $('video-mark').style.opacity = 0;
       } else if (phase === 'poster') {
         setProgress(item.posterAt, unplayable ? item.end : item.videoAt, elapsed);
         show('poster');
       } else {
         setProgress(unplayable ? item.posterAt : item.videoAt, item.end, elapsed);
+        const state = $('video-mark').querySelector('.state');
+        if (state) state.textContent = `${Kit.duration(Math.min(position.offset, item.end - item.videoAt))} / ${Kit.duration(item.end - item.videoAt)}`;
+        const level = Math.max(0, Math.min(1, (item.end - elapsed) / FADE_OUT_S));
+        video.style.opacity = level;
+        video.volume = level;
+        $('video-mark').style.opacity = 1;
         show('video-layer');
         syncVideo(position);
         return;

@@ -62,20 +62,23 @@ count as up to date.
 
 ## LBD screens
 
-Each screen plays its list of plays, each `[timetable][poster][video]`. Screen 7 has no poster. Poster
-time is set per screen, and all screens end around 16:59.
+Each screen plays its videos back to back, each after a 5 s cover with its code, title, authors and
+affiliations; there are no posters. Each video fades out over its last second, and the cover fades
+in over it and out over the next video. A bar on top shows the code and how far the video has played, and
+scrolls the titles of this video and the next. Before the start, the screen shows its timetable.
 
-| Screen | Topic | Plays | Poster | Timetable | Total |
-|---|---|---:|---:|---:|---:|
-| 1 | Music Generation (+682) | 28 | 26 s | 8 s | 118.7 min |
-| 2 | Performance Analysis (+669) | 26 | 45 s | 8 s | 118.8 min |
-| 3 | Symbolic / Notation (+610) | 26 | 19 s | 8 s | 118.7 min |
-| 4 | Representations / Retrieval | 26 | 22 s | 8 s | 118.8 min |
-| 5 | Audio Synthesis / Production (−610, −682) | 24 | 25 s | 8 s | 118.8 min |
-| 6 | Human-Centered MIR (−669) | 26 | 15 s | 8 s | 118.8 min |
-| 7 | MIREX | 33 | none | 5 s | 119.2 min |
+| Screen | Topic | Videos | Plays | Total |
+|---|---|---:|---:|---:|
+| 1 | Music Generation (+666, +682) | 15 | 30 | 114.9 min |
+| 2 | Performance Analysis (+669) | 14 | 28 | 107.3 min |
+| 3 | Symbolic / Notation (+610) | 13 | 26 | 109.2 min |
+| 4 | Representations / Retrieval (−666) | 13 | 26 | 108.0 min |
+| 5 | Audio Synthesis / Production (−610, −682) | 12 | 24 | 107.7 min |
+| 6 | Human-Centered MIR (−669) | 13 | 26 | 110.9 min |
+| 7 | MIREX | 11 | 22 | 79.6 min |
 
-Every LBD plays once in uid order, then the rest of the plays repeat some of them. The default plans are
+Only virtual LBDs play: in-person ones present at their poster; the MIREX overview, m1, plays too. Each
+video plays twice: once through in uid order, then again. The default plans are
 in `lbd_schedule.json`, with the YouTube lengths. These lengths are replaced by the real ones when you
 open a screen's Manage page.
 

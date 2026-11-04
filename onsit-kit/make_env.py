@@ -107,11 +107,27 @@ def merge_mirex(sheet_rows, mirex_rows):
     return sheet_rows + [row for row in mirex_rows if row['uid'] not in listed]
 
 
+def people(text):
+    """'Ann Lee (KAIST; NYU)*; Bo Li (NYU)' -> [['Ann Lee', ['KAIST', 'NYU']], ['Bo Li', ['NYU']]].
+
+    Authors are split on the semicolons outside parentheses; * marks the contact author.
+    """
+    found = []
+    for part in filter(None, (piece.strip() for piece in re.split(r';(?![^(]*\))', text))):
+        match = re.fullmatch(r'([^(]*?)\s*\((.*)\)\s*\**', part)
+        if match:
+            found.append([match[1].strip(), [place.strip() for place in match[2].split(';') if place.strip()]])
+        else:
+            found.append([part.rstrip('*').strip(), []])
+    return found
+
+
 def lbd_rows(rows, folders):
     return [{
         'uid': r['uid'],
         'title': r['title'],
         'authors': re.sub(r'\s*\([^)]*\)|\*', '', r['authors_and_affil_from_pdf']),
+        'people': people(r['authors_and_affil_from_pdf']),
         'mode': r['presentation_mode'],
         'folder': folders.get(r['uid'], r['uid']),
     } for r in rows]
