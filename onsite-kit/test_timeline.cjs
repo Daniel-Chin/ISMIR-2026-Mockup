@@ -1,4 +1,4 @@
-// node --test onsit-kit/test_timeline.cjs
+// node --test onsite-kit/test_timeline.cjs
 const assert = require('node:assert');
 const test = require('node:test');
 const Timeline = require('./web/lbd-timeline.js');

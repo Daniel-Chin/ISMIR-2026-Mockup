@@ -37,7 +37,7 @@ const Kit = {
       `<a href="${href}"${href === active ? ' class="active"' : ''}>${label}</a>`).join('');
     if (location.protocol === 'file:') {
       document.querySelector('main').insertAdjacentHTML('afterbegin',
-        '<div class="notice">This page needs the kit: run python3 onsit-kit/serve.py, then open http://127.0.0.1:8765</div>');
+        '<div class="notice">This page needs the kit: run python3 onsite-kit/serve.py, then open http://127.0.0.1:8765</div>');
     }
   },
 };
