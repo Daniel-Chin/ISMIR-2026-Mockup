@@ -113,8 +113,9 @@ whenever the video plans or the LBDs change. The LBD screens, LBD posters and Ma
 that edits on the day make; *Reset to default plan* brings a poster screen back to the fixed plan.
 
 Posters are drawn whole, scaled to the screen, by pdf.js (`web/vendor/pdfjs`), not shown in Chrome's PDF
-viewer. The poster takes the screen's height; a column on its right shows its code and time, title, authors,
-the QR codes of its paper and group Slack channels, and the next poster; the next poster loads in the background and fades in. Before the start the screen
+viewer. A landscape poster fills the screen's height, and a column on its right takes the width it leaves
+(15-27% of the screen; an upright poster gets an A0 poster's column): the poster's code and time, the QR codes
+of its paper and group Slack channels, and the next poster; the next poster loads in the background and fades in. Before the start the screen
 lists its posters by group, with a countdown. Each screen has a Manage page like the video screens: start time,
 order, adding or removing posters, and the time per poster.
 
