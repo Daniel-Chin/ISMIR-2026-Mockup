@@ -345,6 +345,12 @@ tr.fc-list-item {
   color: #030303;
 }
 
+/* Photos in sheet-authored descriptions, e.g. keynote speakers. */
+.paper-text img {
+  max-width: 240px;
+  height: auto;
+}
+
 /* Rendered by the `markdown` template filter (main.py); site-wide link styles drop the underline. */
 .markdown a,
 .markdown a:hover {
