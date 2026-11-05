@@ -78,7 +78,8 @@ of being discovered on conference day.
 ISMIR2026 chose to purchase its own Zoom licenses:  
 - Zoom Workplace Pro x 1 from Aug to Nov.  
 - 300-attendee Webinars x 1 for Sep.  
-- 500-attendee Webinars x 1 for Nov.  
+- 500-attendee Webinars x 3 for Nov.  
+  - For 3 tutorials in parallel. 3 Zoom accounts need API setup.
 
 ### Shared webinar to be scheduled by script
 
@@ -110,6 +111,40 @@ deferred per action for exactly this reason).
 
 Set the same passcode for all poster-session meetings and for the shared
 webinar.
+
+## Tutorial webinars (`setup-zoom-tutorials`)
+
+Tutorials run three at a time, and each Zoom webinar license can host only one
+webinar at a time. So each tutorial gets its own webinar on one of three
+accounts. Add the extra accounts' S2S apps (same scopes as above) to `.env`:
+
+```
+ZOOM_API_ACCOUNT_ID_2=...  ZOOM_API_CLIENT_ID_2=...  ZOOM_API_CLIENT_SECRET_2=...
+ZOOM_API_ACCOUNT_ID_3=...  ZOOM_API_CLIENT_ID_3=...  ZOOM_API_CLIENT_SECRET_3=...
+```
+
+Tutorials with the same `start_date`/`start_time` form a parallel slot. Within
+a slot, rows in CSV order go to the main account, then `_2`, then `_3`. Each
+webinar uses the tutorial's own time, and the same settings as the shared
+webinar except that it doesn't recur.
+Join URLs are **printed to stdout** with each title, never written to
+`events.csv`.
+
+Only the webinar **write** scopes are needed: the extra accounts may not offer
+`webinar:read:*` scopes. So the script doesn't list webinars from Zoom. Each
+webinar it creates is recorded in `local/zoom_tutorial_webinars.json` (title →
+id, account, join URL). Re-running reprints those and creates only the missing
+ones; it never updates existing webinars. To change a webinar, edit it in the
+Zoom web UI, or delete it there and remove its entry from the JSON so the next
+run recreates it.
+
+```bash
+.venv/bin/python miniconf_prep.py --action setup-zoom-tutorials             # dry-run
+.venv/bin/python miniconf_prep.py --action setup-zoom-tutorials --prod true # real
+```
+
+The main account also hosts the shared livestream webinar. That is fine as
+long as the livestream isn't started while a main-account tutorial is live.
 
 ## Static Zoom redirect utility
 
@@ -161,7 +196,7 @@ For every row in `events.csv`, `setup-zoom` splits behavior into three paths:
 
 1. Poster sessions keep the existing meeting flow described below.
 2. Every non-poster live event shares the same webinar join URL.
-3. Tutorials remain manually created, and `Lunch` / `Social` need no call.
+3. Tutorials are handled by `setup-zoom-tutorials` ([above](#tutorial-webinars-setup-zoom-tutorials)), and `Lunch` / `Social` need no call.
 
 For non-poster live events:
 

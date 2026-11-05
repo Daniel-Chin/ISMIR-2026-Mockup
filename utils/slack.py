@@ -686,6 +686,8 @@ def batch_set_channel_description_interactive(sitedata_dir: str):
         if category_ == 'poster session':
             buf.append("During that time, use this Zoom room for live interaction with authors and audiences:\n")
             buf.append('<' + zoom_link + '>')
+        elif category_ == 'tutorials':
+            pass
         else:
             buf.append("If you aren't onsite, you can join the ")
             match category_:
@@ -695,7 +697,7 @@ def batch_set_channel_description_interactive(sitedata_dir: str):
                     buf.append(f"livestream: <{zoom_link}>\nNo time for live Q&A; Discuss on Slack!")
                 case _:
                     buf.append(f"Webinar: <{zoom_link}>\nStart your discussion here on Slack!")
-        return ''.join(buf)
+        return ''.join(buf).rstrip('\n')
 
     script_dir = Path(__file__).parent
     sitedata_path = script_dir.parent / sitedata_dir
