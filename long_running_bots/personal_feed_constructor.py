@@ -70,6 +70,7 @@ ROUND_AT = dtime(20, 0)  # conference-local time of the evening round
 
 STATE_PATH = Path("tmp/personal_feed_constructor_state.json")
 CHECK_INTERVAL_SECONDS = 30
+GREET_PAUSE_SECONDS = 1.0  # chat.postMessage allows ~1/s sustained
 INVITE_BATCH = 1000  # Slack's max users per conversations.invite
 # Failures that concern the users, not the channel: retrying would not help.
 SETTLED_INVITE_ERRORS = {
@@ -297,18 +298,20 @@ class FeedConstructor:
 
     # ---- greeting ----
 
-    def greet(self, user: dict) -> None:
+    def greet(self, user: dict) -> bool:
+        """Return whether a DM was sent."""
         if user.get("is_bot") or user.get("deleted") or user.get("id") == "USLACKBOT" \
                 or user.get("is_restricted") or user.get("is_ultra_restricted"):
-            return
+            return False
         user_id = user["id"]
         with self.lock:
             if user_id in self.state.greeted:
-                return
+                return False
         self.client.chat_postMessage(channel=user_id, text=GREETING, blocks=greeting_blocks())
         with self.lock:
             self.state.greeted.add(user_id)
             self.state.save()
+        return True
 
     def greet_everyone(self) -> None:
         if self.only_user:
@@ -317,7 +320,8 @@ class FeedConstructor:
         for page in self.client.users_list(limit=200):
             for user in page["members"]:
                 try:
-                    self.greet(user)
+                    if self.greet(user):
+                        Event().wait(GREET_PAUSE_SECONDS)
                 except SlackApiError as e:
                     logger.error("Could not greet %s: %s", user.get("id"), e.response.get("error"))
         logger.info("Greeted members: %d", len(self.state.greeted))
