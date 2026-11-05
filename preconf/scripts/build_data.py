@@ -13,6 +13,7 @@ import csv
 import datetime as dt
 import json
 import re
+import shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -251,6 +252,37 @@ def flag_set(src, value):
     return truthy(value)
 
 
+# The Industry Board's sponsors: these tiers of sitedata/sponsors/sponsors.yml (docs/SPONSORS.md), in order.
+INDUSTRY_TIERS = ("Platinum", "Gold")
+
+
+def read_sponsors(sd, out_dir):
+    """[{tier, name, url, logo, id}] of INDUSTRY_TIERS (id: the board id, from the name); each logo is copied to out_dir, `logo` is its path from
+    public/. sponsors.yml is a list of `- tier: X` with `sponsors:` items `- {name: …, logo: …, url: "…"}`,
+    read here without a YAML library, since the build uses only the standard library."""
+    path = sd / "sponsors" / "sponsors.yml"
+    if not path.is_file():
+        return []
+    sponsors, tier = [], None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if m := re.match(r"\s*-\s*tier:\s*(.+?)\s*$", line):
+            tier = m.group(1).strip("'\"")
+        elif m := re.match(r"\s*-\s*\{(.*)\}\s*$", line):
+            fields = dict(re.findall(r'(\w+):\s*("[^"]*"|[^,]+)', m.group(1)))
+            item = {k: v.strip().strip("'\"") for k, v in fields.items()}
+            if tier in INDUSTRY_TIERS and item.get("name") and item.get("logo"):
+                sponsors.append({"tier": tier, "name": item["name"], "url": item.get("url", ""), "logo": item["logo"],
+                                 "id": re.sub(r"[^a-z0-9]+", "-", item["name"].lower()).strip("-")[:40]})
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for s in sponsors:
+        src = sd / "sponsors" / s["logo"]
+        if not src.is_file():
+            raise SystemExit(f"{path}: no logo file {src.name}")
+        shutil.copy2(src, out_dir / src.name)
+        s["logo"] = f"data/sponsors/{src.name}"
+    return sorted(sponsors, key=lambda s: INDUSTRY_TIERS.index(s["tier"]))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sitedata", type=Path, default=DEFAULT_SITEDATA)
@@ -267,12 +299,9 @@ def main():
 
     # "Oral Session - 1" / "Poster Session - 1" in events.csv: each session's papers get a short
     # oral slot and a poster slot. Same title match as live_overview/scripts/update_schedule.py.
-    slots, lbd_slot, opening = {}, None, None
+    slots, lbd_slot = {}, None
     with open(sd / "events.csv", encoding="utf-8", newline="") as f:
         for ev in csv.DictReader(f):
-            # The Opening Session: from then on, the page points paper discussion to Slack.
-            if (ev.get("category") or "").strip().lower() == "opening" and opening is None:
-                opening = {"date": ev["start_date"].strip(), "start": hhmm(ev["start_time"])}
             if (ev.get("category") or "").strip().upper() == "LBD" and lbd_slot is None:
                 lbd_slot = {"kind": "lbd", "date": ev["start_date"].strip(), "start": hhmm(ev["start_time"]), "end": hhmm(ev["end_time"])}
             m = re.fullmatch(r"(Poster|Oral)\s+Session\s*-?\s*(\d+)", (ev.get("title") or "").strip(), re.I)
@@ -344,7 +373,6 @@ def main():
             "helpdeskUrl": config.get("helpdesk_url", ""),
             "venueCity": config.get("venue_city", ""),
             "slackAppName": config.get("slack_app_name", ""),
-            "opening": opening,   # {date, start} in the conference time zone, or None
         },
         "days": days,
         "sessions": {s["id"]: s for s in sessions},
@@ -354,6 +382,8 @@ def main():
         "lbds": lbds,
         # The LBDs' groups (one theme each), in group order; [] lists them all at once.
         "lbdGroups": read_lbd_groups(sd, lbds),
+        # The Industry Board (features.js industryBoard): Platinum and Gold sponsors, logos in data/sponsors/.
+        "sponsors": read_sponsors(sd, ROOT / "public" / "data" / "sponsors"),
     }
 
     out_json = ROOT / "public" / "data" / "program.json"

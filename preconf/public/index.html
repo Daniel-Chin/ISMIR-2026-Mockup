@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/styles.css" />
   <!-- After the stylesheets, so they start downloading first; still before the body (no flash). -->
   <script src="/vendor/site-chrome.js"></script>
+  <script src="/features.js"></script>
   <!-- Fetched in parallel with everything else instead of one after another. -->
   <link rel="preload" href="/data/program.json" as="fetch" crossorigin="anonymous" />
   <link rel="modulepreload" href="/app.js" />
@@ -30,6 +31,7 @@
       <a href="#welcome" data-nav="welcome">Welcome Reception</a>
       <a href="#papers" data-nav="papers">Paper Hall</a>
       <a href="#lbd" data-nav="lbd">LBD Hall</a>
+      <a href="#industry" data-nav="industry" hidden>Industry</a>
       <a href="https://ismir2026program.ismir.net/live.html" data-site-link="live">Live Overview</a>
       <a href="https://ismir2026program.ismir.net/" data-site-link="miniconf">Mini Conf</a>
       <a href="https://ismir2026.ismir.net/" data-site-link="official" target="_blank" rel="noopener noreferrer">Official Website</a>
@@ -129,6 +131,20 @@
       <div id="lbd-hall" hidden></div>
       <div id="lbd-wall" class="pc-wall" hidden></div>
     </section>
+
+    <!-- The Industry Board (features.js industryBoard; app.js initIndustry): one wall, an area per sponsor. -->
+    <section id="industry" class="section" hidden>
+      <div class="section-heading">
+        <div>
+          <h2 class="section-with-icon"><span class="section-icon section-icon-glance" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M3 21h18"></path><path d="M5 21V9l5 3V9l5 3V5h4v16"></path></svg></span>Industry Board</h2>
+          <p class="section-note">Our Platinum and Gold sponsors. Leave them a note.</p>
+        </div>
+        <div class="pc-head-actions">
+          <a class="link-button pc-add-note" href="#" role="button" id="industry-add">+ Note</a>
+        </div>
+      </div>
+      <div id="industry-wall" class="pc-wall"></div>
+    </section>
   </main>
 
   <footer class="footer">
@@ -136,22 +152,11 @@
     <span>Be kind: notes are visible to every attendee. <a id="helpdesk-link" href="#" target="_blank" rel="noopener noreferrer">Helpdesk</a></span>
   </footer>
 
-  <!-- Once the conference has opened, before a note on a paper or LBD board (app.js beforeNote). -->
-  <dialog class="pc-composer pc-notice" id="slack-notice">
-    <form method="dialog">
-      <h3>The conference is in session</h3>
-      <p>We encourage you to discuss on Slack, where the conversation now happens. You can still leave a note here.</p>
-      <div class="pc-composer-foot">
-        <a class="pc-btn pc-btn-ghost" id="slack-notice-link" href="#" target="_blank" rel="noopener noreferrer" hidden>Open the Slack channel</a>
-        <button class="pc-btn pc-btn-primary" type="submit" id="slack-notice-close">Close</button>
-      </div>
-    </form>
-  </dialog>
-
   <dialog class="pc-composer" id="composer">
     <form method="dialog">
       <h3 id="composer-title">New note</h3>
       <div class="pc-where" id="composer-where"></div>
+      <fieldset class="pc-choices" id="composer-choices" hidden><legend>To</legend></fieldset>
       <textarea id="composer-text" maxlength="600" placeholder="Write something nice…" required></textarea>
       <div class="pc-swatches" id="composer-swatches" role="group" aria-label="Note color"></div>
       <div class="pc-composer-foot">

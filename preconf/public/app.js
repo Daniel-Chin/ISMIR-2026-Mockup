@@ -1,6 +1,6 @@
 import { Room } from './room.js';
 import { BoardView, timeAgo } from './board.js';
-import { WallRooms, WallView, buildWallLayout, sameLayout, screenAspect, wallSlotFor } from './wall.js';
+import { WallRooms, WallView, buildWallLayout, industryWallLayout, sameLayout, screenAspect, wallSlotFor } from './wall.js';
 import { SearchBox } from './search.js';
 import { apiFetch, apiUrl, takeTokenFromHash, clearToken, onSessionChange, hasSession, serverClock } from './api.js';
 
@@ -41,10 +41,20 @@ function toast(message, { error = false, action, ms = 4200 } = {}) {
 // ---------- composer dialog ----------
 const composer = {
   dialog: $('#composer'),
-  open({ heading, where = '', text = '', color, max = 600, colors = true, submit = 'Stick it' }) {
+  // choices: [{ value, label }] to pick one from (radio buttons, required), e.g. which sponsor a
+  // note is for; the pick comes back as `choice`.
+  open({ heading, where = '', text = '', color, max = 600, colors = true, submit = 'Stick it', choices = null }) {
     const d = this.dialog, area = $('#composer-text'), counter = $('#composer-counter');
     $('#composer-title').textContent = heading;
     $('#composer-where').textContent = where;
+    const pick = $('#composer-choices');
+    pick.hidden = !choices?.length;
+    pick.replaceChildren(pick.querySelector('legend'), ...(choices || []).map(c => {
+      const label = el('label', 'pc-choice'), input = el('input');
+      input.type = 'radio'; input.name = 'composer-choice'; input.value = c.value; input.required = true;
+      label.append(input, ' ' + c.label);
+      return label;
+    }));
     $('#composer-submit').textContent = submit;
     area.value = text;
     area.maxLength = max;
@@ -80,7 +90,7 @@ const composer = {
         const value = area.value.trim();
         if (!value) return;
         if (colors) store.set(COLOR_KEY, chosen);
-        done({ text: value, color: chosen });
+        done({ text: value, color: chosen, choice: pick.querySelector('input:checked')?.value });
       };
       area.onkeydown = e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) d.querySelector('form').requestSubmit(); };
       $('#composer-cancel').onclick = () => done(null);
@@ -128,25 +138,6 @@ const app = {
       return;
     }
     location.href = this.loginUrl();
-  },
-  /**
-   * Before a new note (board.js, wall.js). Once the Opening Session has started, a note on a paper
-   * or LBD board first shows a notice pointing to Slack; closing it carries on to the note. The
-   * Welcome Reception never shows it. Resolves false only if the note should not be written.
-   */
-  beforeNote(board) {
-    if (board === 'welcome' || !conferenceOpen()) return Promise.resolve(true);
-    const d = $('#slack-notice'), link = $('#slack-notice-link');
-    const [kind, uid] = String(board).split(':');
-    const item = kind === 'lbd' ? hall.lbdById?.[uid] : hall.program?.papers[uid];
-    const channel = /^https:\/\//.test(item?.channelUrl || '') ? item.channelUrl : '';
-    link.hidden = !channel;
-    if (channel) link.href = channel;
-    return new Promise(resolve => {
-      d.onclose = () => { d.onclose = null; resolve(true); };   // Close, Esc or Open Slack: the note still opens
-      d.showModal();
-      $('#slack-notice-close').focus();
-    });
   },
   /** Returns true when signed in; otherwise nudges toward Slack sign-in. */
   requireLogin(what) {
@@ -228,13 +219,6 @@ function zonedToDate(date, hhmm, timeZone) {
     .formatToParts(guess).map(p => [p.type, p.value]));
   const asIfUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute);
   return new Date(guess.getTime() - (asIfUtc - guess.getTime()));
-}
-
-/** Has the Opening Session (program.conference.opening, in the conference time zone) started? */
-function conferenceOpen(now = serverClock.now()) {
-  const opening = hall.program?.conference?.opening;
-  if (!opening?.date || !opening?.start) return false;
-  return now >= zonedToDate(opening.date, opening.start, hall.program.conference.timezone).getTime();
 }
 
 const viewerZone = () => window.ISMIRTimeZone?.getTimeZone?.() || Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -490,6 +474,7 @@ window.addEventListener('resize', () => {
     if (!hall.program) return;
     relayoutWall(papers, paperWallSpec(hall.program), makeWall);
     if (hall.program.lbds?.length) relayoutWall(lbds, lbdWallSpec(hall.program), makeLbdWall);
+    if (industry.wall) relayoutIndustry();
   }, 300);
 });
 /** "P1-01" for a note on a paper's board: shown after the author on every paper note. */
@@ -714,7 +699,7 @@ function route() {
   }
   const section = location.hash.slice(1);
   // The wall above the LBD Hall can still be growing, so keep the section in place meanwhile.
-  if (['welcome', 'papers', 'lbd', 'home'].includes(section)) keepInView(document.getElementById(section));
+  if (['welcome', 'papers', 'lbd', 'industry', 'home'].includes(section)) keepInView(document.getElementById(section));
 }
 
 function openPaper(uid) {
@@ -1291,6 +1276,90 @@ function showPaperResults(uids) {
   requestAnimationFrame(() => syncAuthorOverflow(grid));
 }
 
+// ---------- industry board ----------
+// One wall (wall.js industryWallLayout): an area per Platinum and Gold sponsor with its logo pinned
+// in the middle, and the CV-pool note pinned across the top. Notes: room "industry", one board
+// per sponsor (industry:<id>), placed by wx/wy on the wall; the boards are never shown on their
+// own. Only where features.js turns it on.
+const CV_POOL_FORM = 'https://docs.google.com/forms/d/e/1FAIpQLSfabJxLHj4BiEqymHyLGcd2zfRZuV88RAy6X8sNRr10XgcTBg/viewform?usp=dialog';
+const industry = { wall: null, layout: null, sponsors: [], rooms: null };
+
+function initIndustry(sponsors) {
+  sponsors = (sponsors || []).filter(s => s.tier === 'Platinum' || s.tier === 'Gold');
+  if (!window.pcFeature?.('industryBoard') || !sponsors.length) return;
+  $('#industry').hidden = false;
+  document.querySelector('[data-nav="industry"]').hidden = false;
+  const base = new URL('./', import.meta.url);
+  industry.sponsors = sponsors.map(s => ({ ...s, logo: new URL(s.logo, base).href, where: `${s.name} (${s.tier} Sponsor)` }));
+  const room = new Room('industry');
+  room.subscribe(ev => {
+    if (ev.type === 'reset') userFromRoom(room);
+    if (ev.type === 'error') handleRoomError(ev);
+  });
+  industry.rooms = new WallRooms(new Map([['industry', room]]), () => 'industry');
+  industry.layout = industryWallLayout(industry.sponsors, screenAspect());
+  makeIndustryWall();
+  // + Note above the wall: the composer asks which sponsor it is for.
+  $('#industry-add').addEventListener('click', e => { e.preventDefault(); industry.wall.commentOn(null); });
+}
+
+function makeIndustryWall() {
+  industry.wall = new WallView($('#industry-wall'), {
+    room: industry.rooms, app, title: 'Industry Board', layout: industry.layout,
+    items: Object.fromEntries(industry.sponsors.map(s => [s.id, s])),
+    buildPin: sponsorPin, buildBlock: cvPoolNote, regionHead: sponsorRegionHead,
+    choices: () => industry.sponsors.map(s => ({ value: s.id, label: s.name })),
+    hint: "Double-click in a sponsor's area to leave them a note",
+    missText: "Double-click in a sponsor's area to leave them a note.",
+  });
+}
+
+function relayoutIndustry() {
+  const next = industryWallLayout(industry.sponsors, screenAspect());
+  if (sameLayout(next, industry.layout)) return;
+  industry.layout = next;
+  const expanded = industry.wall.frame.classList.contains('is-fullscreen');
+  industry.wall.destroy({ keepRooms: true });
+  makeIndustryWall();
+  if (expanded) industry.wall.toggleFullscreen();
+}
+
+/** A sponsor's logo pinned on the wall; it links to their site. */
+function sponsorPin(s) {
+  const card = el('article', `pc-sponsor-pin is-${s.tier.toLowerCase()}`);
+  card.append(el('span', 'pc-pin-tack'));
+  const logo = el('a', 'pc-sponsor-logo');
+  if (/^https:\/\//.test(s.url)) { logo.href = s.url; logo.target = '_blank'; logo.rel = 'noopener noreferrer'; }
+  logo.title = s.name;
+  logo.draggable = false;
+  const img = el('img');
+  img.src = s.logo; img.alt = s.name; img.draggable = false;
+  logo.append(img);
+  card.append(logo);
+  return card;
+}
+
+/** A sponsor area's title band: the name and the tier. */
+function sponsorRegionHead(region) {
+  const head = el('div', 'pc-sponsor-head');
+  head.tabIndex = 0;
+  head.append(el('span', 'pc-wall-region-name', region.sponsor.name), el('span', 'pc-sponsor-tier', `${region.sponsor.tier} Sponsor`));
+  return head;
+}
+
+/** The CV-pool note pinned in the wall's top-left corner; FORM opens the form in a new tab. */
+function cvPoolNote(block) {
+  const note = el('article', 'pc-cv-note');
+  note.style.fontSize = block.font + 'px';
+  note.append(el('span', 'pc-pin-tack'));
+  const form = el('a', 'pc-cv-form', 'FORM');
+  form.href = CV_POOL_FORM; form.target = '_blank'; form.rel = 'noopener noreferrer';
+  const text = el('p');
+  text.append('Join the Industry CV Pool: fill out this ', form, ' to share your resume and contact details with ISMIR 2026 sponsors for recruitment.');
+  note.append(text);
+  return note;
+}
+
 // ---------- welcome reception ----------
 function initWelcome() {
   const room = new Room('welcome');
@@ -1363,6 +1432,7 @@ async function main() {
   renderHall();
   initPaperView();
   initLbdView();
+  initIndustry(program.sponsors);
   initSearch();
   refreshSessionTimes();
   window.addEventListener('ismir-timezone-change', refreshSessionTimes);

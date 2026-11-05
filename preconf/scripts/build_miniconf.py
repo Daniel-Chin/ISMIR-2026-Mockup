@@ -3,6 +3,7 @@
 
 Same contract as live_overview/scripts/build_miniconf.py (see preconf/integration.md):
   build/lounge.html   the page (its own nav, linked from the miniconf)
+  build/lounge-debug.html   the same page for testing: features under test (public/features.js)
   build/lounge/       scripts, styles, the frozen paper data and site-config.js
 Nothing else under build/ is written or removed.
 
@@ -29,9 +30,10 @@ ROOT = Path(__file__).resolve().parents[1]
 REPO = ROOT.parent
 PUBLIC = ROOT / "public"
 PAGE = "lounge.html"
+DEBUG_PAGE = "lounge-debug.html"
 ASSET_DIR = "lounge"
 # Files the page loads; everything else in public/ (local probes, etc.) stays out of the build.
-ASSETS = ["app.js", "board.js", "wall.js", "room.js", "api.js", "search.js", "styles.css"]
+ASSETS = ["app.js", "board.js", "wall.js", "room.js", "api.js", "search.js", "styles.css", "features.js"]
 ASSET_DIRS = ["vendor", "data"]
 
 
@@ -47,6 +49,17 @@ def render_page(text, api_origin, version):
            f"form-action {api_origin}")
     meta = f'  <meta http-equiv="Content-Security-Policy" content="{csp}" />\n  <meta name="referrer" content="strict-origin-when-cross-origin" />\n'
     return text.replace('  <meta name="viewport"', meta + '  <meta name="viewport"', 1)
+
+
+def debug_page(page):
+    """lounge.html -> lounge-debug.html: the same page, marked as the debug channel (features.js).
+    These three edits are the only differences, so a feature tested there behaves the same here once shipped."""
+    marked = page.replace('<html lang="en"', '<html lang="en" data-channel="debug"', 1)
+    marked = re.sub(r'<title>', '<title>[DEBUG] ', marked, count=1)
+    marked = marked.replace('<meta charset="utf-8" />', '<meta charset="utf-8" />\n  <meta name="robots" content="noindex" />', 1)
+    if marked.count('data-channel="debug"') != 1 or '[DEBUG] ' not in marked or 'name="robots"' not in marked:
+        raise ValueError(f'{DEBUG_PAGE}: index.html no longer has the expected <html lang="en">, <title> or charset tag')
+    return marked
 
 
 def main():
@@ -96,12 +109,16 @@ def main():
             code = re.sub(r"""(from\s+'\./[\w-]+\.js)'""", rf"\1?v={version}'", code)
             code = code.replace("'./data/program.json'", f"'./data/program.json?v={version}'")
             f.write_text(code, encoding="utf-8")
-        (stage / PAGE).write_text(render_page((PUBLIC / "index.html").read_text(encoding="utf-8"), api, version), encoding="utf-8")
+        page = render_page((PUBLIC / "index.html").read_text(encoding="utf-8"), api, version)
+        (stage / PAGE).write_text(page, encoding="utf-8")
+        (stage / DEBUG_PAGE).write_text(debug_page(page), encoding="utf-8")
 
         # Replace only the paths this component owns.
         (out / PAGE).unlink(missing_ok=True)
+        (out / DEBUG_PAGE).unlink(missing_ok=True)
         shutil.rmtree(out / ASSET_DIR, ignore_errors=True)
         shutil.move(str(stage / PAGE), out / PAGE)
+        shutil.move(str(stage / DEBUG_PAGE), out / DEBUG_PAGE)
         shutil.move(str(assets), out / ASSET_DIR)
     print(f"Lounge -> {out / PAGE} (API {api}, version {version})")
 

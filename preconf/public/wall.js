@@ -81,6 +81,60 @@ export function buildWallLayout(spec, aspect = 2.2) {
   return best.layout;
 }
 
+/**
+ * The Industry Board: one area per sponsor (Platinum and Gold), its logo pinned in the middle,
+ * and the CV-pool note, about a paper pin's size, pinned in the top-left corner (a block: fixed,
+ * but no notes of its own). Wide screens: the note, then the Platinum area across the rest of the
+ * row, the Gold areas two to a row under it, so the whole wall shows on a landscape screen; tall
+ * screens (phones): one column, the note on top, larger logos. Either way a Gold logo is half the size of a Platinum one. Pins are
+ * keyed by sponsor id; notes go on boards industry:<id>.
+ */
+const SPONSOR_WALL = {
+  wide: {
+    logo: { Platinum: { w: 760, h: 380 }, Gold: { w: 380, h: 190 } },
+    body: { Platinum: 400, Gold: 240 },   // an area under its title band: the logo and room for notes
+    cv: { w: 560, h: 440, font: 36 },
+  },
+  column: {
+    logo: { Platinum: { w: 1120, h: 560 }, Gold: { w: 560, h: 280 } },
+    body: { Platinum: 820, Gold: 620 },
+    cv: { w: 900, h: 600, font: 56 },
+  },
+};
+const SPONSOR_HEAD = 110, SPONSOR_PAD = 30, SPONSOR_AREA_W = 1500, LOGO_TOP = 20, SPONSOR_GAP = 80;
+
+export function industryWallLayout(sponsors, aspect = 2.2) {
+  const column = aspect < 1, size = SPONSOR_WALL[column ? 'column' : 'wide'];
+  const full = column ? SPONSOR_AREA_W : 2 * SPONSOR_AREA_W + SPONSOR_GAP;
+  const regions = [], pins = new Map(), blocks = [];
+  blocks.push({ id: 'cv', x: SPONSOR_GAP, y: SPONSOR_GAP, ...size.cv });
+  // Rows of areas: a Platinum area alone, the Gold ones in pairs (column: every area alone).
+  const rows = [];
+  for (const s of sponsors) {
+    const last = rows[rows.length - 1];
+    if (!column && s.tier !== 'Platinum' && last && last.length === 1 && last[0].tier !== 'Platinum') last.push(s);
+    else rows.push([s]);
+  }
+  // Wide: the first row starts right of the note; column: everything goes under it.
+  let y = column ? SPONSOR_GAP * 2 + size.cv.h : SPONSOR_GAP;
+  rows.forEach((row, n) => {
+    const left = !column && n === 0 ? size.cv.w + SPONSOR_GAP : 0, room = full - left;
+    const w = row[0].tier === 'Platinum' || column ? room : SPONSOR_AREA_W;
+    let x = SPONSOR_GAP + left + (room - (row.length * w + (row.length - 1) * SPONSOR_GAP)) / 2;
+    const h = SPONSOR_PAD * 2 + SPONSOR_HEAD + Math.max(...row.map(s => size.body[s.tier] || size.body.Gold));
+    for (const s of row) {
+      const logo = size.logo[s.tier] || size.logo.Gold;
+      const cell = { x, y: y + SPONSOR_PAD + SPONSOR_HEAD, w, h: h - SPONSOR_PAD - SPONSOR_HEAD };
+      regions.push({ id: s.id, sponsor: s, x, y, w, h });
+      pins.set(s.id, { uid: s.id, group: s.id, x: x + (w - logo.w) / 2, y: cell.y + LOGO_TOP, w: logo.w, h: logo.h, cell });
+      x += w + SPONSOR_GAP;
+    }
+    y += h + SPONSOR_GAP;
+  });
+  // inCell: a free spot for a note stays inside its sponsor's area (freeWallSlot).
+  return { W: full + 2 * SPONSOR_GAP, H: y, regions, pins, blocks, inCell: true, perRow: column ? 1 : 2, rows: 1, prefix: 'industry' };
+}
+
 /** Same arrangement? (A resize only rebuilds the wall when it would change.) */
 export const sameLayout = (a, b) => !!a && !!b && a.perRow === b.perRow && a.rows === b.rows;
 
@@ -106,18 +160,20 @@ export function freeWallSlot(layout, uid, taken) {
   const pin = layout.pins.get(uid);
   if (!pin) return { wx: PIN_W + SLOT_GAP, wy: 0 };
   const sx = NOTE_W + SLOT_GAP, sy = NOTE_H;
-  const pinRect = { x: pin.x, y: pin.y, w: PIN_W, h: PIN_H };
-  const near = [...layout.pins.values()].filter(p => Math.abs(p.x - pin.x) < CELL_W * 3 && Math.abs(p.y - pin.y) < CELL_H * 3);
+  const pinRect = { x: pin.x, y: pin.y, w: pin.w, h: pin.h };
+  const near = [...layout.pins.values(), ...(layout.blocks || [])].filter(p => Math.abs(p.x - pin.x) < CELL_W * 3 + p.w && Math.abs(p.y - pin.y) < CELL_H * 3 + p.h);
   const candidates = [];
   // A lattice anchored just right of the pin, so the first column hugs the card.
   for (let i = -4; i <= 5; i++) {
     for (let j = -3; j <= 7; j++) {
-      const wx = PIN_W + SLOT_GAP + (i - 1) * sx, wy = j * sy;
+      const wx = pin.w + SLOT_GAP + (i - 1) * sx, wy = j * sy;
       const rect = { x: pin.x + wx, y: pin.y + wy, w: NOTE_W, h: NOTE_H };
       if (rect.x < 0 || rect.y < 0 || rect.x + rect.w > layout.W || rect.y + rect.h > layout.H) continue;
+      const c = pin.cell;
+      if (layout.inCell && (rect.x < c.x || rect.y < c.y || rect.x + rect.w > c.x + c.w || rect.y + rect.h > c.y + c.h)) continue;
       if (hits(rect, pinRect, 12)) continue;
       // Nearest first; to the right and below the pin before left and above.
-      const dx = rect.x + rect.w / 2 - (pin.x + PIN_W / 2), dy = rect.y + rect.h / 2 - (pin.y + PIN_H / 2);
+      const dx = rect.x + rect.w / 2 - (pin.x + pin.w / 2), dy = rect.y + rect.h / 2 - (pin.y + pin.h / 2);
       candidates.push({ wx, wy, rect, d: Math.hypot(dx * (dx < 0 ? 1.6 : 1), dy * (dy < 0 ? 2.2 : 1.5)) });
     }
   }
@@ -128,7 +184,7 @@ export function freeWallSlot(layout, uid, taken) {
     return { wx: c.wx, wy: c.wy };
   }
   // Crowded: stack loosely to the right of the pin.
-  return { wx: PIN_W + SLOT_GAP + Math.round(Math.random() * 60), wy: Math.round(Math.random() * 120) };
+  return { wx: pin.w + SLOT_GAP + Math.round(Math.random() * 60), wy: Math.round(Math.random() * 120) };
 }
 
 /**
@@ -264,7 +320,7 @@ export class WallView extends BoardView {
     this.frame.classList.add('pc-wall-frame');
     this.frame.style.setProperty('--wall-ratio', String(this.W / this.H));
     this.titleBar.querySelectorAll('.pc-fullscreen-hint').forEach(n => n.remove());
-    this.titleBar.append(el('div', 'pc-fullscreen-hint', 'Comment on a paper, or double-click beside it to leave a note'));
+    this.titleBar.append(el('div', 'pc-fullscreen-hint', o.hint || 'Comment on a paper, or double-click beside it to leave a note'));
     this.zoomLabel.title = 'Show the whole wall';
     this.zoomLabel.setAttribute('aria-label', 'Show the whole wall');
     this.buildWall();
@@ -316,7 +372,7 @@ export class WallView extends BoardView {
     const pin = this.opts.layout.pins.get(uidIn(this.wall, n));
     if (Number.isFinite(n.wx) && Number.isFinite(n.wy)) return { x: pin.x + n.wx, y: pin.y + n.wy };
     // Older notes: computed spots, the same for every viewer.
-    return wallPositions(this.opts.layout, [...this.room.notes.values()].filter(m => uidIn(this.wall, m) === uidIn(this.wall, n))).get(n.id) || { x: pin.x + PIN_W + SLOT_GAP, y: pin.y };
+    return wallPositions(this.opts.layout, [...this.room.notes.values()].filter(m => uidIn(this.wall, m) === uidIn(this.wall, n))).get(n.id) || { x: pin.x + pin.w + SLOT_GAP, y: pin.y };
   }
 
   sendMove(final, id, x, y) {
@@ -352,11 +408,12 @@ export class WallView extends BoardView {
   }
 
   // Session areas lie under the notes; pins lie above every note (pc-wall-pins in styles.css),
-  // so however notes are moved, no paper is ever covered.
+  // so however notes are moved, no paper is ever covered. Blocks (layout.blocks, built by
+  // opts.buildBlock) are pinned cards that take no notes, like the Industry Board's CV-pool note.
   buildWall() {
     const layer = el('div', 'pc-wall-layer');
     const pins = el('div', 'pc-wall-layer pc-wall-pins');
-    const { items, buildPin, regionHead } = this.opts;
+    const { items, buildPin, buildBlock, regionHead } = this.opts;
     for (const r of this.wall.regions) {
       const box = el('section', 'pc-wall-region');
       Object.assign(box.style, { left: r.x + 'px', top: r.y + 'px', width: r.w + 'px', height: r.h + 'px' });
@@ -372,8 +429,18 @@ export class WallView extends BoardView {
       const card = buildPin(items[pin.uid]);
       card.classList.add('pc-pin');
       card.dataset.uid = pin.uid;
-      Object.assign(card.style, { left: pin.x + 'px', top: pin.y + 'px', width: PIN_W + 'px', height: PIN_H + 'px' });
+      Object.assign(card.style, { left: pin.x + 'px', top: pin.y + 'px', width: pin.w + 'px', height: pin.h + 'px' });
       card.querySelector('[data-comment]')?.addEventListener('click', e => { e.preventDefault(); this.commentOn(pin.uid); });
+      card.addEventListener('dblclick', e => {
+        e.stopPropagation();
+        if (!this.frame.classList.contains('is-fullscreen')) this.expandAt(e);
+      });
+      pins.append(card);
+    }
+    for (const b of this.wall.blocks || []) {
+      const card = buildBlock(b);
+      card.classList.add('pc-pin');
+      Object.assign(card.style, { left: b.x + 'px', top: b.y + 'px', width: b.w + 'px', height: b.h + 'px' });
       card.addEventListener('dblclick', e => {
         e.stopPropagation();
         if (!this.frame.classList.contains('is-fullscreen')) this.expandAt(e);
@@ -435,18 +502,26 @@ export class WallView extends BoardView {
     if (x === undefined) return;
     const cx = x + NOTE_W / 2, cy = y + 20;
     const pin = [...this.wall.pins.values()].find(p => cx >= p.cell.x && cx < p.cell.x + p.cell.w && cy >= p.cell.y && cy < p.cell.y + p.cell.h);
-    if (!pin) { this.app.toast?.('Double-click beside a paper to leave a note on it.'); return; }
+    if (!pin) { this.app.toast?.(this.opts.missText || 'Double-click beside a paper to leave a note on it.'); return; }
     this.commentOn(pin.uid, { x, y });
   }
 
-  /** New note on paper `uid`: beside its pin (or at `at`), and on the paper's own board. */
+  /**
+   * New note on paper `uid`: beside its pin (or at `at`), and on the paper's own board. No uid:
+   * the composer asks which one, from opts.choices() (the Industry Board's + Note).
+   */
   async commentOn(uid, at) {
     this.stopTour();
     if (!this.app.requireLogin('post a note')) return;
-    const paper = this.opts.items[uid], board = `${this.wall.prefix}:${uid}`;
-    if (this.app.beforeNote && !(await this.app.beforeNote(board))) return;
-    const result = await this.app.composer.open({ heading: 'New note', where: `${paper.displayId || '#' + uid} ${paper.title}`, max: this.room.limits.textMax });
+    const choices = uid ? null : this.opts.choices?.();
+    if (!uid && !choices?.length) return;
+    const paper = uid && this.opts.items[uid];
+    const where = !paper ? '' : paper.where || `${paper.displayId || '#' + uid} ${paper.title}`;
+    const result = await this.app.composer.open({ heading: 'New note', where, choices, max: this.room.limits.textMax });
     if (!result) return;
+    uid ||= result.choice;
+    if (!this.wall.pins.has(uid)) return;
+    const board = `${this.wall.prefix}:${uid}`;
     const pin = this.wall.pins.get(uid);
     const notes = [...this.room.notes.values()];
     const slot = at
