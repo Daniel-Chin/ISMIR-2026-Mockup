@@ -41,8 +41,13 @@ class ZoomCreator:
     def _wantsZoom(self, row):
         return row["category"] not in self.SKIP_CATEGORIES
 
+    UNCONFERENCE_ROOMS = ["Please set topic 1 name", "Please set topic 2 name"]
+
     def _breakoutRooms(self, row):
-        """Room names (paper Slack channels) for a 'Poster Session - N' row, else None."""
+        """Breakout room names for a meeting row, else None (-> shared webinar).
+        Poster sessions: paper Slack channels. Unconference: placeholder topics."""
+        if row["category"] == "Unconference":
+            return self.UNCONFERENCE_ROOMS
         if self.papers is None:
             return None
         match = self.POSTER_SESSION_RE.match(str(row["title"]))
@@ -56,7 +61,7 @@ class ZoomCreator:
         rooms = [str(ch) for ch in sessionPapers.slack_channel.dropna()]
         return rooms or None
 
-    def setupZoomCalls(self, zoomUtils, passcode=None):
+    def setupZoomCalls(self, zoomUtils, passcode=None, planOnly=False):
         if self.eventsCsvFile is None:
             raise Exception("eventsCsvFile passed in constructor is null")
 
@@ -69,10 +74,6 @@ class ZoomCreator:
 
         print("## Number of items to create zoom link for: ", len(wanted.index))
         print("### Final data: ", wanted[["uid", "title", "category"]])
-        for _, row in wanted.iterrows():
-            rooms = self._breakoutRooms(row)
-            if rooms:
-                print(f"### Breakout rooms for '{row['title']}': {rooms}")
 
         zoomUtils.createZoomLinksIfNeeded(
             self.eventsCsvFile,
@@ -83,6 +84,7 @@ class ZoomCreator:
             breakoutRoomsForRow=self._breakoutRooms,
             passcode=passcode,
             topicPrefix=self.topicPrefix,
+            planOnly=planOnly,
         )
 
     def _printZoomPlan(self, csv_data, zoomUtils):
@@ -98,7 +100,7 @@ class ZoomCreator:
                     codename = entities.get(key, {}).get("codename")
                     if codename is None:
                         poster_number = 1 + sum(kind == "Meeting" for kind, _ in entities)
-                        codename = f"poster-{poster_number}"
+                        codename = f"meeting-{poster_number}"
                         entities[key] = {"codename": codename, "rooms": rooms or []}
                 else:
                     key = ("Webinar", self.topicPrefix + zoomUtils._sharedWebinarTopic(self.eventsCsvFile))
