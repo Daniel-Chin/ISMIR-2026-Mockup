@@ -122,3 +122,52 @@ class ZoomCreator:
         for row, codename in assignments:
             title = " ".join(str(row["title"]).split())
             print(f"{row['uid']} | {codename} | {title} | {row['category']}")
+
+
+# Tutorials run 3 in parallel; each parallel slot uses its own webinar license.
+TUTORIAL_ACCOUNT_SUFFIXES = ("", "_2", "_3")
+# Extra accounts may not offer webinar read scopes, so created webinars are
+# remembered here (topic -> id, account, join_url) instead of listed from Zoom.
+TUTORIAL_WEBINARS_STATE = "local/zoom_tutorial_webinars.json"
+
+
+def setupTutorialWebinars(eventsCsvFile, zoomUtils, useDummyValues=True,
+                          passcode=None, topicPrefix=""):
+    """One webinar per tutorial, on the account of its parallel slot. Prints
+    title + join URL; never writes events.csv. Create-once: webinars already in
+    TUTORIAL_WEBINARS_STATE are reprinted, not touched. Needs only write scope."""
+    import json
+
+    state = {}
+    if os.path.exists(TUTORIAL_WEBINARS_STATE):
+        with open(TUTORIAL_WEBINARS_STATE) as f:
+            state = json.load(f)
+    events = pd.read_csv(eventsCsvFile)
+    tutorials = events[events.category == "Tutorials"]
+    timezone = zoomUtils._load_conference_timezone(eventsCsvFile)
+    for _, slot in tutorials.groupby(["start_date", "start_time"], sort=False):
+        if len(slot) > len(TUTORIAL_ACCOUNT_SUFFIXES):
+            raise ValueError(f"{len(slot)} parallel tutorials but only "
+                             f"{len(TUTORIAL_ACCOUNT_SUFFIXES)} Zoom accounts")
+        for suffix, (_, row) in zip(TUTORIAL_ACCOUNT_SUFFIXES, slot.iterrows()):
+            topic = topicPrefix + row["title"]
+            hh, mm = str(row["start_time"]).split(":")
+            startTime = f"{row['start_date']}T{int(hh):02d}:{mm}:00"
+            duration = zoomUtils._durationMinutes(row)
+            account = f"ZOOM_API_*{suffix or ' (main)'}"
+            if topic in state:
+                print(f"{topic}\n  (existing) {state[topic]['account']}: {state[topic]['join_url']}")
+                continue
+            if useDummyValues:
+                print(f"[dry-run] {account}: {topic} @ {startTime} {timezone} ({duration} min)")
+                continue
+            zoomUtils.useAccount(suffix)
+            webinar = zoomUtils.createWebinar(topic, startTime, duration,
+                                              timezone=timezone, passcode=passcode)
+            state[topic] = {"id": webinar["id"], "account": account,
+                            "join_url": webinar["join_url"]}
+            os.makedirs(os.path.dirname(TUTORIAL_WEBINARS_STATE), exist_ok=True)
+            with open(TUTORIAL_WEBINARS_STATE, "w") as f:
+                json.dump(state, f, indent=2)
+            print(f"{topic}\n  {account}: {webinar['join_url']}")
+    zoomUtils.useAccount("")

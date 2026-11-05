@@ -59,6 +59,7 @@ def parse_arguments():
 
     #### Possible actions ####
     # setup-zoom
+    # setup-zoom-tutorials
     # setup-tutorial-channels
     # create-tutorial-channels
     # add-admins-to-tutorials
@@ -100,6 +101,15 @@ def setupZoom(eventsCsvFile, papersCsvFile=None, passcode=None, is_mockup=False)
     zoomCreator = ZoomCreator(eventsCsvFile, useDummyValues, papersCsvFile,
                               topicPrefix="mock-" if is_mockup else "")
     zoomCreator.setupZoomCalls(zoomUtils, passcode=passcode)
+
+
+def setupTutorialWebinars(eventsCsvFile, is_mockup=False):
+    from modules.zoom_creator import setupTutorialWebinars as setup
+
+    passcode = None if useDummyValues else input(
+        "Enter passcode for tutorial webinars (empty for none): ").strip() or None
+    setup(eventsCsvFile, zoomUtils, useDummyValues, passcode,
+          topicPrefix="mock-" if is_mockup else "")
 
 
 def setupTutorials(eventsCsvFile, registrationDataCsvFile, followup_action, preferredEmailsCsvFile=None):
@@ -229,7 +239,7 @@ if __name__ == "__main__":
         "add-admins-to-tutorials", "add-registrants-to-tutorials", "invite-authors-to-channels",
         "invite-authors-to-lbd-group-channels",
     }:
-        if action == "setup-zoom":
+        if action in ("setup-zoom", "setup-zoom-tutorials"):
             # zoom creds are only checked on first API call, so this import is
             # safe without .env and setup-zoom never needs SLACK_BOT_TOKEN
             from utils import zoom as zoomUtils
@@ -245,6 +255,9 @@ if __name__ == "__main__":
             passcode=None,
             is_mockup=args.mockup,
         )
+
+    elif action == "setup-zoom-tutorials":
+        setupTutorialWebinars(os.path.join(data_path, "events.csv"), is_mockup=args.mockup)
 
     elif action == "setup-tutorial-channels":
         setupTutorials(os.path.join(data_path, "events.csv"), None, "setup-channels")

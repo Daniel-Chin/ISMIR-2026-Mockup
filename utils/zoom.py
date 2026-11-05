@@ -14,6 +14,9 @@ from utils.shared import load_conference_timezone_name, load_site_config
 accountCreds = None
 accessToken = None
 tokenExpireTime = None
+# appended to the ZOOM_API_* env var names; "" is the main account, "_2"/"_3" the
+# extra webinar licenses used for parallel tutorials
+accountSuffix = ""
 
 _POSTER_SESSION_RE = re.compile(r"^Poster Session - \d+$")
 
@@ -28,20 +31,29 @@ def _load_conference_timezone(csvFilename=None):
     return tz_name
 
 
+def useAccount(suffix):
+    """Switch all subsequent API calls to the account whose env vars end in suffix."""
+    global accountSuffix, accountCreds, accessToken, tokenExpireTime
+    if suffix != accountSuffix:
+        accountSuffix = suffix
+        accountCreds = accessToken = tokenExpireTime = None
+
+
 def getAccountCreds():
     global accountCreds
     if accountCreds is None:
         load_dotenv(dotenv_path=Path(".") / ".env")
+        s = accountSuffix
         try:
             accountCreds = {
-                "accountId": os.environ["ZOOM_API_ACCOUNT_ID"],
-                "clientId": os.environ["ZOOM_API_CLIENT_ID"],
-                "clientSecret": os.environ["ZOOM_API_CLIENT_SECRET"],
+                "accountId": os.environ[f"ZOOM_API_ACCOUNT_ID{s}"],
+                "clientId": os.environ[f"ZOOM_API_CLIENT_ID{s}"],
+                "clientSecret": os.environ[f"ZOOM_API_CLIENT_SECRET{s}"],
             }
         except KeyError as missing:
             raise RuntimeError(
-                f"Missing Zoom credential {missing} — add ZOOM_API_ACCOUNT_ID, "
-                "ZOOM_API_CLIENT_ID and ZOOM_API_CLIENT_SECRET from a "
+                f"Missing Zoom credential {missing} — add ZOOM_API_ACCOUNT_ID{s}, "
+                f"ZOOM_API_CLIENT_ID{s} and ZOOM_API_CLIENT_SECRET{s} from a "
                 "Server-to-Server OAuth app to .env"
             ) from None
     return accountCreds
