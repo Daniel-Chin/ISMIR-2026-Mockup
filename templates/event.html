@@ -30,7 +30,10 @@
       {% endif %}>{% include
       'slack_svg.html' %} Slack Channel</a>
     {% endif %}
-    {% if event.zoom_url %}
+    {% if event.category == "Tutorials" %}
+    <a href="#" class="btn btn-outline-primary"
+      onclick="alert('Open to tutorial registrants only. Please find the Zoom link in the Slack channel.'); return false;">Zoom</a>
+    {% elif event.zoom_url %}
     <a href="{{event.zoom_url}}" class="btn btn-outline-primary"
       target="_blank" rel="noopener noreferrer">Zoom</a>
     {% endif %}
