@@ -181,7 +181,7 @@ def wait(store):
 
 def test_materials_status_download_and_update(store, tmp_path):
     assert states(store) == {'paper': 'missing', 'poster': 'missing', 'video': 'missing',
-                             'thumbnail': 'none', 'captions': 'missing', 'channel': 'none'}
+                             'thumbnail': 'none', 'captions': 'missing', 'channel': 'none', 'subtitles': 'none'}
     assert store.download(['m1/video', 'm1/paper', 'm1/captions'])
     wait(store)
     assert store.job['files'] == 2 and store.job['files_done'] == 1  # captions have no known size
@@ -201,7 +201,10 @@ def test_channel_codes_lie_loose_in_their_folder(tmp_path, monkeypatch):
                          {'id': 'a', 'name': 'LBD_569_lbd569-groovyui.png', 'folder': False},
                          {'id': 'b', 'name': 'LBD_group6_lbd-g6-human.png', 'folder': False},
                          {'id': 'm', 'name': 'LBD_m7_lbd-m7-a-transcription.png', 'folder': False},
-                         {'id': 'c', 'name': 'LBD_999_unknown.png', 'folder': False}],
+                         {'id': 'c', 'name': 'LBD_999_unknown.png', 'folder': False},
+                         {'id': 's', 'name': '569.vtt', 'folder': False},
+                         {'id': 't', 'name': 'm7.vtt', 'folder': False},
+                         {'id': 'u', 'name': '999.vtt', 'folder': False}],
                 'f': [{'id': 'v', 'name': '569_video.mp4', 'folder': False}]}
     monkeypatch.setattr(materials, 'list_folder', listings.get)
     monkeypatch.setattr(materials, 'drive_size', lambda file_id: 1)
@@ -210,8 +213,8 @@ def test_channel_codes_lie_loose_in_their_folder(tmp_path, monkeypatch):
     store.job = {'done': 0, 'total': 0, 'failed': []}
     store.check_drive()
     files = store.listing['files']
-    assert sorted(files['569']) == ['channel', 'video'] and files['g6']['channel']['id'] == 'b'
-    assert files['m7']['channel']['id'] == 'm'
+    assert sorted(files['569']) == ['channel', 'subtitles', 'video'] and files['g6']['channel']['id'] == 'b'
+    assert files['m7']['channel']['id'] == 'm' and files['m7']['subtitles']['id'] == 't'
     assert '999' not in files
 
 

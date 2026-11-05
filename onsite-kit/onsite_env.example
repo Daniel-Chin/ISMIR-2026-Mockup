@@ -6,6 +6,8 @@ DRIVE_FOLDER_LBD=https://drive.google.com/drive/folders/example-LBD-folder
 DRIVE_FOLDER_MIREX=https://drive.google.com/drive/folders/example-MIREX-folder
 # The Slack channel QR codes for the covers: LBD_<uid>_*.png and LBD_group<n>_*.png
 DRIVE_FOLDER_CHANNELS=https://drive.google.com/drive/folders/example-channels-folder
+# The subtitles the video screens show, <uid>.vtt, from build_subtitles.py
+DRIVE_FOLDER_SUBTITLES=https://drive.google.com/drive/folders/example-subtitles-folder
 
 # Extra rows for the links table:
 #   LINK_<anything>=group | name | url | description

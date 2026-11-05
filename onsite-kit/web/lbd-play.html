@@ -99,6 +99,8 @@
     #card-channel:empty { display: none; }
     #card-channel .eyebrow { font-size: 2vh; }
     #card .card-eyebrow { font-size: 2.4vh; margin-bottom: 1.6vh; }
+    /* Subtitles, for videos that have none in the picture: readable from across the room. */
+    #video::cue { font-size: 3.4vh; line-height: 1.35; color: #fff; background: #000000b3; }
     #hint { position: fixed; z-index: 3; right: 1.5vw; bottom: 1.5vh; padding: .6vh 1vw; background: #161616cc; border-radius: 99px;
       font-size: 1.7vh; color: #fff; transition: opacity .4s; }
     body.idle #hint { opacity: 0; }
@@ -166,6 +168,7 @@
     function prepare(item) {
       const media = plan.media[item.uid] || {};
       // Not the revision: an edit further down the list must not reload what is on the wall.
+      // Nor new subtitles: they wait for the next play rather than reload the video on the wall.
       const key = [item.index, item.uid, media.video, media.poster, plan.problems[item.uid], plan.poster_s > 0].join();
       if (prepared === key) return;
       prepared = key;
@@ -179,6 +182,12 @@
       $('poster').innerHTML = markHtml(item, 'poster') + `<div class="stage">${poster}</div>`;
       $('video-mark').innerHTML = markHtml(item, 'video');
       $('cover').innerHTML = coverHtml(item);
+      video.querySelectorAll('track').forEach((track) => track.remove());
+      if (media.subtitles && !unplayable) {
+        const track = Object.assign(document.createElement('track'), { kind: 'subtitles', srclang: 'en', label: 'English', src: media.subtitles, default: true });
+        video.append(track);
+        track.track.mode = 'showing';
+      }
       if (unplayable) {
         video.removeAttribute('src');
         video.load();

@@ -21,7 +21,8 @@ uv run python onsite-kit/make_env.py
 ```
 
 The first time, copy `onsite_env.example` to `.onsite_env` and fill in `DRIVE_FOLDER_LBD` and
-`DRIVE_FOLDER_MIREX` (the camera-ready folders) and `DRIVE_FOLDER_CHANNELS` (the Slack channel QR codes). `make_env.py` generates the rest.
+`DRIVE_FOLDER_MIREX` (the camera-ready folders), `DRIVE_FOLDER_CHANNELS` (the Slack channel QR codes) and
+`DRIVE_FOLDER_SUBTITLES` (see [Subtitles](#subtitles)). `make_env.py` generates the rest.
 Rerun it after any change in the sheets: it keeps the lines you wrote. To add rows to the links table,
 see the example file.
 
@@ -46,7 +47,7 @@ Open <http://127.0.0.1:8765>. The server only answers on this MacBook.
 
 ## Materials
 
-Files go to `media/{papers,posters,videos,thumbnails,captions,channels}/<uid>.<ext>`; the groups' channel
+Files go to `media/{papers,posters,videos,thumbnails,captions,channels,subtitles}/<uid>.<ext>`; the groups' channel
 codes are the rows `g1` to `g7`.
 
 *Check Drive for updates* takes about 2 minutes and compares each file's size with Drive's. It runs by
@@ -104,6 +105,23 @@ for that time, so the screens stay in step.
 - *Fit posters to the slot* picks the poster time that makes the remaining plays end by the end of the slot.
 - *Reset to default plan* discards this screen's changes.
 
+## Subtitles
+
+The video screens show subtitles under videos that have none in the picture. Chrome cannot show the
+authors' caption files or the subtitle tracks inside the videos, so an organizer turns them into one
+`<uid>.vtt` per video, once, and shares them through Drive like every other file:
+
+1. **On an organizer's machine** with every video and caption file downloaded, ffmpeg, and YouTube's
+   automatic captions in `local/youtube_captions/` (`<uid>.en-orig.vtt`, from yt-dlp):
+   `python3 onsite-kit/build_subtitles.py`. It writes `local/subtitles/<uid>.vtt`, taking for each video the
+   authors' caption file, else the video's own track, else YouTube's captions. Videos with subtitles in the
+   picture (listed in the script) get no file.
+2. Upload those files to the Drive folder of `DRIVE_FOLDER_SUBTITLES`, shared by link, replacing old ones.
+3. **On each MacBook**: *Check Drive for updates*, then download the Subtitles column. New or changed
+   files show as ↓ or ↻ like any other. A player picks a file up at the start of the video's next play.
+
+A video with no file plays without subtitles, as before.
+
 ## LBD posters
 
 The 4 poster screens show every LBD and MIREX poster but the MIREX overview (m1), in group order, split into
@@ -130,6 +148,7 @@ order, adding or removing posters, and the time per poster.
 | `materials.py` | Compares Drive with `media/` and downloads files |
 | `lbd_schedule.json` | Default plan per screen, video and poster |
 | `plan_posters.py` | Fixes the poster screens' plans so that no poster meets its own video |
+| `build_subtitles.py` | Makes the subtitle files for the Drive folder, on an organizer's machine |
 | `web/` | The pages; `lbd-timeline.js` holds the timing logic, `vendor/pdfjs/` draws the posters |
 | `.onsite_env`, `media/`, `.state/` | Private or local: gitignored |
 

@@ -28,6 +28,7 @@ STATE = KIT / '.state'
 PROBES = STATE / 'probes.json'
 LOCAL_HOSTS = {'127.0.0.1', 'localhost'}
 mimetypes.add_type('text/javascript', '.mjs')  # pdf.js; older Pythons do not know the extension
+mimetypes.add_type('text/vtt', '.vtt')  # subtitles; Chrome shows no track served as anything else
 POSTER_SCREENS = [f'P{n}' for n in range(1, 5)]  # screens of posters only, alongside the video screens
 CLEAR_MS = 30_000  # a poster keeps this far from its own video, as measured lengths differ a little from YouTube's
 NO_POSTER_SCREEN = {'m1'}  # the MIREX overview: on the video screen only
@@ -67,7 +68,7 @@ def write_json(path: Path, data) -> None:
 def media_files() -> dict:
     """uid -> its video and poster under media/, as URLs, with the video's size."""
     found: dict = {}
-    for kind, directory in (('video', 'videos'), ('poster', 'posters'), ('channel', 'channels')):
+    for kind, directory in (('video', 'videos'), ('poster', 'posters'), ('channel', 'channels'), ('subtitles', 'subtitles')):
         folder = MEDIA / directory
         for file in folder.iterdir() if folder.is_dir() else ():
             if not file.name.endswith('.part'):
@@ -82,7 +83,7 @@ class Kit:
         self.env = load_env()
         self.plan = read_json(KIT / 'lbd_schedule.json', {})
         lbds = json.loads(self.env.get('ONSITE_LBDS', '[]'))
-        roots = [materials.folder_id(value) for key, value in self.env.items() if key.startswith('DRIVE_FOLDER_')]
+        roots = [materials.folder_id(value) for key, value in self.env.items() if key.startswith('DRIVE_FOLDER_') and value.strip()]
         self.groups = json.loads(self.env.get('ONSITE_LBD_GROUPS', '{}'))
         self.group_slack = json.loads(self.env.get('ONSITE_LBD_GROUP_SLACK', '{}'))
         # Each group's Slack channel QR code is a row of its own in Materials, as g<group>.

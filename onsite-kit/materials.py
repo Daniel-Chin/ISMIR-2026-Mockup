@@ -20,10 +20,12 @@ FOLDER_PAGE = 'https://drive.google.com/embeddedfolderview?id={}'
 DOWNLOAD = 'https://drive.usercontent.google.com/download?id={}&export=download&confirm=t'
 ENTRY = re.compile(r'id="entry-([\w-]+)".*?<a href="([^"]+)".*?flip-entry-title">([^<]+)<', re.S)
 KINDS = {'paper': 'papers', 'poster': 'posters', 'video': 'videos', 'thumbnail': 'thumbnails', 'captions': 'captions',
-         'channel': 'channels'}
+         'channel': 'channels', 'subtitles': 'subtitles'}
 # Slack channel QR codes lie loose in their folder: LBD_569_lbd569-groovyui.png, LBD_m7_lbd-m7-a.png (MIREX),
 # LBD_group5_lbd-g5-audio.png.
 CHANNEL = re.compile(r'LBD_(group)?(m?\d+)_')
+# So do the subtitles the players show, from build_subtitles.py: 569.vtt, m1.vtt.
+SUBTITLES = re.compile(r'(m?\d+)\.vtt$')
 VIDEO_SUFFIXES = {'.mp4', '.mov', '.m4v', '.webm'}
 LOOKUPS_AT_ONCE = 8
 DOWNLOADS_AT_ONCE = 3
@@ -143,7 +145,12 @@ class Materials:
         return self.begin({'action': 'check', 'done': 0, 'total': 0}, self.check_drive)
 
     def check_drive(self) -> None:
-        entries = [entry for root in self.roots for entry in list_folder(root)]
+        entries = []
+        for root in self.roots:  # one folder not shared by link must not hide the others
+            try:
+                entries += list_folder(root)
+            except RuntimeError as error:
+                self.job['failed'].append(f'Drive folder {root}: {error} (is it shared with anyone with the link?)')
         subfolders = [entry for entry in entries if entry['folder']]
         matched = [entry for entry in subfolders if entry['name'] in self.uids]
         self.job['total'] = len(matched)
@@ -158,10 +165,13 @@ class Materials:
         found = [(self.uids[entry['name']], file) for entry, names in folders for file in names if not file['folder']]
         known = set(self.uids.values())
         for entry in entries:
-            match = None if entry['folder'] else CHANNEL.match(entry['name'])
-            uid = match and ('g' if match[1] else '') + match[2]
-            if uid in known:
-                found.append((uid, {**entry, 'kind': 'channel'}))
+            if entry['folder']:
+                continue
+            channel, subtitles = CHANNEL.match(entry['name']), SUBTITLES.fullmatch(entry['name'])
+            if channel and ('g' if channel[1] else '') + channel[2] in known:
+                found.append((('g' if channel[1] else '') + channel[2], {**entry, 'kind': 'channel'}))
+            elif subtitles and subtitles[1] in known:
+                found.append((subtitles[1], {**entry, 'kind': 'subtitles'}))
         self.job.update(done=0, total=len(found))
 
         def measure(pair):
