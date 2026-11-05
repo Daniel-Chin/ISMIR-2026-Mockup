@@ -311,6 +311,7 @@ class FeedConstructor:
         with self.lock:
             self.state.greeted.add(user_id)
             self.state.save()
+        logger.info("Greeted %s (%s)", user.get("real_name") or user.get("name"), user_id)
         return True
 
     def greet_everyone(self) -> None:
