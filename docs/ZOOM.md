@@ -2,8 +2,8 @@
 
 Creates Zoom links for live sessions in the events CSV, writes the join URLs
 back into the CSV's `live_url` column (which the site and calendar link to).
-Uses one Zoom meeting per poster session with breakout rooms, and uses one
-shared Zoom webinar link for all non-poster live events.
+Uses one Zoom meeting with breakout rooms per poster session and Unconference, and uses one
+shared Zoom webinar link for all other live events.
 
 ## Architecture
 
@@ -100,6 +100,9 @@ settings:
 # dry-run: prints what would be created, no API calls
 .venv/bin/python miniconf_prep.py --mockup --action setup-zoom
 
+# plan: reads Zoom like a real run, prints every write it would do, writes nothing
+.venv/bin/python miniconf_prep.py --mockup --action setup-zoom --plan
+
 # real run: creates poster-session meetings and the shared webinar, then writes
 # live_url back into events.csv
 .venv/bin/python miniconf_prep.py --mockup --action setup-zoom --prod true
@@ -195,8 +198,9 @@ checkbox.
 For every row in `events.csv`, `setup-zoom` splits behavior into three paths:
 
 1. Poster sessions keep the existing meeting flow described below.
-2. Every non-poster live event shares the same webinar join URL.
-3. Tutorials are handled by `setup-zoom-tutorials` ([above](#tutorial-webinars-setup-zoom-tutorials)), and `Lunch` / `Social` need no call.
+2. Unconference gets its own meeting (no auto-recording, mute on entry) with breakout rooms `Please set topic 1 name` / `Please set topic 2 name`.
+3. Every other non-poster live event shares the same webinar join URL.
+4. Tutorials are handled by `setup-zoom-tutorials` ([above](#tutorial-webinars-setup-zoom-tutorials)), and `Lunch` / `Social` need no call.
 
 For non-poster live events:
 

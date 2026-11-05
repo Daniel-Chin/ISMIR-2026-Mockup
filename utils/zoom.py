@@ -173,8 +173,10 @@ def createMeeting(
     breakoutRooms=None,
     timezone=None,
     passcode=None,
+    extraSettings=None,
 ):
     """
+    extraSettings: merged into the meeting's `settings` payload.
     breakoutRooms: optional list of room names, pre-created in the meeting
     (host still opens them live). Zoom caps pre-assigned rooms at 50 and
     room names at 32 characters.
@@ -194,6 +196,7 @@ def createMeeting(
             "waiting_room": False,
             "join_before_host": True,
             "jbh_time": 0,  # anytime before host
+            **(extraSettings or {}),
         },
     }
     if passcode is not None:
@@ -454,6 +457,46 @@ def _webinarPayload(
     return payload
 
 
+def _meetingRoomsDiffer(meeting, roomNames):
+    breakout = meeting.get("settings", {}).get("breakout_room", {})
+    current = [room.get("name") for room in breakout.get("rooms") or []]
+    expected = [name[:32] for name in roomNames[:50]]
+    return not breakout.get("enable") or sorted(current) != sorted(expected)
+
+
+def _webinarDiffs(current, payload):
+    """Names of payload fields whose value differs from the webinar Zoom has."""
+    diffs = []
+    for key in ("topic", "duration", "timezone", "password"):
+        if key in payload and current.get(key) != payload[key]:
+            diffs.append(f"{key}: want {payload[key]!r}, Zoom has {current.get(key)!r}")
+    for key, value in payload.get("recurrence", {}).items():
+        if current.get("recurrence", {}).get(key) != value:
+            diffs.append(f"recurrence.{key}: want {value!r}, "
+                         f"Zoom has {current.get('recurrence', {}).get(key)!r}")
+    for key, value in payload["settings"].items():
+        have = current.get("settings", {}).get(key, value)
+        # Zoom echoes nested settings with extra defaults; compare only what we send.
+        if isinstance(value, dict) and isinstance(have, dict):
+            have = {k: have.get(k) for k in value}
+        if have != value:
+            diffs.append(f"settings.{key}: want {value!r}, Zoom has {current['settings'][key]!r}")
+    # Zoom reports start_time in UTC (on the first occurrence for recurring webinars).
+    from datetime import datetime, timezone as tz
+    from zoneinfo import ZoneInfo
+    expectedStart = datetime.fromisoformat(payload["start_time"]).replace(
+        tzinfo=ZoneInfo(payload["timezone"])).astimezone(tz.utc)
+    occurrences = current.get("occurrences") or [current]
+    currentStart = occurrences[0].get("start_time")
+    if not currentStart or datetime.fromisoformat(currentStart.replace("Z", "+00:00")) != expectedStart:
+        diffs.append(f"start_time: want {expectedStart.isoformat()}, Zoom has {currentStart!r} "
+                     f"(occurrences: {current.get('occurrences')!r})")
+    return diffs
+
+
+UNCONFERENCE_MEETING_SETTINGS = {"mute_upon_entry": True, "auto_recording": "none"}
+
+
 def createZoomLinksIfNeeded(
     csvFilename,
     topicColumnId,
@@ -463,8 +506,12 @@ def createZoomLinksIfNeeded(
     breakoutRoomsForRow=None,
     passcode=None,
     topicPrefix="",
+    planOnly=False,
 ):
     """
+    planOnly: read Zoom as usual, but print every intended write (Zoom API
+    call or CSV change) instead of performing it.
+
     Conference mode orchestrator:
     - poster sessions -> one meeting per row (with optional breakout rooms)
     - non-poster live events -> one shared webinar URL written to all rows
@@ -506,19 +553,35 @@ def createZoomLinksIfNeeded(
     # save-on-exit: a raise partway through must not lose join_urls of meetings
     # already created (re-running would backfill them by topic, but the CSV
     # should never go stale on disk)
+    def plan(call, *args, **kwargs):
+        shown = [repr(a) for a in args] + [f"{k}={v!r}" for k, v in kwargs.items()]
+        print(f"[plan] WOULD CALL {call}({', '.join(shown)})")
+
+    originalLinks = csvData[zoomColumnId].copy()
     try:
         for index, row, breakoutRooms in posterRows:
             topic = topicPrefix + row[topicColumnId]
             if topic in existingByTopic:
                 posterBackfilled += 1
-                if breakoutRooms:
-                    updateMeetingBreakoutRooms(existingByTopic[topic][0], breakoutRooms)
-                    print(f"patched {len(breakoutRooms)} breakout rooms onto: {topic}")
                 meetingId = existingByTopic[topic][0]
-                if passcode is not None:
-                    updateMeetingPasscode(meetingId, passcode)
-                    print(f"updated Zoom passcode on existing: {topic}")
-                latestMeeting = getMeeting(meetingId)
+                current = getMeeting(meetingId)
+                roomsDiffer = bool(breakoutRooms) and _meetingRoomsDiffer(current, breakoutRooms)
+                passcodeDiffers = bool(passcode) and current.get("password") != str(passcode).strip()
+                if planOnly:
+                    if roomsDiffer:
+                        plan("updateMeetingBreakoutRooms", meetingId, breakoutRooms)
+                    if passcodeDiffers:
+                        plan("updateMeetingPasscode", meetingId, "<passcode>")
+                else:
+                    if roomsDiffer:
+                        updateMeetingBreakoutRooms(meetingId, breakoutRooms)
+                        print(f"patched {len(breakoutRooms)} breakout rooms onto: {topic}")
+                    if passcodeDiffers:
+                        updateMeetingPasscode(meetingId, passcode)
+                        print(f"updated Zoom passcode on existing: {topic}")
+                if not (roomsDiffer or passcodeDiffers):
+                    print(f"{'[plan] ' if planOnly else ''}up to date: meeting {topic}")
+                latestMeeting = current if planOnly or not (roomsDiffer or passcodeDiffers) else getMeeting(meetingId)
                 latestJoinUrl = latestMeeting.get("join_url")
                 if not latestJoinUrl:
                     raise RuntimeError(
@@ -532,14 +595,22 @@ def createZoomLinksIfNeeded(
                 )
             else:
                 startTime = f"{row['start_date']}T{row['start_time']}:00"
-                respJson = createMeeting(
-                    topic,
-                    startTime,
-                    _durationMinutes(row),
-                    breakoutRooms,
+                createArgs = (topic, startTime, _durationMinutes(row), breakoutRooms)
+                createKwargs = dict(
                     timezone=conferenceTimezone,
                     passcode=passcode,
+                    extraSettings=(
+                        UNCONFERENCE_MEETING_SETTINGS
+                        if row.get("category") == "Unconference" else None
+                    ),
                 )
+                if planOnly:
+                    plan("createMeeting", *createArgs,
+                         **{**createKwargs, "passcode": "<passcode>" if passcode else None})
+                    csvData.loc[index, zoomColumnId] = f"<join_url of new meeting {topic!r}>"
+                    posterCreated += 1
+                    continue
+                respJson = createMeeting(*createArgs, **createKwargs)
                 existingByTopic[topic] = (
                     respJson["id"],
                     respJson["topic"],
@@ -569,8 +640,35 @@ def createZoomLinksIfNeeded(
                     existingWebinar = (webinarId, webinarJoinUrl)
                     break
 
+            webinarArgs = (webinarTopic, webinarStart, webinarDuration)
+            webinarKwargs = dict(
+                timezone=conferenceTimezone,
+                passcode="<passcode>" if passcode else None,
+                recurrence=webinarRecurrence,
+            )
+            webinarDiffs = None
             if existingWebinar:
+                webinarDiffs = _webinarDiffs(
+                    getWebinar(existingWebinar[0]),
+                    _webinarPayload(*webinarArgs, timezone=conferenceTimezone,
+                                    passcode=passcode, recurrence=webinarRecurrence),
+                )
+            if existingWebinar and not webinarDiffs:
+                print(f"{'[plan] ' if planOnly else ''}up to date: webinar {webinarTopic}")
+                webinar = {"join_url": existingWebinar[1]}
+            elif planOnly:
+                if existingWebinar:
+                    print("[plan] webinar differs in:\n  " + "\n  ".join(webinarDiffs))
+                    plan("updateWebinar", existingWebinar[0], *webinarArgs, **webinarKwargs)
+                    webinar = {"join_url": existingWebinar[1]}
+                    webinarUpdated += 1
+                else:
+                    plan("createWebinar", *webinarArgs, **webinarKwargs)
+                    webinar = {"join_url": f"<join_url of new webinar {webinarTopic!r}>"}
+                    webinarCreated += 1
+            elif existingWebinar:
                 webinarId = existingWebinar[0]
+                print("webinar differs in:\n  " + "\n  ".join(webinarDiffs))
                 updateWebinar(
                     webinarId,
                     webinarTopic,
@@ -612,12 +710,20 @@ def createZoomLinksIfNeeded(
                 csvData.loc[index, zoomColumnId] = webinarJoinUrl
                 webinarRowsAssigned += 1
     finally:
-        csvData.to_csv(csvFilename)
+        if planOnly:
+            for index in csvData.index:
+                old, new = originalLinks[index], csvData.loc[index, zoomColumnId]
+                if not (pd.isna(old) and pd.isna(new)) and old != new:
+                    print(f"[plan] WOULD SET {csvFilename} {indexColumnId}={index} "
+                          f"{zoomColumnId}: {old!r} -> {new!r}")
+            print("[plan] nothing written.")
+        else:
+            csvData.to_csv(csvFilename)
         print(
-            "createZoomLinksIfNeeded: "
-            f"poster meetings {posterCreated} created, {posterBackfilled} backfilled; "
+            ("[plan] " if planOnly else "") + "createZoomLinksIfNeeded: "
+            f"meetings {posterCreated} created, {posterBackfilled} backfilled; "
             f"shared webinar {webinarCreated} created, {webinarUpdated} updated; "
-            f"{webinarRowsAssigned} non-poster rows assigned webinar URL "
+            f"{webinarRowsAssigned} rows assigned webinar URL "
             f"-> {csvFilename}"
         )
         print(f'You may want to copy the "{zoomColumnId}" column of "{csvFilename}" into Google Sheet.')

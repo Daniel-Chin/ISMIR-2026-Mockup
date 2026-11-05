@@ -42,6 +42,12 @@ def parse_arguments():
     )
 
     parser.add_argument(
+        "--plan",
+        action="store_true",
+        help="setup-zoom: read Zoom like a real run, but only print the writes it would do.",
+    )
+
+    parser.add_argument(
         "--registration-csv",
         help="registration CSV used by tutorial/sponsor attendee assignment",
     )
@@ -93,14 +99,14 @@ def parse_arguments():
 
 
 # Step1: Create Slack channels and Zoom links 
-def setupZoom(eventsCsvFile, papersCsvFile=None, passcode=None, is_mockup=False):
+def setupZoom(eventsCsvFile, papersCsvFile=None, passcode=None, is_mockup=False, plan=False):
     from modules.zoom_creator import ZoomCreator
 
-    if passcode is None and not useDummyValues:
+    if passcode is None and (plan or not useDummyValues):
         passcode = prompt_for_zoom_passcode()
-    zoomCreator = ZoomCreator(eventsCsvFile, useDummyValues, papersCsvFile,
+    zoomCreator = ZoomCreator(eventsCsvFile, useDummyValues and not plan, papersCsvFile,
                               topicPrefix="mock-" if is_mockup else "")
-    zoomCreator.setupZoomCalls(zoomUtils, passcode=passcode)
+    zoomCreator.setupZoomCalls(zoomUtils, passcode=passcode, planOnly=plan)
 
 
 def setupTutorialWebinars(eventsCsvFile, is_mockup=False):
@@ -254,6 +260,7 @@ if __name__ == "__main__":
             os.path.join(data_path, "papers.csv"),
             passcode=None,
             is_mockup=args.mockup,
+            plan=args.plan,
         )
 
     elif action == "setup-zoom-tutorials":
