@@ -519,7 +519,8 @@ export class WallView extends BoardView {
     if (!uid && !choices?.length) return;
     const paper = uid && this.opts.items[uid];
     const where = !paper ? '' : paper.where || `${paper.displayId || '#' + uid} ${paper.title}`;
-    const me = this.room.me || {}, name = this.opts.officialName;
+    // Who we are: the room's word, or (its connection may still be queued behind the others) /api/me's.
+    const me = this.room.me || this.app.user || {}, name = this.opts.officialName;
     const mine = name && me.sponsor && this.wall.pins.has(me.sponsor) ? me.sponsor : null;
     let official = null;
     if (name && me.admin) official = uid ? { value: uid, label: name(uid) } : { value: null, label: 'the sponsor picked above (moderator)' };

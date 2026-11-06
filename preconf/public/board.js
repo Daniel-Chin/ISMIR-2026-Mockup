@@ -26,6 +26,8 @@ const TOUR_HOLD_MS = 2200;     // ...then rest on the shot
 const ZOOM_EASE = 0.22;        // fraction of the remaining distance covered per frame
 // Notes of up to this many wrapped lines can't be taller than wide: no need to measure them.
 const SHORT_NOTE_LINES = 7, CHARS_PER_LINE = 24;
+// Official notes (Industry Board) are this much bigger, text and card alike (styles.css).
+const OFFICIAL_SCALE = 1.5;
 
 export const el = (tag, cls, text) => {
   const node = document.createElement(tag);
@@ -710,7 +712,7 @@ export class BoardView {
     node.classList.toggle('pc-filtered-out', this.filteredOut(n));
     const author = node.querySelector('.pc-note-author');
     // An official note is signed by the sponsor, not by the rep who wrote it.
-    author.textContent = n.official ? `Official · ${this.opts.officialName?.(n.official) || n.official}` : n.authorName;
+    author.textContent = n.official ? this.opts.officialName?.(n.official) || n.official : n.authorName;
     if (this.isMine(n) && !n.official) author.append(el('span', 'mine', ' (you)'));
     // "[P1-01] · 1d ago": with a tag, the name gets the foot's first line; tag, time and
     // buttons the second.
@@ -735,18 +737,21 @@ export class BoardView {
    * the wall looks varied but every viewer sees the same shape.
    */
   fitNote(node, n) {
-    if (node._fitText === n.text) return;
-    node.style.width = NOTE_W + 'px';
+    // An official note is a scaled-up note: the same shape rules, OFFICIAL_SCALE times the size.
+    const k = n.official ? OFFICIAL_SCALE : 1, w0 = NOTE_W * k;
+    if (node._fitText === n.text && node._fitK === k) return;
+    node._fitK = k;
+    node.style.width = w0 + 'px';
     // Most notes are short: count wrapped lines instead of asking the browser for a layout.
     const lines = String(n.text).split('\n').reduce((sum, line) => sum + Math.max(1, Math.ceil([...line].length / CHARS_PER_LINE)), 0);
-    if (lines <= SHORT_NOTE_LINES) { node._fitText = n.text; node._w = NOTE_W; node._h = 56 + lines * 19; return; }
+    if (lines <= SHORT_NOTE_LINES) { node._fitText = n.text; node._w = w0; node._h = (56 + lines * 19) * k; return; }
     if (!node.offsetHeight) return;              // not laid out yet; retried on the next upsert
     node._fitText = n.text;
-    node._w = NOTE_W; node._h = node.offsetHeight;
-    if (node.offsetHeight <= NOTE_W) return;
+    node._w = w0; node._h = node.offsetHeight;
+    if (node.offsetHeight <= w0) return;
     const lowest = NOTE_RATIO_MIN + NOTE_RATIO_SLACK;
     const ratio = lowest + (1 - lowest) * idFraction(n.id);
-    let lo = NOTE_W, hi = NOTE_W_MAX;              // height/width falls as width grows
+    let lo = w0, hi = NOTE_W_MAX * k;              // height/width falls as width grows
     for (let i = 0; i < 9; i++) {
       const mid = (lo + hi) / 2;
       node.style.width = mid + 'px';

@@ -285,7 +285,12 @@ html:not([data-theme="light"]) .pc-session-panel-head button.pc-fs-btn:not(.deta
 /* An official note (Industry Board): white with a red tack, like a pinned paper; signed by the
    sponsor. Only the sponsor's reps can move it: for everyone else it pans the wall. */
 .pc-note[data-color="official"] { --c: #fbf8f1; --c2: #e9e3d6; }
-.pc-note-official .pc-pin-tack { top: -12px; width: 20px; height: 20px; margin-left: -10px; }
+/* 1.5x a note: text, padding and tack (the card's width: OFFICIAL_SCALE in board.js). */
+.pc-note.pc-note-official { font-size: 21px; }
+.pc-note-official .pc-note-body { padding: 15px 15px 9px; }
+.pc-note-official .pc-note-foot { gap: 9px; padding: 0 12px 10px 15px; font-size: 16.5px; }
+.pc-note-official .pc-icon-btn { min-width: 36px; height: 33px; font-size: 1.1em; }
+.pc-note-official .pc-pin-tack { top: -18px; width: 30px; height: 30px; margin-left: -15px; }
 .pc-note-official .pc-note-author { color: #b3140d; }
 .pc-note.is-locked .pc-note-body, .pc-note.is-locked .pc-note-foot { cursor: default; }
 .pc-note.remote-drag { transition: left .09s linear, top .09s linear; outline: 2px dashed var(--magenta); }
