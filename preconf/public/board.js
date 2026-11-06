@@ -674,7 +674,12 @@ export class BoardView {
   updateEmpty() { this.empty.hidden = this.els.size > 0; }
 
   isMine(n) { return !!this.room.me && n.authorId === this.room.me.id; }
-  canDelete(n) { return this.isMine(n) || !!this.room.me?.admin; }
+  // Official notes (Industry Board) belong to the sponsor: all its reps keep them, and only
+  // they (and moderators) move them. The server enforces the same rules (board-core.js).
+  isOurs(n) { return !!n.official && !!this.room.me?.sponsor && this.room.me.sponsor === n.official; }
+  canEdit(n) { return this.isMine(n) || this.isOurs(n) || (!!n.official && !!this.room.me?.admin); }
+  canDelete(n) { return this.canEdit(n) || !!this.room.me?.admin; }
+  canMove(n) { return !n.official || this.isOurs(n) || !!this.room.me?.admin; }
 
   upsertNote(n, fresh) {
     let node = this.els.get(n.id);
@@ -684,7 +689,10 @@ export class BoardView {
       this.surface.append(node);
       if (fresh) { node.classList.add('fresh'); setTimeout(() => node.classList.remove('fresh'), 400); }
     }
-    node.dataset.color = n.color;
+    node.dataset.color = n.official ? 'official' : n.color;
+    node.classList.toggle('pc-note-official', !!n.official);
+    if (n.official && !node.querySelector('.pc-pin-tack')) node.prepend(el('span', 'pc-pin-tack'));
+    node.classList.toggle('is-locked', !this.canMove(n));
     node.style.zIndex = String(n.z || 1);
     const body = node.querySelector('.pc-note-body');
     body.textContent = n.text;
@@ -701,8 +709,9 @@ export class BoardView {
     node.classList.toggle('is-pending', !!n.pending);
     node.classList.toggle('pc-filtered-out', this.filteredOut(n));
     const author = node.querySelector('.pc-note-author');
-    author.textContent = n.authorName;
-    if (this.isMine(n)) author.append(el('span', 'mine', ' (you)'));
+    // An official note is signed by the sponsor, not by the rep who wrote it.
+    author.textContent = n.official ? `Official · ${this.opts.officialName?.(n.official) || n.official}` : n.authorName;
+    if (this.isMine(n) && !n.official) author.append(el('span', 'mine', ' (you)'));
     // "[P1-01] · 1d ago": with a tag, the name gets the foot's first line; tag, time and
     // buttons the second.
     const tag = this.opts.noteTag?.(n) || '';
@@ -715,7 +724,7 @@ export class BoardView {
     time.dataset.ts = n.created;
     time.textContent = timeAgo(n.created) + (n.updated - n.created > 1000 ? ' · edited' : '');
     node.title = n.movedBy ? `Last moved by ${n.movedBy}` : '';
-    node.querySelector('[data-act=edit]').hidden = !!n.pending || !this.isMine(n);
+    node.querySelector('[data-act=edit]').hidden = !!n.pending || !this.canEdit(n);
     node.querySelector('[data-act=delete]').hidden = !!n.pending || !this.canDelete(n);
     this.updateEmpty();
   }
@@ -792,10 +801,10 @@ export class BoardView {
   }
 
   async editNote(note) {
-    if (!note || !this.isMine(note)) return;
+    if (!note || !this.canEdit(note)) return;
     const result = await this.app.composer.open({
-      heading: 'Edit note', where: this.title, text: note.text, color: note.color,
-      max: this.room.limits.textMax, submit: 'Save',
+      heading: note.official ? 'Edit official note' : 'Edit note', where: this.title, text: note.text, color: note.color,
+      max: this.room.limits.textMax, submit: 'Save', colors: !note.official,
     });
     if (!result) return;
     this.room.send({ t: 'edit', id: note.id, text: result.text, color: result.color });
@@ -803,8 +812,8 @@ export class BoardView {
 
   deleteNote(note) {
     if (!note) return;
-    const own = this.isMine(note);
-    if (!confirm(own ? 'Delete your note?' : `Remove this note by ${note.authorName}? (moderator)`)) return;
+    const own = this.canEdit(note);
+    if (!confirm(own ? (note.official ? 'Delete this official note?' : 'Delete your note?') : `Remove this note by ${note.authorName}? (moderator)`)) return;
     this.room.send({ t: 'delete', id: note.id });
   }
 
@@ -815,7 +824,7 @@ export class BoardView {
     if (!note || !node) return;
     // Signed out: notes stay put and nobody is nagged; dragging one just moves the view.
     // A post not yet confirmed can't move either (the server doesn't know it yet).
-    if (!this.app.user || note.pending) { this.startPan(e, true); return; }
+    if (!this.app.user || note.pending || !this.canMove(note)) { this.startPan(e, true); return; }
     e.preventDefault();
     node.setPointerCapture(e.pointerId);
     // Start from where the note is drawn (it may have been nudged inside the board's edge).

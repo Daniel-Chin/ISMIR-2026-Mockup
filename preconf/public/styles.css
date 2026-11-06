@@ -282,6 +282,12 @@ html:not([data-theme="light"]) .pc-session-panel-head button.pc-fs-btn:not(.deta
 .pc-note[data-color="rose"] { --c: #ffbfd0; --c2: #f799b3; }
 .pc-note[data-color="lilac"] { --c: #dccbff; --c2: #c0a6fb; }
 .pc-note[data-color="sand"] { --c: #f3dcae; --c2: #e2c184; }
+/* An official note (Industry Board): white with a red tack, like a pinned paper; signed by the
+   sponsor. Only the sponsor's reps can move it: for everyone else it pans the wall. */
+.pc-note[data-color="official"] { --c: #fbf8f1; --c2: #e9e3d6; }
+.pc-note-official .pc-pin-tack { top: -12px; width: 20px; height: 20px; margin-left: -10px; }
+.pc-note-official .pc-note-author { color: #b3140d; }
+.pc-note.is-locked .pc-note-body, .pc-note.is-locked .pc-note-foot { cursor: default; }
 .pc-note.remote-drag { transition: left .09s linear, top .09s linear; outline: 2px dashed var(--magenta); }
 .pc-note.dragging { box-shadow: 10px 10px 0 rgba(0, 0, 0, .4); cursor: grabbing; transform: rotate(-1.2deg); }
 .pc-note.fresh { animation: pc-pop .35s steps(4, end); }
@@ -434,6 +440,11 @@ dialog.pc-composer::backdrop { background: rgba(4, 6, 12, .6); }
 .pc-composer textarea[data-color="mint"] { --c: #a8f0c6; } .pc-composer textarea[data-color="sky"] { --c: #a9dcff; }
 .pc-composer textarea[data-color="rose"] { --c: #ffbfd0; } .pc-composer textarea[data-color="lilac"] { --c: #dccbff; }
 .pc-composer textarea[data-color="sand"] { --c: #f3dcae; }
+.pc-composer textarea[data-color="official"] { --c: #fbf8f1; }
+.pc-official-box { display: inline-flex; align-items: center; gap: 8px; font-size: .9rem; font-weight: 800; color: #b3140d; cursor: pointer; }
+.pc-official-box[hidden] { display: none; }
+.pc-choice.is-disabled { opacity: .45; cursor: not-allowed; }
+.pc-official-box input { flex: none; width: 18px; height: 18px; min-width: 0; margin: 0; padding: 0; accent-color: #b3140d; }
 .pc-swatches { display: flex; gap: 8px; align-items: center; }
 /* The composer's pick-one (the Industry Board: which sponsor a note is for). */
 .pc-choices { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; margin: 0; padding: 0; border: 0; }

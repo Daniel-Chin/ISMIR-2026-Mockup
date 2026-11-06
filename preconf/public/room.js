@@ -126,6 +126,7 @@ export class Room {
       const note = {
         id, board: msg.board, text: msg.text, color: msg.color, x: msg.x, y: msg.y,
         ...(msg.wx !== undefined ? { wx: msg.wx, wy: msg.wy } : {}),
+        ...(msg.official ? { official: String(msg.board).split(':')[1] } : {}),
         authorId: this.me?.id || '', authorName: this.me?.name || '', z: Number.MAX_SAFE_INTEGER, created: t, updated: t, v: 0, pending: true,
       };
       this.pending.set(msg.cid, id);

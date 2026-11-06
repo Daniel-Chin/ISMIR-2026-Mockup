@@ -43,7 +43,11 @@ const composer = {
   dialog: $('#composer'),
   // choices: [{ value, label }] to pick one from (radio buttons, required), e.g. which sponsor a
   // note is for; the pick comes back as `choice`.
-  open({ heading, where = '', text = '', color, max = 600, colors = true, submit = 'Stick it', choices = null }) {
+  // official: { value, label } offers an "Official" box under the choices (a sponsor's reps,
+  // Industry Board). Ticked, the note is for that sponsor (picked; the other choices greyed out)
+  // and white, like a pinned paper; it comes back as `official: true`. Unticked: as for anyone.
+  // A null value (a moderator) leaves the choices open: the note is official for the one picked.
+  open({ heading, where = '', text = '', color, max = 600, colors = true, submit = 'Stick it', choices = null, official = null }) {
     const d = this.dialog, area = $('#composer-text'), counter = $('#composer-counter');
     $('#composer-title').textContent = heading;
     $('#composer-where').textContent = where;
@@ -55,6 +59,10 @@ const composer = {
       label.append(input, ' ' + c.label);
       return label;
     }));
+    const offBox = $('#composer-official'), offInput = $('#composer-official-input');
+    offBox.hidden = !official;
+    offInput.checked = false;
+    $('#composer-official-label').textContent = official ? `Official note from ${official.label}` : '';
     $('#composer-submit').textContent = submit;
     area.value = text;
     area.maxLength = max;
@@ -72,6 +80,19 @@ const composer = {
       return b;
     }));
     area.dataset.color = colors ? chosen : 'sun';
+    // Official: your own sponsor, picked and fixed (the others greyed out); no colour: it is white.
+    offInput.onchange = () => {
+      const on = offInput.checked;
+      for (const label of pick.querySelectorAll('.pc-choice')) {
+        if (official.value === null) break;
+        const input = label.querySelector('input');
+        input.disabled = on;
+        label.classList.toggle('is-disabled', on);
+        if (on && input.value === official.value) input.checked = true;
+      }
+      swatches.hidden = on || !colors;
+      area.dataset.color = on ? 'official' : colors ? chosen : 'sun';
+    };
     const count = () => {
       const n = [...area.value].length;
       counter.textContent = `${n} / ${max}`;
@@ -90,7 +111,7 @@ const composer = {
         const value = area.value.trim();
         if (!value) return;
         if (colors) store.set(COLOR_KEY, chosen);
-        done({ text: value, color: chosen, choice: pick.querySelector('input:checked')?.value });
+        done({ text: value, color: chosen, choice: pick.querySelector('input:checked')?.value, official: !!official && offInput.checked });
       };
       area.onkeydown = e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) d.querySelector('form').requestSubmit(); };
       $('#composer-cancel').onclick = () => done(null);
@@ -1309,6 +1330,7 @@ function makeIndustryWall() {
     items: Object.fromEntries(industry.sponsors.map(s => [s.id, s])),
     buildPin: sponsorPin, buildBlock: cvPoolNote, regionHead: sponsorRegionHead,
     choices: () => industry.sponsors.map(s => ({ value: s.id, label: s.name })),
+    officialName: id => industry.sponsors.find(s => s.id === id)?.name || '',
     hint: "Double-click in a sponsor's area to leave them a note",
     missText: "Double-click in a sponsor's area to leave them a note.",
   });

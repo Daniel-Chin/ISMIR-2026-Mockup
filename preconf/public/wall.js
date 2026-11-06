@@ -508,7 +508,9 @@ export class WallView extends BoardView {
 
   /**
    * New note on paper `uid`: beside its pin (or at `at`), and on the paper's own board. No uid:
-   * the composer asks which one, from opts.choices() (the Industry Board's + Note).
+   * the composer asks which one, from opts.choices() (the Industry Board's + Note). A sponsor's
+   * reps may post it as Official, on their own sponsor only; a moderator, on any sponsor
+   * (opts.officialName names them).
    */
   async commentOn(uid, at) {
     this.stopTour();
@@ -517,9 +519,15 @@ export class WallView extends BoardView {
     if (!uid && !choices?.length) return;
     const paper = uid && this.opts.items[uid];
     const where = !paper ? '' : paper.where || `${paper.displayId || '#' + uid} ${paper.title}`;
-    const result = await this.app.composer.open({ heading: 'New note', where, choices, max: this.room.limits.textMax });
+    const me = this.room.me || {}, name = this.opts.officialName;
+    const mine = name && me.sponsor && this.wall.pins.has(me.sponsor) ? me.sponsor : null;
+    let official = null;
+    if (name && me.admin) official = uid ? { value: uid, label: name(uid) } : { value: null, label: 'the sponsor picked above (moderator)' };
+    else if (mine && (!uid || uid === mine)) official = { value: mine, label: name(mine) };
+    const result = await this.app.composer.open({ heading: 'New note', where, choices, official, max: this.room.limits.textMax });
     if (!result) return;
     uid ||= result.choice;
+    if (result.official && !me.admin && uid !== mine) return;
     if (!this.wall.pins.has(uid)) return;
     const board = `${this.wall.prefix}:${uid}`;
     const pin = this.wall.pins.get(uid);
@@ -529,7 +537,7 @@ export class WallView extends BoardView {
       : wallSlotFor(this.wall, uid, notes);
     const { boardW, boardH } = this.room.paperLimits;
     const spot = freeBoardSpot(notes.filter(n => n.board === board), boardW, boardH);
-    this.room.send({ t: 'create', board, text: result.text, color: result.color, ...spot, ...slot });
+    this.room.send({ t: 'create', board, text: result.text, color: result.color, ...(result.official ? { official: true } : {}), ...spot, ...slot });
   }
 
   destroy({ keepRooms = false } = {}) {

@@ -25,3 +25,15 @@ Source: <https://ismir2026.ismir.net/meet-the-sponsors>. Only sponsorship tiers 
 3. Save it in `sitedata/sponsors/` and add an entry to `sponsors.yml`.
 
 For a new conference, replace the directory contents.
+
+## Official notes on the Warm-up's Industry Board
+
+A sponsor's reps can tick **Official note from …** when they post on the Industry Board. They pick their own sponsor, and the other choices are greyed out. An official note is white with a red tack, like a pinned paper, and is signed with the sponsor's name, not the rep's. It belongs to the sponsor: any of its reps can edit, move or delete it. Nobody else can, except moderators, who can also post official notes for any sponsor, for example to test. There is no cap on how many a sponsor posts. Notes start inside the sponsor's area but can be moved anywhere. The server enforces these rules in `preconf/src/board-core.js`.
+
+**Who is a rep.** A Live Database tab lists the reps.
+- Each row starts with the sponsor (its first word is the Warm-up id: `moises`, `adobe research`, `anghami`), followed by its reps' emails, one per column, as many as needed.
+- A row starting with `admin` lists moderators.
+
+**How the Worker reads it.** The Worker reads the tab's CSV export itself; `SPONSOR_REPS_SHEET` in `preconf/wrangler.jsonc` holds the URL. Sign-in gives only a Slack id, so the Worker looks each email up with its own Slack bot token. That token is the Warm-up Slack app's and needs the `users:read.email` scope. The Worker keeps the result for a minute (`sheetReps` in `preconf/src/auth.js`). No token leaves Cloudflare, and no list is published. If a Slack lookup fails, for example because the scope is missing, the Worker keeps its last list and does not use a partial one.
+
+**To change reps:** edit the tab. It takes effect within a minute; open boards pick it up when they reconnect. To preview what the Worker will find, run `python scripts/sync_sponsor_reps.py`.
