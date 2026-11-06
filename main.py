@@ -272,7 +272,7 @@ app = Flask(__name__)
 app.config.from_object(__name__)
 freezer = Freezer(app)
 
-markdown_renderer = MarkdownIt("commonmark", {"html": True})
+markdown_renderer = MarkdownIt("commonmark", {"html": True}).enable("table")
 
 
 @app.template_filter("markdown")
