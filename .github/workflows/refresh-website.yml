@@ -73,7 +73,7 @@ jobs:
           key: drive-site-images-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: drive-site-images-
 
-      # Drive images embedded in sheet markdown, as declared in scripts/site_images.json.
+      # Drive images embedded in sheet markdown (columns listed in the script).
       - name: Download site images
         run: uv run python scripts/download_site_images.py $MOCKUP_FLAG
 

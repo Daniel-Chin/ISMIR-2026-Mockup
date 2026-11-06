@@ -1,6 +1,6 @@
 """Download Google Drive images embedded in sheet text so GitHub Pages can serve them.
 
-Scans the markdown cells declared in scripts/site_images.json for image links
+Scans the markdown cells in MARKDOWN_COLUMNS for image links
 like ![Alt](https://drive.google.com/file/d/ID/view), downloads each into a cache
 dir with a URL -> filename map (url_map.json), and copies them plus the map to
 static/site_images/. main.py's markdown filter rewrites those URLs to the local
@@ -21,7 +21,8 @@ from pathlib import Path
 import download_paper_thumbnails as dl
 
 ROOT = dl.ROOT
-CONFIG = Path(__file__).with_name("site_images.json")
+# Sheet cells that may embed Drive images as markdown.
+MARKDOWN_COLUMNS = {"events.csv": ["event_desc"]}
 CACHE_DIR = ROOT / ".cache" / "drive_site_images"
 OUT_DIR = ROOT / "static" / "site_images"
 MARKDOWN_IMAGE = re.compile(r"!\[[^\]]*\]\(\s*<?([^)\s>]+)")
@@ -35,7 +36,7 @@ def main():
     dl.CACHE_DIR = CACHE_DIR  # the shared helpers read this global
     sitedata = ROOT / ("sitedata_mock" if args.mockup else "sitedata")
     urls: list[tuple[str, str]] = []  # (where, url)
-    for name, columns in json.loads(CONFIG.read_text())["columns"].items():
+    for name, columns in MARKDOWN_COLUMNS.items():
         path = sitedata / name
         if not path.exists():
             continue
