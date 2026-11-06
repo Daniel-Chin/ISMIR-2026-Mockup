@@ -357,6 +357,34 @@ tr.fc-list-item {
   text-decoration: underline;
 }
 
+/* Grids of people, e.g. Majlis panelists: a markdown table with an empty header row. */
+.markdown table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+
+.markdown thead:has(th:empty) {
+  display: none;
+}
+
+.markdown td {
+  padding: 0.75rem 0.5rem;
+  vertical-align: top;
+  text-align: center;
+  border-top: 1px solid #dee2e6;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.markdown td img {
+  display: block;
+  width: 100%;
+  max-width: 180px;
+  height: auto;
+  margin: 0.5rem auto 0;
+}
+
 #absShow.collapsed::after {
   content: "+ Show More";
 }

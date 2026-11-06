@@ -10,13 +10,20 @@ systemd-inhibit --what=sleep --why='self service bot' \
     uv run python -m long_running_bots.self_service_pusher
 # interact...
 # ctrl-B D
+tmux new -s feed_bot
+systemd-inhibit --what=sleep --why='feed constructor bot' \
+    uv run python -m long_running_bots.personal_feed_constructor
+# ctrl-B D
 systemd-inhibit --list  # to check locks
 # logout.
 # ...
 # login
 tmux attach -t anno_bot
 tmux attach -t self_s_bot
+tmux attach -t feed_bot
 ```
+Personal Feed Constructor: setup and mechanics are in the docstring of
+[personal_feed_constructor.py](personal_feed_constructor.py).
 
 ## Announcement bot shell
 The announcement bot runs an interactive shell (`announce>` live, `mockup>` with `--mockup`).

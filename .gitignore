@@ -247,3 +247,5 @@ bot/shared/catalogue_schema.py
 .cache/
 static/paper_images/*
 !static/paper_images/.gitkeep
+static/site_images/*
+!static/site_images/.gitkeep
