@@ -1,0 +1,6 @@
+{
+ "_doc": "Sheet cells that may embed Google Drive images as markdown, e.g. ![Alt](https://drive.google.com/file/d/ID/view). scripts/download_site_images.py downloads them; main.py's markdown filter swaps in the local copy.",
+ "columns": {
+  "events.csv": ["event_desc"]
+ }
+}

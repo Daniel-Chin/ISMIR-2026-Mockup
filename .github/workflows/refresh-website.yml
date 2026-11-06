@@ -66,6 +66,24 @@ jobs:
           path: .cache/drive_thumbnails
           key: drive-thumbnails-${{ github.run_id }}-${{ github.run_attempt }}
 
+      - name: Restore site image cache
+        uses: actions/cache/restore@v6.1.0
+        with:
+          path: .cache/drive_site_images
+          key: drive-site-images-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: drive-site-images-
+
+      # Drive images embedded in sheet markdown, as declared in scripts/site_images.json.
+      - name: Download site images
+        run: uv run python scripts/download_site_images.py $MOCKUP_FLAG
+
+      - name: Save site image cache
+        if: ${{ always() }}
+        uses: actions/cache/save@v6.1.0
+        with:
+          path: .cache/drive_site_images
+          key: drive-site-images-${{ github.run_id }}-${{ github.run_attempt }}
+
       - name: Build website
         run: uv run python main.py $MOCKUP_FLAG --build
 

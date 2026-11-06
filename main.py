@@ -278,6 +278,14 @@ markdown_renderer = MarkdownIt("commonmark", {"html": True})
 @app.template_filter("markdown")
 def markdown_filter(value):
     text = "" if value is None else str(value)
+    # Drive image URL -> filename map written by scripts/download_site_images.py
+    try:
+        with open("static/site_images/url_map.json", encoding="utf-8") as f:
+            site_images = json.load(f)
+    except FileNotFoundError:
+        site_images = {}
+    for url, filename in site_images.items():
+        text = text.replace(url, f"static/site_images/{filename}")
     return Markup(f'<div class="markdown">{markdown_renderer.render(text)}</div>')
 
 # MAIN PAGES
