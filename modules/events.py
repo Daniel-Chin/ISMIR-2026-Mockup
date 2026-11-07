@@ -43,7 +43,7 @@ class Events:
         if self.eventsCsvFile is None:
             raise Exception("self.eventsCsvFile passed in constructor is null")
 
-        csv_data = pd.read_csv(self.eventsCsvFile)
+        csv_data = pd.read_csv(self.eventsCsvFile, keep_default_na=False, na_values=[""])
         slack_channel_column = "slack_channel"
         row_mask = self._channel_rows(csv_data)
         if slack_channel_column not in csv_data:
@@ -66,7 +66,7 @@ class Events:
         if self.eventsCsvFile is None:
             raise Exception("self.eventsCsvFile passed in constructor is null")
 
-        csv_data = pd.read_csv(self.eventsCsvFile)
+        csv_data = pd.read_csv(self.eventsCsvFile, keep_default_na=False, na_values=[""])
         slack_channel_column = "slack_channel"
         row_mask = self._channel_rows(csv_data)
         channel_names = [str(name).strip().lstrip("#") for name in csv_data.loc[

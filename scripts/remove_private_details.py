@@ -8,7 +8,7 @@ def remove_author_contacts(in_dir="../miniconf-data/sitedata/", out_dir="sitedat
     os.makedirs(out_dir, exist_ok=True)
 
     print("Removing author details from events.csv ")
-    f = pd.read_csv(os.path.join(in_dir, "events.csv"))
+    f = pd.read_csv(os.path.join(in_dir, "events.csv"), keep_default_na=False, na_values=[""])
     f.drop("organiser_emails", axis=1, inplace=True)
     f.to_csv(os.path.join(out_dir, "events.csv"), index=False)
 

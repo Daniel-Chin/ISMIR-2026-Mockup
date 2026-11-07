@@ -38,8 +38,34 @@ class ZoomCreator:
                     lambda uid: getattr(assignments[uid], attribute)
                 )
 
+    def _isOnlineMajlis(self, row):
+        return row["category"] == "Majlis" and "(Online)" in str(row["title"])
+
     def _wantsZoom(self, row):
-        return row["category"] not in self.SKIP_CATEGORIES
+        return self._isOnlineMajlis(row) or row["category"] not in self.SKIP_CATEGORIES
+
+    def _staticLiveUrl(self, row):
+        """Placeholder live_url for rows that get no Zoom link, else None."""
+        if row["category"] == "Tutorials":
+            return "Confidential"
+        if row["category"] in ("Lunch", "Registration", "Social"):
+            return "NA"
+        if row["category"] == "Majlis" and not self._isOnlineMajlis(row):
+            return "NA"
+        return None
+
+    def _writeStaticLiveUrls(self, planOnly):
+        csv_data = pd.read_csv(self.eventsCsvFile, keep_default_na=False, na_values=[""])
+        changed = False
+        for index, row in csv_data.iterrows():
+            value = self._staticLiveUrl(row)
+            if value is None or row["live_url"] == value:
+                continue
+            print(f"{'[plan] ' if planOnly else ''}live_url = {value!r}: {row['title']}")
+            csv_data.loc[index, "live_url"] = value
+            changed = True
+        if changed and not planOnly:
+            csv_data.to_csv(self.eventsCsvFile, index=False)
 
     UNCONFERENCE_ROOMS = ["Please set topic 1 name", "Please set topic 2 name"]
 
@@ -65,11 +91,12 @@ class ZoomCreator:
         if self.eventsCsvFile is None:
             raise Exception("eventsCsvFile passed in constructor is null")
 
-        csv_data = pd.read_csv(self.eventsCsvFile)
+        csv_data = pd.read_csv(self.eventsCsvFile, keep_default_na=False, na_values=[""])
         if self.useDummyValues:
             self._printZoomPlan(csv_data, zoomUtils)
             return
 
+        self._writeStaticLiveUrls(planOnly)
         wanted = csv_data[csv_data.apply(self._wantsZoom, axis=1)]
 
         print("## Number of items to create zoom link for: ", len(wanted.index))
@@ -106,7 +133,7 @@ class ZoomCreator:
                     key = ("Webinar", self.topicPrefix + zoomUtils._sharedWebinarTopic(self.eventsCsvFile))
                     codename = "shared-webinar"
                     entities[key] = {"codename": codename, "rooms": []}
-            assignments.append((row, codename))
+            assignments.append((row, codename or self._staticLiveUrl(row)))
 
         print("## Dummy mode (no --prod true): no Zoom API calls made.")
         print(f"## Zoom entities to create or reuse: {len(entities)} "

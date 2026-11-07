@@ -528,7 +528,7 @@ def createZoomLinksIfNeeded(
     The old behavior (one meeting per filtered row) is preserved in
     createZoomMeetingLinksPerRow_DEPRECATED for compatibility.
     """
-    csvData = pd.read_csv(csvFilename, index_col=indexColumnId)
+    csvData = pd.read_csv(csvFilename, index_col=indexColumnId, keep_default_na=False, na_values=[""])
     conferenceTimezone = _load_conference_timezone(csvFilename)
     # an all-empty link column reads back as float64; make it hold strings
     csvData[zoomColumnId] = csvData[zoomColumnId].astype("object")
@@ -743,7 +743,7 @@ def createZoomMeetingLinksPerRow_DEPRECATED(
         "[DEPRECATED] createZoomMeetingLinksPerRow_DEPRECATED uses the old "
         "one-meeting-per-row behavior. Prefer createZoomLinksIfNeeded()."
     )
-    csvData = pd.read_csv(csvFilename, index_col=indexColumnId)
+    csvData = pd.read_csv(csvFilename, index_col=indexColumnId, keep_default_na=False, na_values=[""])
     conferenceTimezone = _load_conference_timezone(csvFilename)
     csvData[zoomColumnId] = csvData[zoomColumnId].astype("object")
     existingByTopic = {meeting[1]: meeting for meeting in getListOfMeetings()}
