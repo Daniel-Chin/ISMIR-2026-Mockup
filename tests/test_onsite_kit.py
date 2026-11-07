@@ -243,7 +243,7 @@ def test_talk_sessions_join_the_sheets():
     assert [s['key'] for s in sessions] == ['O1', 'A1'] and sessions[1]['title'] == '★ Award Nominees · Oral Session - 1'
     assert sessions[0]['start'] == '2026-11-09T10:00:00+04:00' and sessions[0]['papers'][0]['position'] == 2
     assert found['7']['authors'] == 'Ann Lee; Bo Li'
-    assert found['7']['files'] == {'paper': 'P7', 'slides_pdf': drive + 'a' * 25, 'award_slides_pdf': ''}  # PDFs only
+    assert found['7']['files'] == {'slides_pdf': drive + 'a' * 25, 'award_slides_pdf': ''}  # slides PDFs only
     assert livedb.mended('JosÃ\xa9') == 'José' and livedb.mended('José') == 'José'
 
 
@@ -272,21 +272,22 @@ def test_talks_are_read_from_the_sheets_and_files_open(server, tmp_path, monkeyp
                                                              'size': None if 'presentation' in url else 3})
     store.job = {'done': 0, 'total': 0, 'failed': []}
     store.check_drive()
-    assert sorted(store.listing['files']['7']) == ['paper', 'slides_pdf'] and store.job['failed'] == []
+    assert sorted(store.listing['files']['7']) == ['slides_pdf'] and store.job['failed'] == []
     assert store.listing['files']['7']['slides_pdf']['unsized']
     (tmp_path / 'talks' / 'slides_pdf').mkdir(parents=True)
     (tmp_path / 'talks' / 'slides_pdf' / '7.pptx').write_bytes(b'deck')
-    assert store.status('7', 'slides_pdf')['state'] == 'unknown' and store.status('7', 'paper')['state'] == 'missing'
+    assert store.status('7', 'slides_pdf')['state'] == 'unknown' and 'paper' not in store.kinds
     award, oral = (session['papers'][0] for session in kit.sessions()['sessions'])
     assert oral['files'] == {'slides': {'kind': 'slides_pdf', 'name': '7.pptx'}} and award['files'] == {}
     assert award['slides_note'] == 'A note, not a link' and not oral['slides_note']
 
     opened = []
+    monkeypatch.setattr(serve.platform, 'release', lambda: 'plain')  # not WSL, which asks wslpath first
     monkeypatch.setattr(serve.subprocess, 'Popen', lambda command: opened.append(command))
     monkeypatch.setattr(serve.os, 'startfile', lambda file: opened.append(file), raising=False)
     response, _ = request(server, 'POST', '/api/talks/open', {'uid': '7', 'kind': 'slides_pdf', 'reveal': True}, json_headers)
     assert response.status == 200 and opened
-    response, _ = request(server, 'POST', '/api/talks/open', {'uid': '7', 'kind': 'paper'}, json_headers)
+    response, _ = request(server, 'POST', '/api/talks/open', {'uid': '7', 'kind': 'award_slides_pdf'}, json_headers)
     assert response.status == 404  # not downloaded
     response, _ = request(server, 'POST', '/api/talks/open', {'uid': '7', 'kind': 'slides_pdf'},
                           {**json_headers, 'Origin': 'https://elsewhere.example'})
@@ -373,3 +374,9 @@ def test_updating_the_screens_from_the_live_database(server, tmp_path, monkeypat
     assert screen['plays'] == ['569', '600', '569', '600'] and screen['start_ms'] == 7  # the edits gone, the start kept
     assert json.loads((tmp_path / '.state' / 'lbd_plan.json').read_text(encoding='utf-8'))['screens']['1']['plays'] == []
     assert json.loads(request(server, 'GET', '/api/lbd-plan')[1])['changes'] == []
+    # Edits in Manage alone count too: the screens show the plan once updated.
+    edit = {'rev': screen['rev'], 'plays': ['569'], 'poster_s': 0, 'timetable_s': 5, 'start_ms': 7}
+    assert request(server, 'POST', '/api/lbd/6', edit)[0].status == 200
+    assert json.loads(request(server, 'GET', '/api/lbd-plan')[1])['changes'] == ['Screen 6: edited in Manage (1 plays), the plan has 4']
+    request(server, 'POST', '/api/lbd-plan', {}, {'Content-Type': 'application/json'})
+    assert json.loads(request(server, 'GET', '/api/lbd/6')[1])['plays'] == ['569', '600', '569', '600']

@@ -7,11 +7,11 @@ screens, and the LBD and MIREX materials. It runs on Python 3.9+ with no package
 |---|---|
 | **Links** | Miniconf, Zoom, Slack, YouTube, Live Database and operations links |
 | **Poster sessions** | Zoom, Slack and miniconf links of all 14 sessions; the live and next ones are marked |
-| **Talk sessions** | The 14 oral and 3 award sessions; in each, its papers in order with buttons to open the slides or paper, or show them in Finder |
+| **Talk sessions** | The 14 oral and 3 award sessions; in each, its papers in order with buttons to open the slides or show them in Finder |
 | **LBD screens** | The 7 video screens: Play and Manage for each |
 | **LBD posters** | The 4 poster screens: Play and Manage for each |
 | **Materials** | Every LBD and MIREX file on Drive against this MacBook: choose what to download or update |
-| **Paper materials** | The same for the papers and slides of the oral and award sessions |
+| **Paper materials** | The same for the slides (PDF) of the oral and award sessions |
 
 ## Before the conference
 
@@ -85,16 +85,16 @@ count as up to date.
 
 From the oral and award session tabs, Papers and Events (see [The Live Database](#the-live-database)) come the
 sessions (time and room from Events; chairs; papers in order, with presenter and onsite or remote) and each
-paper's links: its PDF (Papers), and its slides as PDF for each session (`slides_pdf`; the preferred format is
+paper's slides as PDF for each session (`slides_pdf`; the preferred format, and the paper itself, are
 not used).
 
 **Paper materials** works like Materials, against those links: *Check Drive for updates*, then download.
-Files go to `media/talks/{papers,slides_pdf,award_slides_pdf}/<uid>.<ext>`. A Google Slides link downloads as
+Files go to `media/talks/{slides_pdf,award_slides_pdf}/<uid>.<ext>`. A Google Slides link downloads as
 PowerPoint; Google tells its size only by sending it, so it shows `?` once downloaded: tick it to fetch it
 again. A link not shared with anyone with the link fails the check, and is listed.
 
 **Talk sessions** lists the sessions, the live and next ones marked. In a session, each paper has *Open slides*
-(this session's slides, in their own app), *Paper PDF*, and *Show in Finder*. Slides on a web page open in the
+(this session's slides, in their own app) and *Show in Finder*. Slides on a web page open in the
 browser, and a note in the sheet in place of slides shows under the presenter. The page shows newly downloaded
 files within 30 seconds.
 
@@ -104,7 +104,9 @@ Each screen plays its videos back to back, each after a cover with its code, tit
 affiliations and the QR codes of its paper and group Slack channels, and a faint ring in its top right
 corner that fills as the cover's time runs out; there are no posters. Each video fades out over its last second, and the cover fades
 in over it and out over the next video. A bar on top shows the code and how far the video has played, and
-scrolls the titles of this video and the next. Before the start, the screen shows its timetable.
+scrolls the titles of this video and the next. Before the start, the screen shows its timetable; an LBD of
+another group, there only for a play it had no time for on its own screen, is listed with the play-backs,
+by its code.
 
 As planned from the Live Database on 7 November:
 
@@ -130,9 +132,9 @@ the slot leaves, up to 20 s.
 
 Each MacBook works this plan out from the Live Database (`lbdplan.py`), with the lengths its video files
 state, so every MacBook comes to the same plan without copying anything. When a reading of the Live Database
-changes it, the LBD screens and LBD posters pages say how, with **Update the screens**: do that on every
-MacBook. A screen playing at the time jumps to the new plan; a changed screen loses its edits in Manage, but
-keeps its start time. The plan in use is kept in `.state/lbd_plan.json`.
+changes it, or a screen was edited in Manage unlike it, the LBD screens and LBD posters pages say how, with
+**Update the screens** (**Check the Live Database** reads it again first): do that on every MacBook. A screen
+playing at the time jumps to the new plan; a screen edited in Manage loses its edits, but keeps its start time. The plan in use is kept in `.state/lbd_plan.json`.
 
 `lbd_schedule.json` in the repo is the reference: the plan a new MacBook starts with, the screens' names, the
 YouTube lengths of videos not downloaded, and what counts as new to a screen. `python3 onsite-kit/plan_lbd.py`

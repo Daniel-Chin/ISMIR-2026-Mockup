@@ -315,8 +315,8 @@ class Materials:
             process.terminate()
 
 
-# The papers and slides (as PDF) of the oral and award sessions, each linked on its own from the session sheets.
-TALK_KINDS = {'paper': 'talks/papers', 'slides_pdf': 'talks/slides_pdf', 'award_slides_pdf': 'talks/award_slides_pdf'}
+# The slides (as PDF) of the oral and award sessions, each linked on its own from the session sheets.
+TALK_KINDS = {'slides_pdf': 'talks/slides_pdf', 'award_slides_pdf': 'talks/award_slides_pdf'}
 
 
 class LinkMaterials(Materials):

@@ -52,13 +52,28 @@ const Kit = {
   },
 
   // What the Live Database, as last read, would change in the LBD screens' plan, with a button to take it.
-  async showPlan(element) {
+  async showPlan(element, checked) {
     const status = await Kit.get('/api/lbd-plan');
     const problems = status.problems.length
       ? `<p class="warn">Not planned: ${status.problems.map(Kit.esc).join('; ')}</p>` : '';
     if (!status.changes.length) {
-      element.innerHTML = `<p class="soft">The screens follow the Live Database as read ${status.read_ms
-        ? Kit.clock(status.read_ms, status.timezone, true) : 'never'}.</p>${problems}`;
+      const read = status.read_ms ? Kit.clock(status.read_ms, status.timezone, true) : 'never';
+      element.innerHTML = `<div class="bar"><button id="check-plan">Check the Live Database</button>
+        <span class="${checked ? 'current' : 'soft'}">${checked ? 'No changes: ' : ''}the screens follow the Live
+        Database as read ${read}.</span></div>${problems}`;
+      element.querySelector('#check-plan').onclick = async (event) => {
+        event.target.disabled = true;
+        event.target.textContent = 'Reading the Live Database…';
+        try {
+          await Kit.post('/api/live', {});
+          Kit.liveStatus();
+          await Kit.showPlan(element, true);
+        } catch (error) {
+          event.target.disabled = false;
+          event.target.textContent = 'Check the Live Database';
+          element.insertAdjacentHTML('beforeend', `<p class="warn">${Kit.esc(error.message)}</p>`);
+        }
+      };
       return;
     }
     element.innerHTML = `<div class="notice"><b>The Live Database changes the LBD screens:</b><br>

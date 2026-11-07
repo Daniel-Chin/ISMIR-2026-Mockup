@@ -122,7 +122,7 @@ def poster_sessions(events: list, site: str, zone) -> list:
 def talk_sessions(events: list, papers: list, oral: list, award: list, zone):
     """The oral and award sessions, each with its papers in order; and every paper's title, authors and files.
 
-    A paper's files are links from the sheets: its PDF (Papers), and its slides for each session as PDF.
+    A paper's files are links from the session sheets: its slides for each session, as PDF.
     """
     by_uid = {row.get('uid', ''): row for row in papers}
     times = {}
@@ -151,7 +151,7 @@ def talk_sessions(events: list, papers: list, oral: list, award: list, zone):
             talk = talks.setdefault(uid, {
                 'title': paper.get('title') or row.get('title', ''),
                 'authors': '; '.join(name for name, _ in people(paper.get('authors_and_affil', ''))),
-                'files': {'paper': paper.get('raw_pdf_path', '')}})
+                'files': {}})
             talk['files'][prefix + 'slides_pdf'] = row.get('slides_pdf', '')
     for session in sessions.values():
         session['papers'].sort(key=lambda paper: paper['position'])

@@ -67,7 +67,6 @@
       $('about').textContent = `${when(session)} · ${session.location} · chairs ${session.chair_onsite} (onsite), ${session.chair_remote} (remote)`;
       $('talks').innerHTML = session.papers.map((paper) => {
         const slides = paper.files.slides;
-        const shown = slides || paper.files.paper;
         const remote = /remote/i.test(paper.modality);
         return `<div class="talk">
           <div class="position">${paper.position}</div>
@@ -80,8 +79,7 @@
             ${!slides && paper.slides_web
               ? `<a class="button primary" href="${Kit.esc(paper.slides_web)}" target="_blank" rel="noreferrer">Open slides</a>`
               : `<button class="primary" data-open="${Kit.esc(slides?.kind || '')}" data-uid="${Kit.esc(paper.uid)}"${slides ? '' : ' disabled'}>Open slides</button>`}
-            <button data-open="paper" data-uid="${Kit.esc(paper.uid)}"${paper.files.paper ? '' : ' disabled'}>Paper PDF</button>
-            <button data-reveal="${Kit.esc(shown?.kind || '')}" data-uid="${Kit.esc(paper.uid)}"${shown ? '' : ' disabled'}>Show in Finder</button>
+            <button data-reveal="${Kit.esc(slides?.kind || '')}" data-uid="${Kit.esc(paper.uid)}"${slides ? '' : ' disabled'}>Show in Finder</button>
           </div></div>`;
       }).join('');
     }
@@ -111,11 +109,13 @@
       const button = event.target.closest('button[data-uid]');
       if (!button) return;
       const reveal = 'reveal' in button.dataset;
+      const label = button.textContent;
       try {
         await Kit.post('/api/talks/open', { uid: button.dataset.uid, kind: reveal ? button.dataset.reveal : button.dataset.open, reveal });
-        $('notice').innerHTML = '';
+        button.textContent = 'Opened ✓';  // the app or Finder may open behind this window
+        setTimeout(() => { button.textContent = label; }, 2000);
       } catch (error) {
-        $('notice').innerHTML = `<div class="notice">${Kit.esc(error.message)}</div>`;
+        alert(error.message);
       }
     });
     load();

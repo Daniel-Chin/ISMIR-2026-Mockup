@@ -11,6 +11,7 @@ import argparse
 import json
 import mimetypes
 import os
+import platform
 import re
 import subprocess
 import sys
@@ -183,29 +184,41 @@ class Kit:
         """The plan the Live Database asks for now, and what could not be planned."""
         return lbdplan.build(self.reference, self.live['lbds'], self.groups, self.video_length, self.start_ms, self.slot_s)
 
+    def edited_unlike(self, plan: dict) -> dict:
+        """screen -> its edits in Manage, where they differ from what that plan has for it."""
+        found = {}
+        for screen in [*plan.get('screens', {}), *POSTER_SCREENS]:
+            saved = read_json(STATE / f'screen_{screen}.json', None)
+            body = plan['screens'].get(screen) or plan.get('posters', {}).get(screen)
+            if saved and body and (saved['plays'], saved['poster_s'], saved['timetable_s']) != (
+                    body['plays'], body['poster_s'], body.get('timetable_s', 0)):
+                found[screen] = saved
+        return found
+
     def plan_status(self) -> dict:
+        """What the Live Database would change on the screens: the plan, and edits in Manage that differ from it."""
         plan, problems = self.new_plan()
-        return {'changes': lbdplan.changes(self.plan, plan), 'problems': problems,
+        changes = lbdplan.changes(self.plan, plan)
+        for screen, saved in self.edited_unlike(plan).items():
+            label = f'Poster screen {screen}' if screen in POSTER_SCREENS else f'Screen {screen}'
+            body = plan['screens'].get(screen) or plan['posters'][screen]
+            changes.append(f'{label}: edited in Manage ({len(saved["plays"])} plays), the plan has {len(body["plays"])}')
+        return {'changes': changes, 'problems': problems,
                 'planned_ms': self.plan.get('planned_ms', 0), 'read_ms': self.live['read_ms'], 'timezone': self.timezone}
 
     def apply_plan(self) -> dict:
-        """Take the plan the Live Database asks for. A screen whose plays change loses its edits in Manage (its
-        start time stays), so it shows the new plan."""
+        """Take the plan the Live Database asks for. A screen edited in Manage unlike the plan loses its edits
+        (its start time stays), so every screen shows the plan."""
         plan, problems = self.new_plan()
-        changed = [line.split(':')[0] for line in lbdplan.changes(self.plan, plan)]
-        old = {screen: self.schedule(screen) for screen in [*self.plan.get('screens', {}), *POSTER_SCREENS]}
+        edited = self.edited_unlike(plan)
         plan['planned_ms'] = int(datetime.now().timestamp() * 1000)
         write_json(STATE / 'lbd_plan.json', plan)
         self.plan = plan
         self.materials.screen_of = {uid: screen for screen, body in plan['screens'].items() for uid in body['plays']}
-        reset = []
-        for screen, schedule in old.items():
-            saved = STATE / f'screen_{screen}.json'
-            label = f'Poster screen {screen}' if screen in POSTER_SCREENS else f'Screen {screen}'
-            if saved.exists() and label in changed:
-                write_json(saved, {**self.default_schedule(screen), 'start_ms': schedule['start_ms'], 'rev': schedule['rev'] + 1})
-                reset.append(screen)
-        return {**self.plan_status(), 'reset': reset, 'problems': problems}
+        for screen, saved in edited.items():
+            write_json(STATE / f'screen_{screen}.json',
+                       {**self.default_schedule(screen), 'start_ms': saved['start_ms'], 'rev': saved['rev'] + 1})
+        return {**self.plan_status(), 'reset': sorted(edited), 'problems': problems}
 
     def schedule(self, screen: str) -> dict:
         return read_json(STATE / f'screen_{screen}.json', self.default_schedule(screen))
@@ -338,7 +351,7 @@ class Kit:
             for paper in session['papers']:
                 talk = self.talks.get(paper['uid'], {})
                 here = {role: (kind, store.local_file(paper['uid'], kind))
-                        for role, kind in (('slides', prefix + 'slides_pdf'), ('paper', 'paper'))}
+                        for role, kind in (('slides', prefix + 'slides_pdf'),)}
                 files = {role: {'kind': kind, 'name': file.name} for role, (kind, file) in here.items() if file}
                 link = talk.get('files', {}).get(prefix + 'slides_pdf', '')
                 # What the sheet has instead of a file: slides on a web page, or a note in place of a link.
@@ -350,23 +363,29 @@ class Kit:
         return {'timezone': self.timezone, 'sessions': found, 'read_ms': self.live['read_ms'],
                 'configured': self.talk_materials.has_sheets}
 
-    def open_talk_file(self, uid: str, kind: str, reveal: bool) -> bool:
-        """Open a downloaded paper or slides file in its own app, or show it in Finder. False when it is not here."""
+    def open_talk_file(self, uid: str, kind: str, reveal: bool) -> str:
+        """Open a downloaded slides file in its own app, or show it in Finder. '' when done, else why not."""
         if kind not in self.talk_materials.kinds or uid not in self.talks:
-            return False
+            return 'No such file'
         file = self.talk_materials.local_file(uid, kind)
         if not file:
-            return False
-        if sys.platform == 'darwin':
-            subprocess.Popen(['open', '-R', str(file)] if reveal else ['open', str(file)])
-        elif sys.platform == 'win32':
-            if reveal:
-                subprocess.Popen(['explorer', f'/select,{file}'])
+            return 'Not downloaded on this MacBook: see Paper materials'
+        try:
+            if sys.platform == 'darwin':
+                subprocess.Popen(['open', '-R', str(file)] if reveal else ['open', str(file)])
+            elif sys.platform == 'win32':
+                if reveal:
+                    subprocess.Popen(['explorer', f'/select,{file}'])
+                else:
+                    os.startfile(file)  # noqa: S606 (a file of ours, opened by its own app)
+            elif 'microsoft' in platform.release().lower():  # WSL, which has no desktop of its own: Windows'
+                path = subprocess.run(['wslpath', '-w', str(file)], capture_output=True, text=True, check=True).stdout.strip()
+                subprocess.Popen(['explorer.exe', f'/select,{path}' if reveal else path])
             else:
-                os.startfile(file)  # noqa: S606 (a file of ours, opened by its own app)
-        else:
-            subprocess.Popen(['xdg-open', str(file.parent if reveal else file)])
-        return True
+                subprocess.Popen(['xdg-open', str(file.parent if reveal else file)])
+        except (OSError, subprocess.CalledProcessError) as error:
+            return f'Could not open {file.name}: {error}'
+        return ''
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -511,9 +530,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.materials_action(self.kit.materials if path == '/api/materials' else self.kit.talk_materials, body)
         elif path == '/api/talks/open':
             if self.same_site():
-                opened = self.kit.open_talk_file(str(body.get('uid', '')), str(body.get('kind', '')), bool(body.get('reveal')))
-                self.send_json({} if opened else {'error': 'Not downloaded on this MacBook: see Paper materials.'},
-                               200 if opened else 404)
+                failed = self.kit.open_talk_file(str(body.get('uid', '')), str(body.get('kind', '')), bool(body.get('reveal')))
+                self.send_json({'error': failed} if failed else {}, 404 if failed else 200)
         elif screen and self.kit.has_screen(screen[1]):
             try:
                 saved = self.kit.save(screen[1], body)

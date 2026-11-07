@@ -197,7 +197,8 @@
       }
     }
 
-    // A play's round is how many times its video has come up so far.
+    // A play's round is how many times its video has come up so far. An LBD of another group, only playing
+    // here as there was no time for it on its own screen, is listed with the play-backs, by its code only.
     let drawnTimetable = '';
     function drawTimetable() {
       const key = [plan.rev, plan.start_ms, timeline.items.length, innerHeight, innerWidth].join();
@@ -205,11 +206,14 @@
       drawnTimetable = key;
       $('tt-title').textContent = plan.theme;
       const seen = {};
-      const rounds = [];
+      let rounds = [];
       timeline.items.forEach((item) => {
         seen[item.uid] = (seen[item.uid] || 0) + 1;
-        (rounds[seen[item.uid] - 1] = rounds[seen[item.uid] - 1] || []).push(item);
+        const group = paperOf(item).group;
+        const round = group && String(group) !== String(plan.screen) ? Math.max(seen[item.uid], 2) : seen[item.uid];
+        (rounds[round - 1] = rounds[round - 1] || []).push(item);
       });
+      rounds = Array.from(rounds, (items) => items || []);  // a guest may leave a round empty
       $('rows').innerHTML = (rounds[0] || []).map((item) => `<div class="row"><time>${atClock(item.start)}</time>
         <span class="code">${code(item.uid)}</span><div>${Kit.esc(paperOf(item).title)}</div></div>`).join('') +
         rounds.slice(1).map((items, index) => `<div class="round"><h2>Play back${index ? ` ${index + 1}` : ''}</h2>
