@@ -15,6 +15,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from urllib.parse import unquote
 
 FOLDER_PAGE = 'https://drive.google.com/embeddedfolderview?id={}'
 DOWNLOAD = 'https://drive.usercontent.google.com/download?id={}&export=download&confirm=t'
@@ -58,6 +59,32 @@ def drive_size(file_id: str) -> int:
     return int(sizes[-1])
 
 
+def link_source(link: str):
+    """A Drive file or Google Slides link from a sheet -> (id, download URL), or None for anything else.
+    Google Slides come as PowerPoint files, whose size Google tells only by sending them."""
+    found = re.search(r'(?:[?&]id=|/d/)([\w-]{20,})', link)
+    if not found:
+        return None
+    if 'docs.google.com/presentation' in link:
+        return found[1], f'https://docs.google.com/presentation/d/{found[1]}/export/pptx'
+    return found[1], DOWNLOAD.format(found[1])
+
+
+def link_file(url: str) -> dict:
+    """The name and size (None when not told) of the file at a download URL."""
+    headers = curl('--range', '0-0', '--dump-header', '-', '--output', os.devnull, url)
+    names = re.findall(r"filename\*=UTF-8''([^;\r\n]+)", headers, re.I) or re.findall(r'filename="([^"]+)"', headers, re.I)
+    sizes = re.findall(r'content-range: bytes 0-0/(\d+)', headers, re.I)
+    if not names:
+        raise RuntimeError('not shared with anyone with the link?')
+    return {'name': unquote(names[-1]), 'size': int(sizes[-1]) if sizes else None}
+
+
+def downloadable(remote: dict) -> bool:
+    """A file of known size, or one whose size only the download tells (an exported Google Slides deck)."""
+    return remote.get('size') is not None or bool(remote.get('unsized'))
+
+
 def kind_of(name: str) -> str:
     """569_lbd.pdf, 569_poster.pdf, 569_thumbnail.png, 569_video.mp4; captions come under many names."""
     if Path(name).suffix.lower() in VIDEO_SUFFIXES:
@@ -69,14 +96,17 @@ def kind_of(name: str) -> str:
 
 
 class Materials:
+    kinds = KINDS
+    listing_name = 'drive_listing.json'
+
     def __init__(self, media: Path, state: Path, roots: list, lbds: list, screens: dict):
         self.media = media
         self.state = state
         self.roots = roots
-        self.lbds = lbds
-        self.uids = {lbd.get('folder', lbd['uid']): lbd['uid'] for lbd in lbds}
+        self.use_lbds(lbds)
         self.screen_of = {uid: screen for screen, plan in screens.items() for uid in plan['plays']}
-        self.listing_file = state / 'drive_listing.json'
+        self.screens = list(screens)
+        self.listing_file = state / self.listing_name
         self.listing = (json.loads(self.listing_file.read_text(encoding='utf-8'))
                         if self.listing_file.exists() else {'checked_ms': 0, 'files': {}, 'unmatched': []})
         self.lock = threading.Lock()
@@ -84,8 +114,14 @@ class Materials:
         self.cancelled = threading.Event()
         self.processes: set = set()
 
+    def use_lbds(self, lbds: list) -> None:
+        """The rows to show: uid and title, and the Drive ids of the files the sheet links (file_ids)."""
+        self.lbds = lbds
+        self.uids = {lbd['uid']: lbd['uid'] for lbd in lbds}  # a Drive folder named after its uid
+        self.by_file = {file_id: lbd['uid'] for lbd in lbds for file_id in lbd.get('file_ids', [])}
+
     def local_file(self, uid: str, kind: str):
-        folder = self.media / KINDS[kind]
+        folder = self.media / self.kinds[kind]
         return next((file for file in sorted(folder.glob(f'{uid}.*')) if file.stem == uid), None) if folder.is_dir() else None
 
     def status(self, uid: str, kind: str) -> dict:
@@ -101,7 +137,10 @@ class Materials:
             state = 'unknown'
         else:
             state = 'current' if size == local_size else 'changed'
-        return {'state': state, 'size': size, 'local_size': local_size}
+        return {'state': state, 'size': size, 'local_size': local_size, 'remote': bool(remote) and downloadable(remote)}
+
+    def configured(self) -> bool:
+        return bool(self.roots)
 
     def progress(self) -> dict:
         job = dict(self.job)
@@ -114,12 +153,13 @@ class Materials:
 
     def snapshot(self) -> dict:
         return {
-            'configured': bool(self.roots),
+            'configured': self.configured(),
             'checked_ms': self.listing['checked_ms'],
             'unmatched': self.listing['unmatched'],
-            'kinds': list(KINDS),
+            'kinds': list(self.kinds),
+            'screens': self.screens,
             'rows': [{'uid': lbd['uid'], 'title': lbd['title'], 'screen': self.screen_of.get(lbd['uid'], ''),
-                      'files': {kind: self.status(lbd['uid'], kind) for kind in KINDS}} for lbd in self.lbds],
+                      'files': {kind: self.status(lbd['uid'], kind) for kind in self.kinds}} for lbd in self.lbds],
             'job': self.progress(),
         }
 
@@ -152,8 +192,7 @@ class Materials:
             except RuntimeError as error:
                 self.job['failed'].append(f'Drive folder {root}: {error} (is it shared with anyone with the link?)')
         subfolders = [entry for entry in entries if entry['folder']]
-        matched = [entry for entry in subfolders if entry['name'] in self.uids]
-        self.job['total'] = len(matched)
+        self.job['total'] = len(subfolders)
 
         def contents(entry):
             names = list_folder(entry['id'])
@@ -161,8 +200,15 @@ class Materials:
             return entry, names
 
         with ThreadPoolExecutor(LOOKUPS_AT_ONCE) as pool:
-            folders = list(pool.map(contents, matched))
-        found = [(self.uids[entry['name']], file) for entry, names in folders for file in names if not file['folder']]
+            folders = list(pool.map(contents, subfolders))
+        # A folder is named after its uid (569), or, for MIREX, after its task: then a file the sheet links is in it.
+        owner = {}
+        for entry, names in folders:
+            uid = self.uids.get(entry['name']) or next((self.by_file[f['id']] for f in names if f['id'] in self.by_file), None)
+            if uid:
+                owner[entry['id']] = uid
+        found = [(owner[entry['id']], file) for entry, names in folders if entry['id'] in owner
+                 for file in names if not file['folder']]
         known = set(self.uids.values())
         for entry in entries:
             if entry['folder']:
@@ -188,7 +234,7 @@ class Materials:
         for uid, file in found:
             files.setdefault(uid, {})[file.get('kind') or kind_of(file['name'])] = {key: file.get(key) for key in ('id', 'name', 'size')}
         self.listing = {'checked_ms': int(time.time() * 1000), 'files': files,
-                        'unmatched': sorted(entry['name'] for entry in subfolders if entry['name'] not in self.uids)}
+                        'unmatched': sorted(entry['name'] for entry in subfolders if entry['id'] not in owner)}
         self.state.mkdir(exist_ok=True)
         self.listing_file.write_text(json.dumps(self.listing), encoding='utf-8')
 
@@ -197,10 +243,10 @@ class Materials:
         for key in keys:
             uid, kind = key.split('/')
             remote = self.listing['files'].get(uid, {}).get(kind)
-            if remote and remote.get('size') is not None:
+            if remote and kind in self.kinds and downloadable(remote):
                 items.append((uid, kind, remote))
         job = {'action': 'download', 'files': len(items), 'files_done': 0, 'active': {}, 'finished_bytes': 0,
-               'total_bytes': sum(remote['size'] for _, _, remote in items)}
+               'total_bytes': sum(remote.get('size') or 0 for _, _, remote in items)}
         return self.begin(job, self.download_all, items)
 
     def download_all(self, items: list) -> None:
@@ -212,21 +258,23 @@ class Materials:
         if self.cancelled.is_set():
             return
         label = f'{uid} {kind}'
-        # Named after the Drive file, so a partial download is resumed only from the same file.
+        # Named after the Drive file, so a partial download is resumed only from the same file; and the
+        # kind, as one file can serve twice (a paper's slides for its oral and its award session).
         parts = self.media / '.parts'
         parts.mkdir(parents=True, exist_ok=True)
-        part = parts / remote['id']
+        part = parts / f'{remote["id"]}-{kind}'
         self.job['active'][label] = part
         try:
             self.transfer(remote, part)
-            target_dir = self.media / KINDS[kind]
-            target_dir.mkdir(exist_ok=True)
+            target_dir = self.media / self.kinds[kind]
+            target_dir.mkdir(parents=True, exist_ok=True)
             target = target_dir / f'{uid}{Path(remote["name"]).suffix.lower()}'
             old = self.local_file(uid, kind)
+            size = part.stat().st_size
             os.replace(part, target)  # a player reading the old file keeps it until it is done
             if old and old != target:
                 old.unlink()
-            self.job['finished_bytes'] += remote['size']
+            self.job['finished_bytes'] += size
             self.job['files_done'] += 1
         except RuntimeError as error:
             if not self.cancelled.is_set():
@@ -235,13 +283,17 @@ class Materials:
             self.job['active'].pop(label)
 
     def transfer(self, remote: dict, part: Path) -> None:
-        if part.exists() and part.stat().st_size >= remote['size']:
-            if part.stat().st_size == remote['size']:
+        size = remote.get('size')
+        if size is None:  # nothing to check a partial file against: start again
+            part.unlink(missing_ok=True)
+        elif part.exists() and part.stat().st_size >= size:
+            if part.stat().st_size == size:
                 return
             part.unlink()
+        resume = ['--continue-at', '-'] if size is not None else []
         process = subprocess.Popen(
             ['curl', '--fail', '--location', '--silent', '--show-error', '--retry', '3', '--retry-delay', '5',
-             '--continue-at', '-', '--output', str(part), DOWNLOAD.format(remote['id'])],
+             *resume, '--output', str(part), remote.get('url') or DOWNLOAD.format(remote['id'])],
             stderr=subprocess.PIPE, text=True, encoding='utf-8', errors='replace')
         self.processes.add(process)
         _, errors = process.communicate()
@@ -253,7 +305,7 @@ class Materials:
             raise RuntimeError(QUOTA_HINT)
         if process.returncode:
             raise RuntimeError(errors.strip() or f'curl exit code {process.returncode}')
-        if part.stat().st_size != remote['size']:
+        if size is not None and part.stat().st_size != size:
             part.unlink()
             raise RuntimeError(QUOTA_HINT)
 
@@ -261,3 +313,56 @@ class Materials:
         self.cancelled.set()
         for process in list(self.processes):
             process.terminate()
+
+
+# The papers and slides (as PDF) of the oral and award sessions, each linked on its own from the session sheets.
+TALK_KINDS = {'paper': 'talks/papers', 'slides_pdf': 'talks/slides_pdf', 'award_slides_pdf': 'talks/award_slides_pdf'}
+
+
+class LinkMaterials(Materials):
+    """Files linked one by one from a sheet rather than laid out in Drive folders."""
+    kinds = TALK_KINDS
+    listing_name = 'talk_listing.json'
+
+    def __init__(self, media: Path, state: Path, rows: list, links: dict, screens: list):
+        super().__init__(media, state, [], rows, {})
+        self.has_sheets = False  # whether there are sheets to read the links from, before they have been read
+        self.use(rows, links, screens)
+
+    def use(self, rows: list, links: dict, screens: list) -> None:
+        """rows: uid, title and screen (its sessions) of each paper; links: uid -> kind -> the sheet's link."""
+        self.lbds = rows
+        self.uids = {row['uid']: row['uid'] for row in rows}
+        self.links = links
+        self.screen_of = {row['uid']: row['screen'] for row in rows}
+        self.screens = screens
+
+    def configured(self) -> bool:
+        return self.has_sheets or bool(self.links)
+
+    def check_drive(self) -> None:
+        # Other links (slides on a web page) and notes are for the Talk sessions page to show, not to download.
+        wanted = [(uid, kind, source) for uid, kinds in self.links.items() for kind, link in kinds.items()
+                  if kind in self.kinds for source in [link_source(link)] if source]
+        self.job['total'] = len(wanted)
+
+        def look(item):
+            uid, kind, source = item
+            try:
+                found = link_file(source[1])
+                return uid, kind, {'id': source[0], 'url': source[1], 'name': found['name'], 'size': found['size'],
+                                   'unsized': found['size'] is None}
+            except RuntimeError as error:
+                self.job['failed'].append(f'{uid} {kind}: {error}')
+                return None
+            finally:
+                self.job['done'] += 1
+
+        with ThreadPoolExecutor(LOOKUPS_AT_ONCE) as pool:
+            found = [result for result in pool.map(look, wanted) if result]
+        files: dict = {}
+        for uid, kind, remote in found:
+            files.setdefault(uid, {})[kind] = remote
+        self.listing = {'checked_ms': int(time.time() * 1000), 'files': files, 'unmatched': []}
+        self.state.mkdir(exist_ok=True)
+        self.listing_file.write_text(json.dumps(self.listing), encoding='utf-8')

@@ -9,6 +9,7 @@
   <nav id="nav"></nav>
   <main>
     <h1>LBD posters</h1>
+    <div id="plan"></div>
     <p class="soft">Every poster, in group order, split over the poster screens; each shows for the same time, and never
       while its own video or cover is on a video screen.</p>
     <div id="conflicts"></div>
@@ -19,6 +20,7 @@
   <script src="kit.js"></script>
   <script>
     Kit.nav('lbd-posters.html');
+    Kit.showPlan(document.getElementById('plan'));
     Kit.showConflicts(document.getElementById('conflicts'));
     Kit.get('/api/posters').then((screens) => {
       document.getElementById('screens').innerHTML =

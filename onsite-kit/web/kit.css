@@ -5,6 +5,8 @@ body { margin: 0; color: var(--ink); background: #f7f9fa; font: 15px/1.45 -apple
 #nav { display: flex; gap: 22px; align-items: center; padding: 12px 24px; background: #fff; border-bottom: 1px solid var(--line); }
 #nav a { color: var(--soft); text-decoration: none; }
 #nav a.active { color: var(--accent); font-weight: 600; }
+#nav .live { margin-left: auto; font-size: 13px; color: var(--soft); }
+#nav .live.warn { color: var(--warn); border-color: #f0cfc4; }
 main { max-width: 1120px; margin: 0 auto; padding: 20px 24px 60px; }
 h1 { font-size: 22px; margin: 8px 0 14px; }
 h2 { font-size: 16px; margin: 26px 0 8px; }
@@ -41,6 +43,7 @@ td.actions button { padding: 1px 8px; }
 .current { color: var(--accent); }
 .changed { color: #b8862b; font-weight: 700; }
 .missing { color: var(--warn); font-weight: 700; }
+.unknown { color: #b8862b; }
 .legend { margin: 0 0 8px; }
 .legend span { margin-right: 12px; }
 td.title { max-width: 330px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Onsite kit: talk sessions</title>
+  <link rel="stylesheet" href="kit.css">
+  <style>
+    .session { cursor: pointer; }
+    .session:hover { border-color: var(--accent); }
+    .talk { display: grid; grid-template-columns: 34px 1fr 190px auto; gap: 14px; align-items: center; padding: 11px 14px;
+      background: #fff; border: 1px solid var(--line); border-bottom: none; }
+    .talk:last-child { border-bottom: 1px solid var(--line); }
+    .talk .position { font-size: 20px; font-weight: 700; color: var(--soft); text-align: center; }
+    .talk .file { font-size: 12px; overflow-wrap: anywhere; }
+    .talk .actions { white-space: nowrap; }
+    .talk .actions button { margin-left: 5px; }
+    .mode { font-size: 12px; font-weight: 600; }
+    .mode.remote { color: #b8862b; }
+  </style>
+</head>
+<body>
+  <nav id="nav"></nav>
+  <main>
+    <span class="clock" id="clock"></span>
+    <div id="notice"></div>
+    <div id="list">
+      <h1>Oral and award sessions</h1>
+      <div id="sessions"></div>
+    </div>
+    <div id="detail" hidden>
+      <p><a href="talks.html">← All sessions</a></p>
+      <h1 id="title"></h1>
+      <p class="soft" id="about"></p>
+      <div id="talks"></div>
+    </div>
+  </main>
+  <script src="kit.js"></script>
+  <script>
+    Kit.nav('talks.html');
+    const $ = (id) => document.getElementById(id);
+    const key = new URLSearchParams(location.search).get('session');
+    let data;
+
+    const when = (session) => (session.start
+      ? `${Kit.clock(Date.parse(session.start), data.timezone, true)}–${Kit.clock(Date.parse(session.end), data.timezone)}` : '');
+    const ready = (session) => session.papers.filter((paper) => paper.files.slides).length;
+
+    function drawList() {
+      const now = Date.now();
+      const next = data.sessions.find((session) => Date.parse(session.start) > now);
+      $('sessions').innerHTML = data.sessions.map((session) => {
+        const live = Date.parse(session.start) <= now && now < Date.parse(session.end);
+        const state = live ? 'live' : session === next ? 'next' : Date.parse(session.end) <= now ? 'past' : '';
+        return `<div class="session ${state}" data-key="${Kit.esc(session.key)}">
+          <div>${when(session)}</div>
+          <div><b>${Kit.esc(session.title)}</b>
+            ${live ? '<span class="badge">LIVE</span>' : session === next ? '<span class="badge">NEXT</span>' : ''}
+            <div class="soft">${Kit.esc(session.location)} · chairs ${Kit.esc(session.chair_onsite)} (onsite),
+              ${Kit.esc(session.chair_remote)} (remote)</div></div>
+          <div class="soft nowrap">${session.papers.length} papers · slides here for ${ready(session)}</div></div>`;
+      }).join('');
+    }
+
+    function drawSession(session) {
+      document.title = `Onsite kit: ${session.title}`;
+      $('title').textContent = session.title;
+      $('about').textContent = `${when(session)} · ${session.location} · chairs ${session.chair_onsite} (onsite), ${session.chair_remote} (remote)`;
+      $('talks').innerHTML = session.papers.map((paper) => {
+        const slides = paper.files.slides;
+        const shown = slides || paper.files.paper;
+        const remote = /remote/i.test(paper.modality);
+        return `<div class="talk">
+          <div class="position">${paper.position}</div>
+          <div><b>${Kit.esc(paper.title)}</b> <span class="soft">#${Kit.esc(paper.uid)}</span>
+            <div class="soft">${Kit.esc(paper.authors)}</div></div>
+          <div>${Kit.esc(paper.presenter || '—')}<br><span class="mode ${remote ? 'remote' : ''}">${Kit.esc(paper.modality)}</span>
+            <div class="file soft">${slides ? Kit.esc(slides.name) : paper.slides_note ? `Note: ${Kit.esc(paper.slides_note)}`
+              : paper.slides_web ? 'slides on the web' : paper.slides_linked ? 'slides not downloaded' : 'no slides in the sheet'}</div></div>
+          <div class="actions">
+            ${!slides && paper.slides_web
+              ? `<a class="button primary" href="${Kit.esc(paper.slides_web)}" target="_blank" rel="noreferrer">Open slides</a>`
+              : `<button class="primary" data-open="${Kit.esc(slides?.kind || '')}" data-uid="${Kit.esc(paper.uid)}"${slides ? '' : ' disabled'}>Open slides</button>`}
+            <button data-open="paper" data-uid="${Kit.esc(paper.uid)}"${paper.files.paper ? '' : ' disabled'}>Paper PDF</button>
+            <button data-reveal="${Kit.esc(shown?.kind || '')}" data-uid="${Kit.esc(paper.uid)}"${shown ? '' : ' disabled'}>Show in Finder</button>
+          </div></div>`;
+      }).join('');
+    }
+
+    function draw() {
+      $('clock').textContent = `Venue time ${Kit.clock(Date.now(), data.timezone, true)}`;
+      if (!data.configured) {
+        $('notice').innerHTML = '<div class="notice">No SHEET_ORAL_SESSIONS or SHEET_AWARD_SESSIONS in .onsite_env: see README.md.</div>';
+      }
+      const session = key && data.sessions.find((candidate) => candidate.key === key);
+      $('list').hidden = Boolean(session);
+      $('detail').hidden = !session;
+      if (session) drawSession(session);
+      else drawList();
+    }
+
+    async function load() {
+      data = await Kit.get('/api/talks');
+      draw();
+    }
+
+    $('sessions').addEventListener('click', (event) => {
+      const row = event.target.closest('[data-key]');
+      if (row) location.search = `?session=${encodeURIComponent(row.dataset.key)}`;
+    });
+    $('talks').addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-uid]');
+      if (!button) return;
+      const reveal = 'reveal' in button.dataset;
+      try {
+        await Kit.post('/api/talks/open', { uid: button.dataset.uid, kind: reveal ? button.dataset.reveal : button.dataset.open, reveal });
+        $('notice').innerHTML = '';
+      } catch (error) {
+        $('notice').innerHTML = `<div class="notice">${Kit.esc(error.message)}</div>`;
+      }
+    });
+    load();
+    setInterval(() => load().catch(() => {}), 30000);  // files downloaded meanwhile, and the live session
+  </script>
+</body>
+</html>

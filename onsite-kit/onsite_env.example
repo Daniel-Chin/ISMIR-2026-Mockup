@@ -1,5 +1,5 @@
-# Template of .onsite_env. make_env.py copies it, then fills everything under the GENERATED line.
-# Keep it private: it ends up holding every link. The repo is public.
+# Template of .onsite_env. make_env.py copies it, then adds the other Live Database tabs under the GENERATED line.
+# Links only: each MacBook reads the tabs itself. Keep it private: the repo is public.
 
 # The camera-ready Drive folders, shared by link:
 DRIVE_FOLDER_LBD=https://drive.google.com/drive/folders/example-LBD-folder
@@ -8,6 +8,9 @@ DRIVE_FOLDER_MIREX=https://drive.google.com/drive/folders/example-MIREX-folder
 DRIVE_FOLDER_CHANNELS=https://drive.google.com/drive/folders/example-channels-folder
 # The subtitles the video screens show, <uid>.vtt, from build_subtitles.py
 DRIVE_FOLDER_SUBTITLES=https://drive.google.com/drive/folders/example-subtitles-folder
+# The oral and award session tabs of the Live Database: papers, order, presenters, slides links
+SHEET_ORAL_SESSIONS=https://docs.google.com/spreadsheets/d/example-sheet/edit?gid=1#gid=1
+SHEET_AWARD_SESSIONS=https://docs.google.com/spreadsheets/d/example-sheet/edit?gid=2#gid=2
 
 # Extra rows for the links table:
 #   LINK_<anything>=group | name | url | description

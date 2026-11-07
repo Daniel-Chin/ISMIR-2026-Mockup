@@ -1,6 +1,9 @@
-Kit.nav('materials.html');
+// The LBD and MIREX materials, or the talks' papers and slides: the page names its API and its nav entry.
+const { api: API = '/api/materials', page: PAGE = 'materials.html' } = document.body.dataset;
+Kit.nav(PAGE);
 const $ = (id) => document.getElementById(id);
-const LABELS = { paper: 'Paper', poster: 'Poster', video: 'Video', thumbnail: 'Thumbnail', captions: 'Captions', channel: 'Channel', subtitles: 'Subtitles' };
+const LABELS = { paper: 'Paper', poster: 'Poster', video: 'Video', thumbnail: 'Thumbnail', captions: 'Captions', channel: 'Channel',
+  subtitles: 'Subtitles', slides: 'Slides', slides_pdf: 'Slides PDF', award_slides: 'Award slides', award_slides_pdf: 'Award slides PDF' };
 const MARKS = { current: '✓', changed: '↻', missing: '↓', unknown: '?', local: '✓' };
 const POLL_MS = 1000;
 const selected = new Set();
@@ -15,14 +18,14 @@ const size = (bytes) => {
   if (!bytes) return '0 MB';
   return bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${Math.max(bytes / 1e6, 0.1).toFixed(1)} MB`;
 };
-const downloadable = (file) => file.size != null;
+const downloadable = (file) => file.remote;
 const needsUpdate = (file) => file.state === 'missing' || file.state === 'changed';
 const eachFile = (rows, visit) => rows.forEach((row) => data.kinds.forEach((kind) => visit(row, kind, row.files[kind])));
 
 function shownRows() {
   const search = $('search').value.trim().toLowerCase();
   return data.rows.filter((row) => (!search || row.uid.toLowerCase().includes(search) || row.title.toLowerCase().includes(search))
-    && (!$('screen').value || row.screen === $('screen').value)
+    && (!$('screen').value || row.screen.split(' ').includes($('screen').value))
     && (!$('only-update').checked || data.kinds.some((kind) => needsUpdate(row.files[kind]))));
 }
 
@@ -92,9 +95,10 @@ function drawJob() {
 
 async function poll() {
   clearTimeout(pollTimer);
-  data = await Kit.get('/api/materials').catch(() => data);
+  data = await Kit.get(API).catch(() => data);
   if (!data.configured) {
-    $('notice').innerHTML = '<div class="notice">No DRIVE_FOLDER_* lines in .onsite_env: see README.md.</div>';
+    $('notice').innerHTML = `<div class="notice">${Kit.esc(document.body.dataset.unconfigured
+      || 'No DRIVE_FOLDER_* lines in .onsite_env')}: see README.md.</div>`;
   } else if (data.unmatched.length) {
     $('notice').innerHTML = `<div class="notice">Drive folders with no LBD in .onsite_env, skipped: ${data.unmatched.map(Kit.esc).join(', ')}. Rerun make_env.py.</div>`;
   } else {
@@ -113,7 +117,7 @@ async function poll() {
 
 async function act(body) {
   try {
-    await Kit.post('/api/materials', body);
+    await Kit.post(API, body);
     $('notice').innerHTML = '';
     await poll();
   } catch (error) {
@@ -175,5 +179,5 @@ $('download').onclick = async () => {
   await act({ action: 'download', files });
 };
 
-$('screen').innerHTML += ['1', '2', '3', '4', '5', '6', '7'].map((id) => `<option>${id}</option>`).join('');
-poll().then(() => { if (data.configured && !data.checked_ms && !data.job.running) act({ action: 'check' }); });
+poll().then(() => {
+  $('screen').innerHTML += data.screens.map((id) => `<option>${Kit.esc(id)}</option>`).join(''); if (data.configured && !data.checked_ms && !data.job.running) act({ action: 'check' }); });
