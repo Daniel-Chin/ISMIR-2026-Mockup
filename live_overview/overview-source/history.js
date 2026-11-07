@@ -137,50 +137,76 @@ function render(rawState) {
   }).join('') : '<article class="empty-card">No completed events yet.</article>';
 }
 
-function compactHistoryEventForPrompt(e) {
-  const base = {
-    id: e.id,
-    type: e.type,
-    title: e.title,
-    topic: e.topic,
-    venue: e.venue,
-    startsAt: e.startsAt,
-    endsAt: e.endsAt,
-    peakZoomOnline: e.metrics?.available === false ? null : Number(e.metrics?.peakZoom || 0),
-    summary: e.summary || '',
-    links: e.links || {},
-  };
-  if (Array.isArray(e.papers) && e.papers.length) {
-    base.paperCount = e.papers.length;
-    base.papers = e.papers.map((p) => ({
-      id: p.id,
-      title: p.title,
-      authors: p.authors,
-      presenterMode: p.presenterMode,
-      peakZoomOnline: p.metrics?.available === false ? null : Number(p.metrics?.peakZoom || 0),
-      detailUrl: p.detailUrl || p.links?.info || '',
-    }));
+/* ---- LLM history prompt (shared prompt helpers: overview-common.js) ----
+   Completed events newest first, each paper written out once (the poster session, which ends after
+   the oral one, comes first), abstracts for the most recently presented papers, then what is left. */
+const HISTORY_PROMPT_ABSTRACTS = 20;
+
+function promptPeak(metrics) {
+  return metrics?.available === false ? 'unknown' : String(Number(metrics?.peakZoom || 0));
+}
+
+function historyPromptPaper(p, { first, withAbstract, posterRoom }) {
+  const id = p.displayId || p.id;
+  if (!first) return `- ${id} "${p.title}" (details above)`;
+  const lines = [`- ${id} "${p.title}" — ${p.authors || 'authors TBA'} · ${presenterLabel(p.presenterMode)}`
+    + (posterRoom ? ` · peak ${promptPeak(p.metrics)} in its poster Zoom room` : '')];
+  const topics = promptTopics(p);
+  if (topics) lines.push(`  Topics: ${topics}`);
+  const links = promptLinks([['Slack', p.links?.slack], ['Page (PDF, poster, video)', detailUrlFromPaper(p)]]);
+  if (links) lines.push(`  ${links}`);
+  if (withAbstract && p.abstract) lines.push(`  Abstract: ${promptText(p.abstract)}`);
+  if (withAbstract && p.funFact) lines.push(`  Fun fact: ${promptText(p.funFact)}`);
+  return lines.join('\n');
+}
+
+function buildHistoryPromptContext(display) {
+  const now = conferenceNow(display);
+  const events = display.events || [];
+  const done = events.filter(e => e.status === 'history').sort((a, b) => Date.parse(b.endsAt) - Date.parse(a.endsAt));
+  const left = events.filter(e => e.status !== 'history').sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
+  const seen = new Set();
+  const out = [...promptHeader(display, now), ...promptUsefulLinks(), ''];
+
+  const paperCount = new Set(done.flatMap(e => (e.papers || []).map(p => p.sourcePaperId || p.id))).size;
+  out.push(`## Completed events (${done.length}, newest first; ${paperCount} papers presented so far)`);
+  if (!done.length) out.push('Nothing has finished yet.');
+  let day = '';
+  for (const e of done) {
+    const d = promptDay(Date.parse(e.startsAt));
+    if (d !== day) { out.push('', `### ${d}`); day = d; }
+    const lines = [`#### ${e.title} · ${e.category || e.type} · ${promptRange(e)} · ended ${promptDuration(now - Date.parse(e.endsAt))} ago`];
+    if (e.organiser) lines.push(`Organiser: ${e.organiser}`);
+    if (e.summary) lines.push(`Summary: ${promptText(e.summary)}`);
+    const links = promptLinks([['Slack', e.links?.slack], ['Info', eventInfoUrl(e)]]);
+    if (links) lines.push(links);
+    if (e.zoomKind || Number(e.metrics?.peakZoom || 0) > 0) lines.push(`Peak online on Zoom: ${promptPeak(e.metrics)}`);
+    if (e.papers?.length) {
+      lines.push('Papers:');
+      for (const p of e.papers) {
+        const key = p.sourcePaperId || p.id, first = !seen.has(key);
+        seen.add(key);
+        lines.push(historyPromptPaper(p, { first, withAbstract: first && seen.size <= HISTORY_PROMPT_ABSTRACTS, posterRoom: e.type === 'poster' }));
+      }
+    }
+    out.push(lines.join('\n'));
   }
-  return base;
+
+  out.push('', '## Still to come');
+  if (!left.length) out.push('Nothing; the conference is over.');
+  day = '';
+  for (const e of left) {
+    const d = promptDay(Date.parse(e.startsAt));
+    if (d !== day) { out.push(`### ${d}`); day = d; }
+    out.push(`- ${promptHM(Date.parse(e.startsAt))}–${e.endTimeTBD ? 'TBD' : promptHM(Date.parse(e.endsAt))} ${e.title} (${e.category || e.type}${e.status === 'live' ? ', LIVE now' : ''})`);
+  }
+  return out.join('\n');
 }
 
 async function buildHistoryPrompt(state) {
   const display = stateAtConferenceTime(state || latestState || { events: [] });
-  const history = (display.events || [])
-    .filter((e) => e.status === 'history')
-    .sort((a, b) => new Date(b.endsAt) - new Date(a.endsAt))
-    .slice(0, 40)
-    .map(compactHistoryEventForPrompt);
-  const snapshot = {
-    conference: display.conference || {},
-    generatedAt: new Date(serverNow()).toISOString(),
-    serverNow: display.serverNow || display.updatedAt || null,
-    completedEventCount: history.length,
-    completedEvents: history,
-  };
-  return window.ISMIRPrompts.build('history', snapshot);
+  return window.ISMIRPrompts.build('history', buildHistoryPromptContext(display));
 }
-
 
 window.addEventListener('ismir-timezone-change', () => { if (latestState) render(latestState); });
 window.ISMIRPublic.start({

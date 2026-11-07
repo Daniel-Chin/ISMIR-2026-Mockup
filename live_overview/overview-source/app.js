@@ -210,14 +210,6 @@ function paperBadge(p) {
   return `<span class="upcoming-badge">Scheduled</span>`;
 }
 
-function presenterLabel(mode) {
-  if (!mode) return 'Presentation mode TBA';
-  const clean = String(mode).toLowerCase();
-  if (clean === 'online') return 'Presented Virtual';
-  if (clean === 'mixed') return 'Presented In-person + Virtual';
-  return 'Presented In-person';
-}
-
 function statCard(key, label, value, help) {
   return `<article class="stat-card" data-stat-card="${esc(key)}">
     <div class="stat-label">${esc(label)}</div>
@@ -257,56 +249,6 @@ const PROMPT_UPCOMING_HOURS = 6;     // "Coming up": events starting within this
 const PROMPT_UPCOMING_MIN = 6;       // ...but at least this many events...
 const PROMPT_UPCOMING_MAX = 15;      // ...and at most this many.
 // Abstracts: for papers on now and in the next paper session only (all 140 would be ~45k tokens).
-
-function promptTzOffset(timeZone, ms) {
-  try {
-    const part = new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'longOffset' })
-      .formatToParts(new Date(ms)).find(p => p.type === 'timeZoneName');
-    return (part?.value || 'GMT').replace('GMT', 'UTC') || 'UTC';
-  } catch (_) { return 'UTC'; }
-}
-
-function promptDateTime(ms, timeZone = displayTimeZone()) {   // "Mon Nov 9 10:30"
-  return new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone })
-    .format(new Date(ms)).replace(/,/g, '');
-}
-
-function promptDay(ms) {   // "Mon Nov 9"
-  return new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: displayTimeZone() })
-    .format(new Date(ms)).replace(/,/g, '');
-}
-
-function promptHM(ms) {
-  return new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: displayTimeZone() }).format(new Date(ms));
-}
-
-function promptDuration(ms) {
-  const mins = Math.max(1, Math.round(ms / 60000));
-  if (mins < 60) return `${mins} min`;
-  if (mins < 48 * 60) return `${Math.floor(mins / 60)} h${mins % 60 ? ` ${mins % 60} min` : ''}`;
-  return `${Math.round(mins / 1440)} days`;
-}
-
-function promptRange(e) {
-  const start = Date.parse(e.startsAt), end = Date.parse(e.endsAt);
-  return `${promptDateTime(start)}–${e.endTimeTBD ? 'end TBD' : promptHM(end)}`;
-}
-
-function promptZoomCount(h) {
-  if (h?.available === false && !h?.partial) return 'unknown';
-  return `${h?.partial ? '≥' : ''}${Number(h?.zoom || 0)}`;
-}
-
-function promptTopics(p) {
-  const leaves = (p.subjects || []).map(s => String(s).split('->').pop().trim()).filter(Boolean);
-  return [...new Set(leaves)].join('; ');
-}
-
-function promptLinks(pairs) {
-  return pairs.filter(([, url]) => url).map(([label, url]) => `${label}: ${url}`).join(' · ');
-}
-
-const promptText = s => String(s || '').replace(/\s+/g, ' ').trim();
 
 /** One paper. "full": everything incl. abstract; "brief": ID and title only (details elsewhere). */
 function promptPaperLine(p, { mode = 'full', liveRoom = false } = {}) {
@@ -367,7 +309,6 @@ function promptEventBlock(e, now, abstractsShown, wantAbstracts) {
 function buildPromptContext(display) {
   const now = conferenceNow(display);
   const userTz = displayTimeZone();
-  const confTz = window.ISMIRSite?.timeZone || display.conference?.timeZone || 'UTC';
   const events = (display.events || []).slice().sort(byStart);
   const live = events.filter(e => e.status === 'live');
   const upcomingAll = events.filter(e => e.status === 'upcoming');
@@ -376,39 +317,17 @@ function buildPromptContext(display) {
   const nextPaperEvent = upcomingAll.find(sessionHasPapers);
   const out = [];
 
-  // Time and conference phase.
-  const conf = window.ISMIRSite?.conference || {};
-  // Main conference dates (startsOn/endsOn, YYYY-MM-DD) compared with today in the conference's zone.
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: confTz }).format(new Date(now));
-  const { startsOn, endsOn } = display.conference || {};
-  const phase = startsOn && today < startsOn ? 'The main conference has not started yet.'
-    : (endsOn && today > endsOn) || (!live.length && !upcomingAll.length) ? 'The conference is over.'
-    : 'The conference is in progress.';
-  out.push('## Time and status (at the moment this prompt was copied)');
-  out.push(`Current time: ${promptDateTime(now, userTz)} in my time zone (${userTz}, ${promptTzOffset(userTz, now)}).`);
-  if (confTz !== userTz) out.push(`That is ${promptDateTime(now, confTz)} conference local time (${confTz}, ${promptTzOffset(confTz, now)}).`);
-  out.push(`Conference: ${conf.name || display.conference?.name || ''}${conf.date ? `, ${conf.date}` : ''}, local time zone ${confTz}. ${phase}`);
-  out.push(`All times below are in my time zone (${userTz}) unless marked otherwise.`);
-  if (display.offline) out.push('NOTE: the page was offline when this was copied, so live headcounts and Zoom links are missing.');
-  else if (live.length) {
+  out.push(...promptHeader(display, now));
+  if (!display.offline && live.length) {
     const stats = dashboardStats(display);
     out.push(`At a glance: live events: ${stats.liveEvents[1]} · people on Zoom across live events: ${stats.zoomAttendees[1]} · ${stats.activeConversations[2]}.`);
   }
-
-  out.push('', '## Useful links');
-  const site = window.ISMIRSite?.programSite || '';
-  for (const [label, url] of [
-    ['Live overview (this page)', site && site + '/live.html'],
-    ['Program site (papers, schedule, posters)', site && site + '/'],
-    ['Warm-up discussion board', site && site + '/lounge.html'],
-    ['Helpdesk Slack channel', conf.helpdeskUrl],
-    ['Official conference website', conf.officialSiteUrl],
-  ]) if (url) out.push(`- ${label}: ${url}`);
+  out.push(...promptUsefulLinks(), '');
 
   // Now and next, in detail. Each paper's abstract is given once (oral N and poster N share papers).
   const abstractsShown = new Set();
   const wantAbstracts = e => e.status === 'live' || e === nextPaperEvent;
-  out.push('', '## Happening now');
+  out.push('## Happening now');
   out.push(live.length ? live.map(e => promptEventBlock(e, now, abstractsShown, wantAbstracts(e))).join('\n\n') : 'Nothing is live right now.');
   out.push('', '## Coming up next');
   out.push(upcoming.length ? upcoming.map(e => promptEventBlock(e, now, abstractsShown, wantAbstracts(e))).join('\n\n') : 'Nothing else is scheduled.');

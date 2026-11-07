@@ -124,6 +124,103 @@ async function copyText(text) {
   document.body.removeChild(ta);
 }
 
+/* ---- Copied LLM prompts (live page: app.js, history page: history.js) ----
+   Chat AIs cannot run these pages' scripts, so each prompt carries its data as plain text,
+   with times in the visitor's chosen time zone. */
+function presenterLabel(mode) {
+  if (!mode) return 'Presentation mode TBA';
+  const clean = String(mode).toLowerCase();
+  if (clean === 'online') return 'Presented Virtual';
+  if (clean === 'mixed') return 'Presented In-person + Virtual';
+  return 'Presented In-person';
+}
+
+function promptTzOffset(timeZone, ms) {
+  try {
+    const part = new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'longOffset' })
+      .formatToParts(new Date(ms)).find(p => p.type === 'timeZoneName');
+    return (part?.value || 'GMT').replace('GMT', 'UTC') || 'UTC';
+  } catch (_) { return 'UTC'; }
+}
+
+function promptDateTime(ms, timeZone = displayTimeZone()) {   // "Mon Nov 9 10:30"
+  return new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone })
+    .format(new Date(ms)).replace(/,/g, '');
+}
+
+function promptDay(ms) {   // "Mon Nov 9"
+  return new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: displayTimeZone() })
+    .format(new Date(ms)).replace(/,/g, '');
+}
+
+function promptHM(ms) {
+  return new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: displayTimeZone() }).format(new Date(ms));
+}
+
+function promptDuration(ms) {
+  const mins = Math.max(1, Math.round(ms / 60000));
+  if (mins < 60) return `${mins} min`;
+  if (mins < 48 * 60) return `${Math.floor(mins / 60)} h${mins % 60 ? ` ${mins % 60} min` : ''}`;
+  return `${Math.round(mins / 1440)} days`;
+}
+
+function promptRange(e) {
+  const start = Date.parse(e.startsAt), end = Date.parse(e.endsAt);
+  return `${promptDateTime(start)}–${e.endTimeTBD ? 'end TBD' : promptHM(end)}`;
+}
+
+function promptZoomCount(h) {
+  if (h?.available === false && !h?.partial) return 'unknown';
+  return `${h?.partial ? '≥' : ''}${Number(h?.zoom || 0)}`;
+}
+
+function promptTopics(p) {
+  const leaves = (p.subjects || []).map(s => String(s).split('->').pop().trim()).filter(Boolean);
+  return [...new Set(leaves)].join('; ');
+}
+
+function promptLinks(pairs) {
+  return pairs.filter(([, url]) => url).map(([label, url]) => `${label}: ${url}`).join(' · ');
+}
+
+const promptText = s => String(s || '').replace(/\s+/g, ' ').trim();
+
+/** Time, conference phase and time zones, as of `now`. */
+function promptHeader(display, now) {
+  const userTz = displayTimeZone();
+  const confTz = window.ISMIRSite?.timeZone || display.conference?.timeZone || 'UTC';
+  const conf = window.ISMIRSite?.conference || {};
+  const events = display.events || [];
+  // Main conference dates (startsOn/endsOn, YYYY-MM-DD) compared with today in the conference's zone.
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: confTz }).format(new Date(now));
+  const { startsOn, endsOn } = display.conference || {};
+  const phase = startsOn && today < startsOn ? 'The main conference has not started yet.'
+    : (endsOn && today > endsOn) || !events.some(e => e.status !== 'history') ? 'The conference is over.'
+    : 'The conference is in progress.';
+  const out = ['## Time and status (at the moment this prompt was copied)'];
+  out.push(`Current time: ${promptDateTime(now, userTz)} in my time zone (${userTz}, ${promptTzOffset(userTz, now)}).`);
+  if (confTz !== userTz) out.push(`That is ${promptDateTime(now, confTz)} conference local time (${confTz}, ${promptTzOffset(confTz, now)}).`);
+  out.push(`Conference: ${conf.name || display.conference?.name || ''}${conf.date ? `, ${conf.date}` : ''}, local time zone ${confTz}. ${phase}`);
+  out.push(`All times below are in my time zone (${userTz}) unless marked otherwise.`);
+  if (display.offline) out.push('NOTE: the page was offline when this was copied, so live headcounts, peak counts and Zoom links are missing.');
+  return out;
+}
+
+function promptUsefulLinks() {
+  const conf = window.ISMIRSite?.conference || {};
+  const site = window.ISMIRSite?.programSite || '';
+  const out = ['', '## Useful links'];
+  for (const [label, url] of [
+    ['Live overview (now and next)', site && site + '/live.html'],
+    ['History page (completed events)', site && site + '/live_overview/history.html'],
+    ['Program site (papers, schedule, posters)', site && site + '/'],
+    ['Warm-up discussion board', site && site + '/lounge.html'],
+    ['Helpdesk Slack channel', conf.helpdeskUrl],
+    ['Official conference website', conf.officialSiteUrl],
+  ]) if (url) out.push(`- ${label}: ${url}`);
+  return out;
+}
+
 /** "Copy prompt" buttons: build the prompt (llm-prompts.json, prompt-config.js), copy it, report. */
 async function copyPrompt(button, status, build) {
   if (button) button.disabled = true;
