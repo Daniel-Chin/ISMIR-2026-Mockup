@@ -23,7 +23,8 @@
           pageUrl: window.ISMIRSite?.conference?.miniconfUrl
             ? (kind === 'history' ? new URL('./history.html', configUrl).href : window.ISMIRSite.programSite + '/live.html')
             : new URL(kind === 'history' ? './history.html' : './', configUrl).href,
-          snapshot: JSON.stringify(snapshot, null, 2)
+          // The live page renders its own plain-text context; history still sends JSON.
+          snapshot: typeof snapshot === 'string' ? snapshot : JSON.stringify(snapshot, null, 2)
         };
         return paragraphs.join('\n\n').replace(/\{\{(\w+)\}\}/g, (match, key) => {
           if (!Object.hasOwn(values, key)) throw new Error('Unknown prompt placeholder: ' + key);
