@@ -205,8 +205,9 @@ def changes(old: dict, new: dict) -> list:
         removed = sorted(set(before['plays']) - set(body['plays']), key=order)
         counted = sorted((uid for uid in set(body['plays']) & set(before['plays'])
                           if body['plays'].count(uid) != before['plays'].count(uid)), key=order)
+        times = ', '.join(f'{uid} ×{body["plays"].count(uid)}' for uid in counted)  # no nested quotes: Python 3.9
         parts = ([f'adds {", ".join(added)}'] if added else []) + ([f'drops {", ".join(removed)}'] if removed else []) \
-            + ([f'plays {", ".join(f"{uid} ×{body["plays"].count(uid)}" for uid in counted)}'] if counted else [])
+            + ([f'plays {times}'] if counted else [])
         if parts or body['plays'] != before['plays'] or body['timetable_s'] != before['timetable_s']:
             found.append(f'Screen {screen}: ' + ('; '.join(parts) or 'new order')
                          + f'; cover {body["timetable_s"]} s')
