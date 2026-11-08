@@ -14,7 +14,8 @@
  */
 (function () {
   const FEATURES = Object.freeze({
-    // name: 'debug' | 'live', e.g. newPanel: 'debug'. Nothing is under test right now.
+    // name: 'debug' | 'live', e.g. newPanel: 'debug'.
+    venue: 'debug',   // each session's onsite room (events.csv onsite_location), when it has one
   });
   const channel = document.documentElement.dataset.channel === 'debug' ? 'debug' : 'live';
   window.ISMIRChannel = channel;

@@ -28,6 +28,15 @@ class Tests(unittest.TestCase):
             self.assertNotEqual(oral['papers'][0]['id'],poster['papers'][0]['id'])
             self.assertNotIn('papers',award);self.assertTrue(tbd['endTimeTBD'])
             self.assertNotIn('PRIVATE REVIEW',json.dumps(s));self.assertNotIn('presenterMode',poster['papers'][0])
+    def test_venue_from_onsite_location(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);fixture(root)
+            rows=list(csv.DictReader((root/'events(2).csv').open(encoding='utf-8')))
+            for row,room in zip(rows,['A6-008','[A6 Upper Atrium](https://maps.example/a6)','Unknown','Not NYUAD']):row['onsite_location']=room
+            write(root/'events(2).csv',rows)
+            s,notes=tool.convert(root,CONF)
+            self.assertEqual([e.get('venue') for e in s['events']],['A6-008','A6 Upper Atrium',None,None])
+            self.assertEqual([e.get('venueUrl') for e in s['events']],[None,'https://maps.example/a6',None,None])
     def test_missing_and_duplicate_assignments_fail(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);fixture(root)

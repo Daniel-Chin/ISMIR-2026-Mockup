@@ -103,7 +103,7 @@ function renderHistoryTutorials(group) {
     <div class="timeline-time upcoming-card-time history-ended-time">${group.endTimeTBD ? 'End time TBD' : 'Ended ' + esc(fmtEndedTime(group.endsAt))}</div>
     <h3 class="card-title upcoming-card-title">Tutorials</h3>
     <div class="tutorial-rows">${group.tutorials.map(e => `<div class="tutorial-row" data-event-id="${esc(e.id)}" data-event-type="tutorial">
-      ${eventTitleHtml(e)}<div class="tutorial-row-actions">${Number(e.metrics?.peakZoom || 0) > 0 ? peakBadge(e.metrics) : ''}${actionLinks(e.links)}</div>
+      ${eventTitleHtml(e)}<div class="tutorial-row-actions">${venueHtml(e, 'tutorial-row-venue')}${Number(e.metrics?.peakZoom || 0) > 0 ? peakBadge(e.metrics) : ''}${actionLinks(e.links)}</div>
     </div>`).join('')}</div>
   </article>`;
 }
@@ -124,7 +124,7 @@ function render(rawState) {
     const isPaperExpanded = hasPapers && expandedHistoryPaperEventIds.has(e.id);
     return `<article class="timeline-item upcoming-completed-card history-completed-card${isPoster ? ' upcoming-poster-card history-poster-card' : ''}${isPaperExpanded ? ' is-paper-expanded' : ''}" data-event-id="${esc(e.id)}" data-event-type="${esc(e.type || 'event')}">
       <div class="timeline-status-row history-card-status-row">
-        <div class="timeline-time upcoming-card-time history-ended-time">${e.endTimeTBD ? 'End time TBD' : 'Ended ' + esc(fmtEndedTime(e.endsAt))}</div>
+        <div class="timeline-time upcoming-card-time history-ended-time">${e.endTimeTBD ? 'End time TBD' : 'Ended ' + esc(fmtEndedTime(e.endsAt))}${venueHtml(e)}</div>
         ${(hadZoom || peak > 0) ? peakBadge(e.metrics) : ''}
       </div>
       <div class="history-title-actions-row">

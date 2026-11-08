@@ -25,6 +25,23 @@ def find_csv(folder,stem):
     if len(found)!=1:raise ValueError(f'请在 {folder} 放入唯一的 {stem}.csv（也支持下载时的括号编号）。')
     return found[0]
 
+# events.csv onsite_location values that name no room: the session then shows no venue.
+NO_VENUE={'','unknown','tbd','tba','na','n/a','none','not nyuad'}
+
+MD_LINK=re.compile(r'\[([^\]]+)\]\(([^)\s]+)\)')
+
+def venue(value):
+    """onsite_location -> (room text, https link or ''). It may be a markdown link [display](link) (docs/SPREADSHEET_FORMAT.md)."""
+    raw=helper.clean_text(value);text=MD_LINK.sub(lambda m:m[1],raw).strip()
+    if text.lower() in NO_VENUE:return '',''
+    links=[m[2] for m in MD_LINK.finditer(raw) if urlsplit(m[2]).scheme=='https']
+    return text,(links[0] if links else '')
+
+def add_venue(event,value):
+    text,link=venue(value)
+    if text:event['venue']=text
+    if text and link:event['venueUrl']=link
+
 EXTRA_EVENTS=ROOT/'extra-events.json'
 
 def extra_events(conf,problem,path=EXTRA_EVENTS):
@@ -55,6 +72,7 @@ def extra_events(conf,problem,path=EXTRA_EVENTS):
         if tbd:event['endTimeTBD']=True
         if item.get('debugOnly') is True:event['debugOnly']=True # on live-debug.html only (organisers' tests)
         if item.get('zoomDirect') is True:event['zoomDirect']=True # Zoom button: the meeting link without its passcode
+        add_venue(event,item.get('venue'))
         out.append(event)
     return out
 
@@ -118,6 +136,7 @@ def convert(folder,conf,warnings=None):
         event={'id':'event-'+uid,'sourceEventId':uid,'title':title,'type':typ,'category':category,'track':'poster' if typ=='poster' else 'main','startsAt':start.isoformat(),'endsAt':end.isoformat(),'links':links,'day':start.strftime('%A'),'dayNumber':helper.parse_int(row.get('day')),'topic':helper.topic_from_event(typ,category),'summary':helper.clean_text(row.get('description')),'organiser':helper.clean_text(row.get('organiser'))}
         page=event_link(row)
         if page:event['detailUrl']=f"{conf['miniconf_url']}/{page}"
+        add_venue(event,row.get('onsite_location'))
         if tbd:event['endTimeTBD']=True
         if 'zoom' in links:event['zoomKind']='meeting' if typ=='poster' else 'webinar'
         match=re.fullmatch(r'(Poster|Oral)\s+Session\s*-?\s*(\d+)',title,re.I)

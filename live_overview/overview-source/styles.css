@@ -5733,3 +5733,53 @@ html:not([data-theme="light"]) .canon-egg-board li { background: rgba(255, 255, 
 }
 .debug-channel-banner strong { letter-spacing: .12em; }
 .debug-channel-banner a { color: #fff; text-decoration: underline; margin-left: auto; }
+
+/* Venue feature (features.js): a session's onsite room, after its time. */
+.event-venue {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 8px;
+  white-space: nowrap;
+  font-weight: 700;
+  color: inherit;
+}
+.event-venue-icon {
+  display: inline-flex;
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  transform: translateY(-.5px);
+}
+.event-venue-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.55;
+}
+.event-venue-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.tutorial-row-venue,
+.live-tutorial-venue {
+  margin-left: 0;
+  font-size: .86em;
+  opacity: .85;
+}
+/* Live tutorials: its own line under the title, above the row's underline. */
+#live-events .live-tutorial-venue {
+  display: flex;
+  width: max-content;
+  margin-top: 3px;
+  font-size: .72rem;
+  color: var(--gold);
+  opacity: 1;
+}
+html[data-theme="light"] #live-events .live-tutorial-venue { color: #805c15; }
+a.event-venue { text-decoration: underline; text-underline-offset: 2px; }

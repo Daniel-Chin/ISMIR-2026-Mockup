@@ -88,6 +88,18 @@ function eventInfoUrl(e) {
   return e?.detailUrl || links.info || links.detail || '';
 }
 
+/** A session's onsite room (venue feature), or '' when it has none. */
+function eventVenue(e) {
+  return ismirFeature('venue') ? String(e?.venue || '').trim() : '';
+}
+/** linked: false inside another link (a nested <a> is invalid HTML), e.g. a live tutorial's title. */
+function venueHtml(e, className = '', { linked = true } = {}) {
+  const venue = eventVenue(e);
+  const url = linked && /^https:\/\//.test(e?.venueUrl || '') ? e.venueUrl : '';
+  const tag = url ? `a href="${esc(url)}" target="_blank" rel="noopener"` : 'span';
+  return venue ? `<${tag} class="event-venue${className ? ' ' + className : ''}" title="Onsite room"><span class="event-venue-icon" aria-hidden="true"><svg viewBox="0 0 16 16" focusable="false"><path d="M8 14.25s4.25-4.1 4.25-7.5a4.25 4.25 0 0 0-8.5 0c0 3.4 4.25 7.5 4.25 7.5z"></path><circle cx="8" cy="6.75" r="1.5"></circle></svg></span><span class="event-venue-sr">Room: </span>${esc(venue)}</${url ? 'a' : 'span'}>` : '';
+}
+
 /** Tutorials running at the same time are shown together, as one "Tutorials" card. */
 function groupTutorialEvents(events) {
   const groups = new Map(), result = [];
@@ -96,7 +108,7 @@ function groupTutorialEvents(events) {
     const key = JSON.stringify([event.startsAt, event.endsAt]);
     let group = groups.get(key);
     if (!group) {
-      group = { ...event, id: `tutorials-${event.id}`, type: 'tutorial-group', title: 'Tutorials', links: {}, papers: [], tutorials: [] };
+      group = { ...event, id: `tutorials-${event.id}`, type: 'tutorial-group', title: 'Tutorials', links: {}, papers: [], tutorials: [], venue: '' };   // each tutorial shows its own room
       groups.set(key, group); result.push(group);
     }
     group.tutorials.push(event);

@@ -250,6 +250,7 @@ const PROMPT_UPCOMING = 6;   // "Coming up next": this many events
 function promptLiveEvent(e, now) {
   const end = Date.parse(e.endsAt);
   const lines = [`### ${e.title} · ${e.category || e.type} · ${promptRange(e)} · ${e.endTimeTBD ? 'LIVE now' : `LIVE now, ends in ${promptDuration(end - now)}`}`];
+  if (eventVenue(e)) lines.push(`Room (on-site): ${eventVenue(e)}`);
   const links = promptLinks([['Slack', e.links?.slack], ['Zoom', e.links?.zoom], ['Papers and abstracts', promptSessionFile(e)]]);
   if (links) lines.push(links);
   if (e.links?.zoom) {
@@ -270,8 +271,9 @@ function promptLiveEvent(e, now) {
 }
 
 function promptUpcomingLine(e, now) {
+  const room = eventVenue(e) ? ` · Room: ${eventVenue(e)}` : '';
   const links = promptLinks([['Slack', e.links?.slack], ['Papers', promptSessionFile(e)]]);
-  return `- ${promptRange(e)} ${e.title} (${e.category || e.type}) · starts in ${promptDuration(Date.parse(e.startsAt) - now)}${links ? ` · ${links}` : ''}`;
+  return `- ${promptRange(e)} ${e.title} (${e.category || e.type}) · starts in ${promptDuration(Date.parse(e.startsAt) - now)}${room}${links ? ` · ${links}` : ''}`;
 }
 
 function buildPromptContext(display) {
@@ -333,7 +335,7 @@ function updateDashboard(state) {
 function tutorialRows(group, live) {
   return `<div class="tutorial-rows">${group.tutorials.map(e => `<div class="tutorial-row" data-event-id="${esc(e.id)}" data-event-type="tutorial">
     ${eventTitleHtml(e, 'card-title tutorial-row-title')}
-    <div class="tutorial-row-actions">${live ? eventBadge(e, `event:${e.id}`) : ''}${live ? linkRow(e.links, { showInfo: false }) : upcomingSlackLink(e)}</div>
+    <div class="tutorial-row-actions">${venueHtml(e, 'tutorial-row-venue')}${live ? eventBadge(e, `event:${e.id}`) : ''}${live ? linkRow(e.links, { showInfo: false }) : upcomingSlackLink(e)}</div>
   </div>`).join('')}</div>`;
 }
 function upcomingSlackLink(e) {
@@ -348,7 +350,8 @@ function renderLiveTutorials(group) {
       const match = String(e.title || '').match(/^(T\d+\s*\([^)]+\))\s*[:：–—-]?\s*(.*)$/i);
       const label = match ? match[1] : 'Tutorial';
       const title = match ? match[2] : e.title;
-      const content = `<span class="upcoming-paper-id">${esc(label)}</span><span class="upcoming-paper-title">${esc(title)}</span>`;
+      // The room sits under the title, inside the row's underline: below it, it reads as the next tutorial's.
+      const content = `<span class="upcoming-paper-id">${esc(label)}</span><span class="upcoming-paper-title">${esc(title)}${venueHtml(e, 'live-tutorial-venue', { linked: false })}</span>`;
       const url = eventInfoUrl(e);
       return `<li class="live-tutorial-row" data-event-id="${esc(e.id)}" data-event-type="tutorial">
         ${url ? `<a class="live-tutorial-title" href="${esc(url)}" target="_blank" rel="noopener">${content}</a>` : `<span class="live-tutorial-title">${content}</span>`}
@@ -383,7 +386,7 @@ function renderCompactLivePaperPanel(e) {
 
 
 function liveOngoingMeta(e) {
-  return `<div class="live-ongoing-meta"><strong>Ongoing</strong><span aria-hidden="true"> · </span><time datetime="${esc(e.startsAt)}">${fmtTime(e.startsAt)}</time><span aria-hidden="true">–</span><time datetime="${esc(e.endsAt)}">${(e.endTimeTBD ? 'TBD' : fmtTime(e.endsAt))}</time><span class="live-event-timezone">· ${esc(fmtUtcOffset(e.startsAt))}</span></div>`;
+  return `<div class="live-ongoing-meta"><strong>Ongoing</strong><span aria-hidden="true"> · </span><time datetime="${esc(e.startsAt)}">${fmtTime(e.startsAt)}</time><span aria-hidden="true">–</span><time datetime="${esc(e.endsAt)}">${(e.endTimeTBD ? 'TBD' : fmtTime(e.endsAt))}</time><span class="live-event-timezone">· ${esc(fmtUtcOffset(e.startsAt))}</span>${venueHtml(e)}</div>`;
 }
 
 function renderEventCard(e, opts = {}) {
@@ -633,7 +636,7 @@ function renderUpcomingCard(e) {
   const hasPapers = sessionHasPapers(e);
   return `<article class="timeline-item upcoming-completed-card${isPoster ? ' upcoming-poster-card' : ''}" data-event-id="${esc(e.id)}" data-event-type="${esc(e.type || 'event')}">
     <div class="timeline-status-row upcoming-card-time-row">
-      <div class="timeline-time upcoming-card-time"><span class="upcoming-clock-icon" aria-hidden="true"><svg viewBox="0 0 16 16" focusable="false"><circle cx="8" cy="8" r="5.75"></circle><path d="M8 4.75v3.6l2.45 1.45"></path></svg></span><time datetime="${esc(e.startsAt)}">${fmtTimelineTime(e.startsAt)}</time><span aria-hidden="true">–</span><time datetime="${esc(e.endsAt)}">${(e.endTimeTBD ? 'TBD' : fmtTimelineTime(e.endsAt))}</time><span class="upcoming-event-timezone">· ${esc(fmtUtcOffset(e.startsAt))}</span></div>
+      <div class="timeline-time upcoming-card-time"><span class="upcoming-clock-icon" aria-hidden="true"><svg viewBox="0 0 16 16" focusable="false"><circle cx="8" cy="8" r="5.75"></circle><path d="M8 4.75v3.6l2.45 1.45"></path></svg></span><time datetime="${esc(e.startsAt)}">${fmtTimelineTime(e.startsAt)}</time><span aria-hidden="true">–</span><time datetime="${esc(e.endsAt)}">${(e.endTimeTBD ? 'TBD' : fmtTimelineTime(e.endsAt))}</time><span class="upcoming-event-timezone">· ${esc(fmtUtcOffset(e.startsAt))}</span>${venueHtml(e)}</div>
     </div>
     <div class="upcoming-card-title-row">
       ${eventTitleHtml(e, 'card-title upcoming-card-title')}
