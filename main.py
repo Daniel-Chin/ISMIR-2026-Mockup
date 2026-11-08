@@ -182,8 +182,9 @@ def main(site_data_path: str, mockup: bool = False):
         for p in site_data[typ]:
             by_uid[typ][p["uid"]] = p
     for event in site_data.get("events", []):
-        if str(event.get("live_url", "")).strip():
-            event["join_url"] = str(event["live_url"]).strip()
+        live_url = str(event.get("live_url", "")).strip()
+        if live_url.upper() not in ("", "NA", "NAN"):
+            event["join_url"] = live_url
             event["zoom_url"] = build_zoom_redirect_url(
                 load_site_config(site_data_path)["miniconf_url"],
                 str(event["uid"]),
