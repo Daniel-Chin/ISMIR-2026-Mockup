@@ -51,6 +51,7 @@ calendar:
     Tutorials:      {bg: '#E5E8F7', border: '#5764B0'}
     Majlis:         {bg: '#F7E4D7', border: '#C06A3F'}
     Special:        {bg: '#EFE5F3', border: '#8A5A9C'}
+    Special_lecture: {bg: '#F7E8C4', border: '#B8862B'}
     Industry:       {bg: '#EFE5F3', border: '#8A5A9C'}
     WiMIR_Meetup:   {bg: '#F4E4EF', border: '#A2557F'}
     Social:         {bg: '#DFEDF7', border: '#3B7CB0'}

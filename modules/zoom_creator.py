@@ -16,7 +16,9 @@ class ZoomCreator:
 
     # Tutorials are created manually; the other skipped categories need no call.
     # The LBD session needs no Zoom: its live_url is NA, like Lunch.
-    SKIP_CATEGORIES = ("Tutorials", "Social", "Registration", "Majlis", "Lunch", "LBD")
+    # A Special lecture is hosted by someone else; its live_url is hand-entered and kept.
+    SKIP_CATEGORIES = ("Tutorials", "Social", "Registration", "Majlis", "Lunch", "LBD",
+                       "Special lecture")
 
     POSTER_SESSION_RE = re.compile(r"Poster Session - (\d+)")
 

@@ -87,7 +87,7 @@ slack_channel, channel_url, live_url, onsite_location, event_desc
 | `day` | 1–5; **every day 1–5 needs at least one row** or the site crashes (`main.py:group_by_days`) |
 | `start_date` | `YYYY-MM-DD` |
 | `start_time`, `end_time` | `H:MM`, 24 h, in the timezone configured in `sitedata/config.yml` |
-| `category` | fixed vocabulary: `Tutorials`, `Opening`, `All Meeting` (keynotes), `Poster session` (also orals), `LBD`, `Industry`, `Music`, `Meetup`, `VMeetup`, `WiMIR Meetup`, `Awards`, `Social`, `Lunch`, `Registration`, `Satellite`, `Performance`. Drives day-page section, calendar color, and calendar click-through link |
+| `category` | fixed vocabulary: `Tutorials`, `Opening`, `All Meeting` (keynotes), `Special lecture` (externally hosted; live_url hand-entered, never overwritten), `Poster session` (also orals), `LBD`, `Industry`, `Music`, `Meetup`, `VMeetup`, `WiMIR Meetup`, `Awards`, `Social`, `Lunch`, `Registration`, `Satellite`, `Performance`. Drives day-page section, calendar color, and calendar click-through link |
 | private — stripped before publish |
 | ⚙️ `channel_url`, `live_url` | Slack link / Zoom-YouTube stream link |
 | `onsite_location` | room shown on the event page; plain text, or a markdown link `[display](link)` |
