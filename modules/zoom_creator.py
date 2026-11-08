@@ -15,7 +15,8 @@ class ZoomCreator:
     """
 
     # Tutorials are created manually; the other skipped categories need no call.
-    SKIP_CATEGORIES = ("Tutorials", "Social", "Registration", "Majlis", "Lunch")
+    # The LBD session needs no Zoom: its live_url is NA, like Lunch.
+    SKIP_CATEGORIES = ("Tutorials", "Social", "Registration", "Majlis", "Lunch", "LBD")
 
     POSTER_SESSION_RE = re.compile(r"Poster Session - (\d+)")
 
@@ -48,7 +49,7 @@ class ZoomCreator:
         """Placeholder live_url for rows that get no Zoom link, else None."""
         if row["category"] == "Tutorials":
             return "Confidential"
-        if row["category"] in ("Lunch", "Registration", "Social"):
+        if row["category"] in ("Lunch", "Registration", "Social", "LBD"):
             return "NA"
         if row["category"] == "Majlis" and not self._isOnlineMajlis(row):
             return "NA"
