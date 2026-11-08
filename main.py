@@ -783,6 +783,7 @@ def event(slug):
     start = _event_start(v)
     data = _data()
     data["event"] = v
+    data["room"] = Markup(markdown_renderer.renderInline(v.get("onsite_location", "")))
     award_session = next(
         (s for s, uid in award_event_uids.items() if uid == event), None
     )

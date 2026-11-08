@@ -10,8 +10,9 @@
     <h3 class="card-subtitle mb-2 text-muted text-center">
       {{start_label}} – {{event.end_time}} ({{timezone_name}})
     </h3>
-    {% if event.onsite_location %}
-    <h4 class="text-muted text-center">Room: {{event.onsite_location}}</h4>
+    {% if room %}
+    <h4 class="text-muted text-center room">Room: {{room}}</h4>
+    <style>.room a { text-decoration: underline; }</style>
     {% endif %}
     <h4 id="event-countdown" class="text-muted text-center"
       data-start="{{start_utc}}"></h4>
