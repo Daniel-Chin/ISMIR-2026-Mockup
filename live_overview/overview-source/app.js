@@ -241,51 +241,18 @@ function dashboardStats(state) {
 
 
 /* ---- LLM attendance prompt ----
-   Chat AIs cannot run this page's scripts (fetching live.html gives an empty shell), so the copied
-   prompt carries everything itself as plain text: the time, what is on now with live headcounts,
-   what is next (abstracts for papers about to be presented), the whole schedule and every paper,
-   with Slack channels. Wording lives in llm-prompts.json; this only renders the data. */
-const PROMPT_UPCOMING_HOURS = 6;     // "Coming up": events starting within this many hours...
-const PROMPT_UPCOMING_MIN = 6;       // ...but at least this many events...
-const PROMPT_UPCOMING_MAX = 15;      // ...and at most this many.
-// Abstracts: for papers on now and in the next paper session only (all 140 would be ~45k tokens).
+   Chat AIs cannot run this page's scripts (fetching live.html gives an empty shell). The copied
+   prompt is short: the time, what is on now with the live numbers only this page has, the next
+   few events, and links to the plain-text programme the build publishes (scripts/llm_files.py),
+   which the AI opens when a question needs it. Wording lives in llm-prompts.json. */
+const PROMPT_UPCOMING = 6;   // "Coming up next": this many events
 
-/** One paper. "full": everything incl. abstract; "brief": ID and title only (details elsewhere). */
-function promptPaperLine(p, { mode = 'full', liveRoom = false } = {}) {
-  const id = p.displayId || p.id;
-  const lines = mode === 'brief'
-    ? [`- ${id} "${p.title}"`]
-    : [`- ${id} "${p.title}" — ${p.authors || 'authors TBA'} · ${presenterLabel(p.presenterMode)}`];
-  if (liveRoom) lines.push(`  Live: ${promptZoomCount(p.headcounts)} in this poster's Zoom room · ${speakerInfo(p).label}`);
-  if (mode === 'full') {
-    const topics = promptTopics(p);
-    if (topics) lines.push(`  Topics: ${topics}`);
-    const links = promptLinks([['Slack', p.links?.slack], ['Page', detailUrlFromPaper(p)]]);
-    if (links) lines.push(`  ${links}`);
-    if (p.abstract) lines.push(`  Abstract: ${promptText(p.abstract)}`);
-    if (p.funFact) lines.push(`  Fun fact: ${promptText(p.funFact)}`);
-  }
-  return lines.join('\n');
-}
-
-/** The all-papers list: one line each, no abstract. */
-function promptCatalogLine(p, slots) {
-  const topics = promptTopics(p);
-  return `- ${p.displayId || p.id} "${p.title}" — ${p.authors || 'authors TBA'} · ${presenterLabel(p.presenterMode)}`
-    + `${topics ? ` · Topics: ${topics}` : ''} · ${slots.join(', ')}${p.links?.slack ? ` · Slack: ${p.links.slack}` : ''}`;
-}
-
-function promptEventBlock(e, now, abstractsShown, wantAbstracts) {
-  const start = Date.parse(e.startsAt), end = Date.parse(e.endsAt);
-  const when = e.status === 'live'
-    ? (e.endTimeTBD ? 'LIVE now' : `LIVE now, ends in ${promptDuration(end - now)}`)
-    : `starts in ${promptDuration(start - now)}`;
-  const lines = [`### ${e.title} · ${e.category || e.type} · ${promptRange(e)} · ${when}`];
-  if (e.organiser) lines.push(`Organiser: ${e.organiser}`);
-  if (e.summary) lines.push(`Summary: ${String(e.summary).replace(/\s+/g, ' ').trim()}`);
-  const links = promptLinks([['Slack', e.links?.slack], ['Zoom', e.links?.zoom], ['Info', eventInfoUrl(e)]]);
+function promptLiveEvent(e, now) {
+  const end = Date.parse(e.endsAt);
+  const lines = [`### ${e.title} · ${e.category || e.type} · ${promptRange(e)} · ${e.endTimeTBD ? 'LIVE now' : `LIVE now, ends in ${promptDuration(end - now)}`}`];
+  const links = promptLinks([['Slack', e.links?.slack], ['Zoom', e.links?.zoom], ['Papers and abstracts', promptSessionFile(e)]]);
   if (links) lines.push(links);
-  if (e.status === 'live' && e.links?.zoom) {
+  if (e.links?.zoom) {
     let live = `Live: ${promptZoomCount(e.headcounts)} people on Zoom`;
     if (e.type === 'poster') {
       live += ` (main room ${e.headcounts?.available === false ? 'unknown' : Number(e.headcounts?.lobbyZoom || 0)})`;
@@ -293,70 +260,35 @@ function promptEventBlock(e, now, abstractsShown, wantAbstracts) {
     }
     lines.push(live);
   }
-  if (sessionHasPapers(e)) {
-    const keys = e.papers.map(p => p.sourcePaperId || p.id);
-    const full = wantAbstracts && keys.some(k => !abstractsShown.has(k));
-    lines.push(full ? 'Papers:' : 'Papers (details in the paper list or above):');
-    e.papers.forEach((p, i) => {
-      const mode = full && !abstractsShown.has(keys[i]) ? 'full' : 'brief';
-      if (mode === 'full') abstractsShown.add(keys[i]);
-      lines.push(promptPaperLine(p, { mode, liveRoom: e.status === 'live' && e.type === 'poster' }));
-    });
+  if (e.type === 'poster' && e.papers?.length) {
+    lines.push('Poster rooms right now:');
+    for (const p of e.papers) lines.push(`- ${p.displayId || p.id} "${p.title}" · ${promptZoomCount(p.headcounts)} in its Zoom room · ${speakerInfo(p).label}`);
+  } else if (e.papers?.length) {
+    lines.push(`Papers: ${e.papers.map(p => `${p.displayId || p.id} "${p.title}"`).join('; ')}`);
   }
   return lines.join('\n');
 }
 
+function promptUpcomingLine(e, now) {
+  const links = promptLinks([['Slack', e.links?.slack], ['Papers', promptSessionFile(e)]]);
+  return `- ${promptRange(e)} ${e.title} (${e.category || e.type}) · starts in ${promptDuration(Date.parse(e.startsAt) - now)}${links ? ` · ${links}` : ''}`;
+}
+
 function buildPromptContext(display) {
   const now = conferenceNow(display);
-  const userTz = displayTimeZone();
   const events = (display.events || []).slice().sort(byStart);
   const live = events.filter(e => e.status === 'live');
-  const upcomingAll = events.filter(e => e.status === 'upcoming');
-  const soon = upcomingAll.filter(e => Date.parse(e.startsAt) - now <= PROMPT_UPCOMING_HOURS * 3600000);
-  const upcoming = upcomingAll.slice(0, Math.min(PROMPT_UPCOMING_MAX, Math.max(PROMPT_UPCOMING_MIN, soon.length)));
-  const nextPaperEvent = upcomingAll.find(sessionHasPapers);
-  const out = [];
-
-  out.push(...promptHeader(display, now));
+  const upcoming = events.filter(e => e.status === 'upcoming').slice(0, PROMPT_UPCOMING);
+  const out = [...promptHeader(display, now)];
   if (!display.offline && live.length) {
     const stats = dashboardStats(display);
     out.push(`At a glance: live events: ${stats.liveEvents[1]} · people on Zoom across live events: ${stats.zoomAttendees[1]} · ${stats.activeConversations[2]}.`);
   }
-  out.push(...promptUsefulLinks(), '');
-
-  // Now and next, in detail. Each paper's abstract is given once (oral N and poster N share papers).
-  const abstractsShown = new Set();
-  const wantAbstracts = e => e.status === 'live' || e === nextPaperEvent;
-  out.push('## Happening now');
-  out.push(live.length ? live.map(e => promptEventBlock(e, now, abstractsShown, wantAbstracts(e))).join('\n\n') : 'Nothing is live right now.');
-  out.push('', '## Coming up next');
-  out.push(upcoming.length ? upcoming.map(e => promptEventBlock(e, now, abstractsShown, wantAbstracts(e))).join('\n\n') : 'Nothing else is scheduled.');
-
-  // The whole programme, one line per event.
-  out.push('', `## Full schedule (times in ${userTz})`);
-  let day = '';
-  for (const e of events) {
-    const d = promptDay(Date.parse(e.startsAt));
-    if (d !== day) { out.push(`### ${d}`); day = d; }
-    const status = e.status === 'live' ? 'LIVE' : e.status === 'history' ? 'done' : 'upcoming';
-    out.push(`- ${promptHM(Date.parse(e.startsAt))}–${e.endTimeTBD ? 'TBD' : promptHM(Date.parse(e.endsAt))} ${e.title} (${e.category || e.type}, ${status})${e.links?.slack ? ` · Slack: ${e.links.slack}` : ''}`);
-  }
-
-  // Every paper once, with when it is presented.
-  const papers = new Map();
-  for (const e of events) {
-    for (const p of e.papers || []) {
-      const key = p.sourcePaperId || p.id;
-      if (!papers.has(key)) papers.set(key, { paper: p, slots: [] });
-      const slots = papers.get(key).slots, start = Date.parse(e.startsAt);
-      const sameDay = slots.length && slots.at(-1).day === promptDay(start);
-      slots.push({ day: promptDay(start), text: `${e.title} ${sameDay ? promptHM(start) : promptDateTime(start)}` });
-    }
-  }
-  if (papers.size) {
-    out.push('', `## All papers (${papers.size}); abstracts above only for papers on now or next`);
-    for (const { paper, slots } of papers.values()) out.push(promptCatalogLine(paper, slots.map(x => x.text)));
-  }
+  out.push(...promptReferenceLinks());
+  out.push('', '## Happening now');
+  out.push(live.length ? live.map(e => promptLiveEvent(e, now)).join('\n\n') : 'Nothing is live right now.');
+  out.push('', `## Coming up next (the next ${PROMPT_UPCOMING}; the full schedule is in index.txt)`);
+  out.push(upcoming.length ? upcoming.map(e => promptUpcomingLine(e, now)).join('\n') : 'Nothing else is scheduled.');
   return out.join('\n');
 }
 

@@ -174,16 +174,19 @@ function promptZoomCount(h) {
   return `${h?.partial ? '≥' : ''}${Number(h?.zoom || 0)}`;
 }
 
-function promptTopics(p) {
-  const leaves = (p.subjects || []).map(s => String(s).split('->').pop().trim()).filter(Boolean);
-  return [...new Set(leaves)].join('; ');
-}
-
 function promptLinks(pairs) {
   return pairs.filter(([, url]) => url).map(([label, url]) => `${label}: ${url}`).join(' · ');
 }
 
-const promptText = s => String(s || '').replace(/\s+/g, ' ').trim();
+/** The plain-text programme the build publishes for chat AIs (scripts/llm_files.py). */
+function promptFileUrl(name) {
+  return `${window.ISMIRSite?.programSite || ''}/live_overview/llm/${name}`;
+}
+
+/** A paper event's file: oral N and poster N share session-N.txt. */
+function promptSessionFile(e) {
+  return e?.papers?.length && e.sessionNumber != null ? promptFileUrl(`session-${e.sessionNumber}.txt`) : '';
+}
 
 /** Time, conference phase and time zones, as of `now`. */
 function promptHeader(display, now) {
@@ -206,19 +209,12 @@ function promptHeader(display, now) {
   return out;
 }
 
-function promptUsefulLinks() {
-  const conf = window.ISMIRSite?.conference || {};
-  const site = window.ISMIRSite?.programSite || '';
-  const out = ['', '## Useful links'];
-  for (const [label, url] of [
-    ['Live overview (now and next)', site && site + '/live.html'],
-    ['History page (completed events)', site && site + '/live_overview/history.html'],
-    ['Program site (papers, schedule, posters)', site && site + '/'],
-    ['Warm-up discussion board', site && site + '/lounge.html'],
-    ['Helpdesk Slack channel', conf.helpdeskUrl],
-    ['Official conference website', conf.officialSiteUrl],
-  ]) if (url) out.push(`- ${label}: ${url}`);
-  return out;
+function promptReferenceLinks() {
+  const tz = window.ISMIRSite?.timeZone || 'the conference time zone';
+  return ['', `## Reference files (plain text; times there are conference local time, ${tz})`,
+    `- Guide, links (helpdesk, program site) and full schedule with Slack channels: ${promptFileUrl('index.txt')}`,
+    `- All papers, one line each (title, authors, topics, session): ${promptFileUrl('papers.txt')}`,
+    `- Paper session N with every abstract, Slack channel and paper page: ${promptFileUrl('session-N.txt')} (N = 1, 2, …)`];
 }
 
 /** "Copy prompt" buttons: build the prompt (llm-prompts.json, prompt-config.js), copy it, report. */

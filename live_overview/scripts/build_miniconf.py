@@ -6,6 +6,7 @@ Owned outputs (see integration.md):
   build/live-debug.html   the same page for testing (debug_page): features under test and the
                     organisers' test clock apply there only. Not linked from anywhere.
   build/live_overview/     assets, config and the frozen schedule snapshot
+  build/live_overview/llm/ the plain-text programme the copied LLM prompts link to (llm_files.py)
 Nothing else under build/ is written or removed.
 """
 import argparse
@@ -26,6 +27,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from site_files import ASSETS, asset_source, content_version, snapshot  # noqa: E402
 import update_schedule  # noqa: E402
+import llm_files  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 REPO = ROOT.parent
@@ -168,6 +170,10 @@ def write_site(out, api_origin, conf, schedule):
                 (stage / DEBUG_PAGE).write_text(debug_page(page), encoding='utf-8')
             else:
                 (assets / name).write_text(render_page(text, './', '../' + PAGE, version) if name.endswith('.html') else text, encoding='utf-8')
+        # The plain-text programme the copied LLM prompts link to (llm_files.py).
+        (assets / llm_files.DIR).mkdir()
+        for name, text in llm_files.build(schedule, conf).items():
+            (assets / llm_files.DIR / name).write_text(text, encoding='utf-8')
 
         (out / PAGE).unlink(missing_ok=True)
         (out / DEBUG_PAGE).unlink(missing_ok=True)
