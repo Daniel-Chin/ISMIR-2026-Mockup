@@ -169,7 +169,7 @@ function buildHistoryPromptContext(display) {
   }
 
   out.push('', `## Still to come (the next ${HISTORY_PROMPT_LEFT}; the full schedule is in index.txt)`);
-  out.push(left.length ? left.slice(0, HISTORY_PROMPT_LEFT).map(e => `- ${promptRange(e)} ${e.title} (${e.category || e.type})${e.status === 'live' ? ' · LIVE now' : ''}`).join('\n') : 'Nothing; the conference is over.');
+  out.push(left.length ? left.slice(0, HISTORY_PROMPT_LEFT).map(e => `- ${promptRange(e)} ${e.title} (${e.category || e.type})${eventVenue(e) ? ` · Room: ${eventVenue(e)}` : ''}${e.status === 'live' ? ' · LIVE now' : ''}`).join('\n') : 'Nothing; the conference is over.');
   return out.join('\n');
 }
 

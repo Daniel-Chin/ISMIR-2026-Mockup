@@ -26,7 +26,7 @@ SCHEDULE = {'conference': {'timeZone': 'Asia/Dubai'}, 'events': [
     event(1, 'oral', '10:00', '10:30', sessionNumber=1, links={'zoom': 'https://zoom.us/j/1?pwd=secret', 'slack': 'https://slack.example/o1', 'youtube': 'Confidential'},
           papers=[paper('7', 1, 1, funFact='NA'), paper('9', 1, 2)]),
     event(2, 'poster', '10:30', '11:30', sessionNumber=1, links={'zoom': 'https://zoom.us/j/2'}, papers=[paper('7', 1, 1), paper('9', 1, 2)]),
-    event(3, 'keynote', '12:00', '13:00', links={'youtube': 'https://youtube.example/live'}, summary='  A   talk. '),
+    event(3, 'keynote', '12:00', '13:00', links={'youtube': 'https://youtube.example/live'}, summary='  A   talk. ', venue='A6-008'),
     event(4, 'special', '13:00', '14:00', debugOnly=True),
 ]}
 
@@ -54,7 +54,8 @@ class LlmFilesTest(unittest.TestCase):
     def test_content(self):
         index, papers, session = self.files['index.txt'], self.files['papers.txt'], self.files['session-1.txt']
         self.assertIn('Asia/Dubai (UTC+04:00)', index)
-        self.assertIn('- 12:00–13:00 keynote 3 (keynote) · A talk.', index)
+        self.assertIn('- 12:00–13:00 keynote 3 (keynote) · Room: A6-008 · A talk.', index)
+        self.assertIn('- 10:00–10:30 oral 1 (oral) · Slack', index)   # no room, no Room field
         self.assertNotIn('special 4', index)   # debug-only events stay off
         self.assertEqual(papers.count('P1-01'), 1)   # oral and poster share papers
         self.assertIn('P1-01 "Paper 7" — A; B · leaf one; Topic', papers)

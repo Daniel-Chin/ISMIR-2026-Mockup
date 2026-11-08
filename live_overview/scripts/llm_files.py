@@ -61,6 +61,11 @@ def _zoom_page(conf, event):
     return f"{conf['miniconf_url']}/zoom.html?event_uid={uid}"
 
 
+def _room(event):
+    room = _text(event.get('venue'))
+    return f' · Room: {room}' if room else ''
+
+
 def _event_links(conf, event):
     links = event.get('links') or {}
     return _links([('Slack', links.get('slack')), ('Zoom', _zoom_page(conf, event)),
@@ -105,6 +110,7 @@ def build(schedule, conf):
            f"- Paper IDs like P3-07 mean paper session 3, paper 7. Abstracts of session N, with each paper's Slack channel and page: {base}session-N.txt",
            '- Every session and every paper has its own Slack channel in the conference Slack workspace, for questions and discussion with the authors, also after the session.',
            '- "Zoom" links go to the program site, which sends signed-in attendees to the meeting.',
+           '- "Room" is where an event takes place on-site (NYU Abu Dhabi campus); events without one have no on-site room listed.',
            '',
            '## Links',
            f"- Live overview (now and next): {conf['miniconf_url']}/live.html",
@@ -121,7 +127,7 @@ def build(schedule, conf):
             day = _day(e['startsAt'])
             out.append(f'### {day}')
         end = 'TBD' if e.get('endTimeTBD') else _hm(e['endsAt'])
-        line = f"- {_hm(e['startsAt'])}–{end} {e['title']} ({e.get('category') or e.get('type')})"
+        line = f"- {_hm(e['startsAt'])}–{end} {e['title']} ({e.get('category') or e.get('type')})" + _room(e)
         extra = [_text(e.get('organiser')) and f"organiser: {_text(e['organiser'])}", _text(e.get('summary'))]
         line += ''.join(f' · {x}' for x in extra if x)
         links = _event_links(conf, e)
@@ -144,7 +150,7 @@ def build(schedule, conf):
         for e in evs:
             end = 'TBD' if e.get('endTimeTBD') else _hm(e['endsAt'])
             links = _event_links(conf, e)
-            out.append(f"- {e['title']}: {_day(e['startsAt'])} {_hm(e['startsAt'])}–{end}" + (f' · {links}' if links else ''))
+            out.append(f"- {e['title']}: {_day(e['startsAt'])} {_hm(e['startsAt'])}–{end}" + _room(e) + (f' · {links}' if links else ''))
         for p in papers.values():
             links = p.get('links') or {}
             out += ['', f"## {p.get('displayId') or p['id']} {_text(p['title'])}",
